@@ -10,7 +10,7 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
@@ -42,7 +42,7 @@ export function Layout() {
         </div>
 
         <TopBar />
-        <main className="hide-scrollbar flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="hide-scrollbar flex-1 overflow-hidden p-4 md:p-6">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
