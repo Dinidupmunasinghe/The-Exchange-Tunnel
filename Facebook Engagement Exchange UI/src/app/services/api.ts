@@ -129,8 +129,8 @@ async function authRequest<T>(path: string, options: RequestInit = {}): Promise<
   return request<T>(path, options);
 }
 
-export async function loginWithFacebook(accessToken: string) {
-  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/facebook", {
+export async function loginWithSoundCloud(accessToken: string) {
+  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/soundcloud", {
     method: "POST",
     body: JSON.stringify({ accessToken }),
   });
@@ -138,26 +138,48 @@ export async function loginWithFacebook(accessToken: string) {
   return data;
 }
 
-/** Preferred when Facebook uses `response_type=code` (implicit token-in-URL is often disabled). */
-export async function loginWithFacebookCode(code: string, redirectUri: string) {
-  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/facebook", {
+/** Preferred when OAuth uses `response_type=code`. Send `codeVerifier` for SoundCloud OAuth 2.1 (PKCE). */
+export async function loginWithSoundCloudCode(
+  code: string,
+  redirectUri: string,
+  codeVerifier?: string | null
+) {
+  const body: Record<string, string> = { code, redirectUri };
+  if (codeVerifier) body.codeVerifier = codeVerifier;
+  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/soundcloud", {
     method: "POST",
-    body: JSON.stringify({ code, redirectUri }),
+    body: JSON.stringify(body),
   });
   setToken(data.token);
   return data;
 }
 
+/** @deprecated Use loginWithSoundCloud */
+export const loginWithFacebook = loginWithSoundCloud;
+/** @deprecated Use loginWithSoundCloudCode */
+export const loginWithFacebookCode = loginWithSoundCloudCode;
+
 export const api = {
   getProfile: () => authRequest("/users/me") as Promise<{ user: any }>,
   getDashboard: () => authRequest("/users/dashboard") as Promise<{ stats: any }>,
+  connectSoundCloud: (payload: {
+    accessToken?: string;
+    code?: string;
+    redirectUri?: string;
+    codeVerifier?: string | null;
+  }) =>
+    authRequest("/soundcloud/connect", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  /** @deprecated Use connectSoundCloud */
   connectFacebook: (payload: { accessToken?: string; code?: string; redirectUri?: string }) =>
-    authRequest("/facebook/connect", {
+    authRequest("/soundcloud/connect", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
   getManagedPages: () =>
-    authRequest("/facebook/pages") as Promise<{
+    authRequest("/soundcloud/pages") as Promise<{
       pages: {
         id: string;
         name: string;
@@ -169,7 +191,7 @@ export const api = {
       selectedPageId: string | null;
     }>,
   selectManagedPage: (pageId: string) =>
-    authRequest("/facebook/pages/select", {
+    authRequest("/soundcloud/pages/select", {
       method: "POST",
       body: JSON.stringify({ pageId }),
     }) as Promise<{
@@ -183,11 +205,11 @@ export const api = {
       };
     }>,
   clearSelectedManagedPage: () =>
-    authRequest("/facebook/pages/select", {
+    authRequest("/soundcloud/pages/select", {
       method: "DELETE",
     }) as Promise<{ message: string }>,
   getSelectedPagePosts: () =>
-    authRequest("/facebook/posts") as Promise<{
+    authRequest("/soundcloud/posts") as Promise<{
       page: { id: string; name: string | null };
       posts: {
         id: string;
@@ -210,8 +232,8 @@ export const api = {
     }),
   createCampaign: (payload: {
     name?: string;
-    facebookPostId?: string;
-    facebookPostUrl: string;
+    soundcloudPostId?: string;
+    soundcloudPostUrl: string;
     engagementType:
       | "like"
       | "comment"
@@ -249,8 +271,16 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getTransactions: () => authRequest("/transactions") as Promise<{ transactions: any[] }>,
+  getSoundCloudPostPreview: (url: string) =>
+    authRequest(`/soundcloud/post-preview?${new URLSearchParams({ url }).toString()}`) as Promise<{
+      imageUrl: string | null;
+      title: string | null;
+      description: string | null;
+      isVideo?: boolean;
+    }>,
+  /** @deprecated Use getSoundCloudPostPreview */
   getFacebookPostPreview: (url: string) =>
-    authRequest(`/facebook/post-preview?${new URLSearchParams({ url }).toString()}`) as Promise<{
+    authRequest(`/soundcloud/post-preview?${new URLSearchParams({ url }).toString()}`) as Promise<{
       imageUrl: string | null;
       title: string | null;
       description: string | null;

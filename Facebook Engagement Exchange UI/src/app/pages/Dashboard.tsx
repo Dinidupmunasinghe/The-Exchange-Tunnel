@@ -25,7 +25,7 @@ const creditsData = [
 ];
 
 const recentActivity = [
-  { action: "Earned 10 credits", post: "Facebook Marketing Tips 2024", time: "2 min ago", type: "like" },
+  { action: "Earned 10 credits", post: "SoundCloud Promotion Tips 2024", time: "2 min ago", type: "like" },
   { action: "Campaign started", post: "Product Launch Announcement", time: "15 min ago", type: "campaign" },
   { action: "Earned 15 credits", post: "Social Media Strategy Guide", time: "1 hour ago", type: "comment" },
   { action: "Earned 20 credits", post: "Growth Hacking Techniques", time: "2 hours ago", type: "share" },

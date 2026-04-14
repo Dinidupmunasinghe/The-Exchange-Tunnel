@@ -9,7 +9,7 @@ const env = {
   db: {
     host: process.env.DB_HOST || "localhost",
     port: Number(process.env.DB_PORT || 3306),
-    name: process.env.DB_NAME || "facebook_exchange",
+    name: process.env.DB_NAME || "soundcloud_exchange",
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || ""
   },
@@ -27,6 +27,14 @@ const env = {
     pagesAppId: process.env.META_PAGES_APP_ID || process.env.META_APP_ID || "",
     pagesAppSecret: process.env.META_PAGES_APP_SECRET || process.env.META_APP_SECRET || "",
     graphApiBase: process.env.META_GRAPH_API_BASE || "https://graph.facebook.com/v22.0"
+  },
+  /** SoundCloud OAuth 2.1 + api.soundcloud.com (PKCE on the client). */
+  soundcloud: {
+    clientId: process.env.SOUNDCLOUD_CLIENT_ID || "",
+    clientSecret: process.env.SOUNDCLOUD_CLIENT_SECRET || "",
+    authorizeUrl: process.env.SOUNDCLOUD_AUTHORIZE_URL || "https://secure.soundcloud.com/authorize",
+    tokenUrl: process.env.SOUNDCLOUD_TOKEN_URL || "https://secure.soundcloud.com/oauth/token",
+    apiBase: process.env.SOUNDCLOUD_API_BASE || "https://api.soundcloud.com"
   },
   limits: {
     dailyEarnLimit: Number(process.env.DAILY_EARN_LIMIT || 500),

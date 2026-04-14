@@ -8,11 +8,25 @@ module.exports = (sequelize, DataTypes) => {
       email: { type: DataTypes.STRING(120), allowNull: false, unique: true },
       passwordHash: { type: DataTypes.STRING(255), allowNull: false },
       name: { type: DataTypes.STRING(120), allowNull: true },
-      facebookUserId: { type: DataTypes.STRING(80), allowNull: true },
-      facebookAccessTokenEncrypted: { type: DataTypes.TEXT, allowNull: true },
-      facebookPageId: { type: DataTypes.STRING(80), allowNull: true },
-      facebookPageName: { type: DataTypes.STRING(160), allowNull: true },
-      facebookPageAccessTokenEncrypted: { type: DataTypes.TEXT, allowNull: true },
+      /** OAuth subject id (stored in legacy `facebookUserId` column). */
+      soundcloudUserId: { type: DataTypes.STRING(80), allowNull: true, field: "facebookUserId" },
+      soundcloudAccessTokenEncrypted: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: "facebookAccessTokenEncrypted"
+      },
+      /** Acting account for automated actions (legacy Meta "Page" id column). */
+      soundcloudActingAccountId: { type: DataTypes.STRING(80), allowNull: true, field: "facebookPageId" },
+      soundcloudActingAccountName: {
+        type: DataTypes.STRING(160),
+        allowNull: true,
+        field: "facebookPageName"
+      },
+      soundcloudActingAccountTokenEncrypted: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: "facebookPageAccessTokenEncrypted"
+      },
       credits: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
       dailyEarnedCredits: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
       dailyEarnedAt: { type: DataTypes.DATEONLY, allowNull: true },
@@ -24,21 +38,28 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  User.prototype.setFacebookToken = function setFacebookToken(accessToken) {
-    this.facebookAccessTokenEncrypted = encrypt(accessToken);
+  User.prototype.setSoundCloudToken = function setSoundCloudToken(accessToken) {
+    this.soundcloudAccessTokenEncrypted = encrypt(accessToken);
   };
 
-  User.prototype.setFacebookPageToken = function setFacebookPageToken(page) {
-    this.facebookPageId = page.id;
-    this.facebookPageName = page.name;
-    this.facebookPageAccessTokenEncrypted = encrypt(page.accessToken);
+  User.prototype.setSoundCloudActingAccountToken = function setSoundCloudActingAccountToken(page) {
+    this.soundcloudActingAccountId = page.id;
+    this.soundcloudActingAccountName = page.name;
+    this.soundcloudActingAccountTokenEncrypted = encrypt(page.accessToken);
   };
 
-  User.prototype.clearFacebookPage = function clearFacebookPage() {
-    this.facebookPageId = null;
-    this.facebookPageName = null;
-    this.facebookPageAccessTokenEncrypted = null;
+  User.prototype.clearSoundCloudActingAccount = function clearSoundCloudActingAccount() {
+    this.soundcloudActingAccountId = null;
+    this.soundcloudActingAccountName = null;
+    this.soundcloudActingAccountTokenEncrypted = null;
   };
+
+  /** @deprecated Use setSoundCloudToken */
+  User.prototype.setFacebookToken = User.prototype.setSoundCloudToken;
+  /** @deprecated Use setSoundCloudActingAccountToken */
+  User.prototype.setFacebookPageToken = User.prototype.setSoundCloudActingAccountToken;
+  /** @deprecated Use clearSoundCloudActingAccount */
+  User.prototype.clearFacebookPage = User.prototype.clearSoundCloudActingAccount;
 
   return User;
 };

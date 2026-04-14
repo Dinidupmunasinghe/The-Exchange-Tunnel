@@ -3,23 +3,27 @@ export function PrivacyPolicy() {
     <div className="h-screen overflow-y-auto bg-background text-foreground">
       <div className="mx-auto max-w-4xl px-4 py-10 md:px-6">
         <h1 className="text-3xl font-bold">Exchange Tunnel Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: April 8, 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: April 14, 2026</p>
 
         <div className="mt-8 space-y-6 text-sm leading-6 text-muted-foreground">
           <section>
             <h2 className="text-lg font-semibold text-foreground">1. What we collect</h2>
             <p>
               We collect account and platform data required to run Exchange Tunnel, including your name, email,
-              connected Facebook account ID, selected Facebook Page ID, campaign/task activity, credits, and related
-              timestamps.
+              SoundCloud user identifier, selected automation account (the SoundCloud profile used for actions),
+              campaign and task activity, credits, and related timestamps.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-foreground">2. Facebook data usage</h2>
+            <h2 className="text-lg font-semibold text-foreground">2. SoundCloud and OAuth data</h2>
             <p>
-              We use Facebook data only to support requested features such as login, Page connection, post selection,
-              and engagement verification. We do not sell Facebook data and we do not request unnecessary permissions.
+              Sign-in uses SoundCloud OAuth 2.1 with PKCE: your browser generates a one-time secret (code verifier)
+              that is not stored on our servers until you complete login. We exchange the authorization code for an
+              access token on the backend using your app&apos;s client secret. Tokens are used only to authenticate you,
+              list your tracks where the product needs them, and perform the engagements you explicitly start (for
+              example likes, comments, or reposts on SoundCloud URLs you interact with in the app). We do not sell this
+              data and we request only what is needed for those features.
             </p>
           </section>
 
@@ -27,7 +31,8 @@ export function PrivacyPolicy() {
             <h2 className="text-lg font-semibold text-foreground">3. How we use your data</h2>
             <p>
               Data is used to authenticate users, run campaigns, track credits, prevent abuse, support operations, and
-              comply with legal obligations. Access tokens are stored in encrypted form on the backend.
+              comply with legal obligations. SoundCloud access tokens and acting-account tokens are stored in encrypted
+              form on the backend.
             </p>
           </section>
 

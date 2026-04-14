@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { CheckCircle2, Facebook, Loader2 } from "lucide-react";
+import { CheckCircle2, Cloud, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { api } from "../services/api";
 import { toast } from "sonner";
+import { buildSoundCloudAuthorizeUrl } from "../lib/soundcloudPkce";
 
 const FB_GRAPH_VERSION = "v22.0";
 const PAGE_CONNECT_SCOPES = [
@@ -19,9 +20,9 @@ const PAGE_CONNECT_SCOPES = [
 const SETTINGS_ROUTE_PATH = "/settings";
 
 type Profile = {
-  facebookUserId?: string;
-  facebookPageId?: string | null;
-  facebookPageName?: string | null;
+  soundcloudUserId?: string;
+  soundcloudActingAccountId?: string | null;
+  soundcloudActingAccountName?: string | null;
   email?: string;
   name?: string;
 };
@@ -38,6 +39,7 @@ type ManagedPage = {
 function buildFacebookPagesOAuthUrl(appId: string): string {
   const redirectUri = `${window.location.origin}${SETTINGS_ROUTE_PATH}`;
   const state = crypto.randomUUID();
+  sessionStorage.setItem("settings_oauth_provider", "facebook");
   sessionStorage.setItem("fb_pages_oauth_state", state);
 
   const params = new URLSearchParams({
@@ -51,9 +53,14 @@ function buildFacebookPagesOAuthUrl(appId: string): string {
   return `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
 }
 
+const SC_SETTINGS_STATE_KEY = "sc_oauth_state_settings";
+const SC_SETTINGS_VERIFIER_KEY = "sc_pkce_verifier_settings";
+
 export function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const appId = import.meta.env.VITE_META_PAGES_APP_ID || import.meta.env.VITE_META_APP_ID || "";
+  const soundcloudClientId = (import.meta.env.VITE_SOUNDCLOUD_CLIENT_ID || "").trim();
+  const metaPagesAppId = import.meta.env.VITE_META_PAGES_APP_ID || import.meta.env.VITE_META_APP_ID || "";
+  const canConnectAccounts = Boolean(soundcloudClientId || metaPagesAppId);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pages, setPages] = useState<ManagedPage[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -94,16 +101,16 @@ export function Settings() {
   }, [refreshProfile]);
 
   useEffect(() => {
-    if (profile?.facebookUserId) {
+    if (profile?.soundcloudUserId) {
       void refreshPages();
     }
-  }, [profile?.facebookUserId, refreshPages]);
+  }, [profile?.soundcloudUserId, refreshPages]);
 
   useEffect(() => {
     const error = searchParams.get("error");
     const errorDesc = searchParams.get("error_description");
     if (error || searchParams.get("error_code")) {
-      toast.error(errorDesc?.replace(/\+/g, " ") || error || "Facebook page connection failed");
+      toast.error(errorDesc?.replace(/\+/g, " ") || error || "SoundCloud account connection failed");
       setSearchParams({}, { replace: true });
       return;
     }
@@ -112,25 +119,67 @@ export function Settings() {
     const returnedState = searchParams.get("state");
     if (!code) return;
 
+    const useSoundCloudPkce =
+      sessionStorage.getItem("settings_oauth_provider") === "soundcloud" ||
+      Boolean(sessionStorage.getItem(SC_SETTINGS_VERIFIER_KEY));
+
+    if (useSoundCloudPkce) {
+      const savedState = sessionStorage.getItem(SC_SETTINGS_STATE_KEY);
+      if (savedState && returnedState && savedState !== returnedState) {
+        toast.error("SoundCloud account connection expired. Please try again.");
+        sessionStorage.removeItem(SC_SETTINGS_STATE_KEY);
+        sessionStorage.removeItem(SC_SETTINGS_VERIFIER_KEY);
+        sessionStorage.removeItem("settings_oauth_provider");
+        setSearchParams({}, { replace: true });
+        return;
+      }
+      const codeVerifier = sessionStorage.getItem(SC_SETTINGS_VERIFIER_KEY);
+      sessionStorage.removeItem(SC_SETTINGS_STATE_KEY);
+      sessionStorage.removeItem(SC_SETTINGS_VERIFIER_KEY);
+      sessionStorage.removeItem("settings_oauth_provider");
+      setConnectingPages(true);
+      const redirectUri = `${window.location.origin}${SETTINGS_ROUTE_PATH}`;
+      void api
+        .connectSoundCloud({
+          code,
+          redirectUri,
+          ...(codeVerifier ? { codeVerifier } : {}),
+        })
+        .then(async () => {
+          toast.success("SoundCloud account connected");
+          await Promise.all([refreshProfile(), refreshPages()]);
+        })
+        .catch((e: unknown) => {
+          toast.error(e instanceof Error ? e.message : "Could not connect SoundCloud accounts");
+        })
+        .finally(() => {
+          setConnectingPages(false);
+          setSearchParams({}, { replace: true });
+        });
+      return;
+    }
+
     const savedState = sessionStorage.getItem("fb_pages_oauth_state");
     if (savedState && returnedState && savedState !== returnedState) {
-      toast.error("Facebook page connection expired. Please try again.");
+      toast.error("SoundCloud account connection expired. Please try again.");
       sessionStorage.removeItem("fb_pages_oauth_state");
+      sessionStorage.removeItem("settings_oauth_provider");
       setSearchParams({}, { replace: true });
       return;
     }
 
     sessionStorage.removeItem("fb_pages_oauth_state");
+    sessionStorage.removeItem("settings_oauth_provider");
     setConnectingPages(true);
     const redirectUri = `${window.location.origin}${SETTINGS_ROUTE_PATH}`;
     void api
-      .connectFacebook({ code, redirectUri })
+      .connectSoundCloud({ code, redirectUri })
       .then(async () => {
-        toast.success("Facebook account connected for Page access");
+        toast.success("SoundCloud account connected");
         await Promise.all([refreshProfile(), refreshPages()]);
       })
       .catch((e: unknown) => {
-        toast.error(e instanceof Error ? e.message : "Could not connect Facebook Pages");
+        toast.error(e instanceof Error ? e.message : "Could not connect SoundCloud accounts");
       })
       .finally(() => {
         setConnectingPages(false);
@@ -139,33 +188,52 @@ export function Settings() {
   }, [refreshPages, refreshProfile, searchParams, setSearchParams]);
 
   const selectedPage = useMemo(
-    () => pages.find((page) => page.id === profile?.facebookPageId) ?? null,
-    [pages, profile?.facebookPageId]
+    () => pages.find((page) => page.id === profile?.soundcloudActingAccountId) ?? null,
+    [pages, profile?.soundcloudActingAccountId]
   );
-  const hasPlaceholderEmail = Boolean(profile?.email && profile.email.endsWith("@users.facebook.exchange"));
+  const hasPlaceholderEmail = Boolean(
+    profile?.email &&
+      (profile.email.endsWith("@users.facebook.exchange") || profile.email.endsWith("@users.soundcloud.exchange"))
+  );
   const displayEmail = loadingProfile
     ? "Loading..."
     : hasPlaceholderEmail
-      ? "Not shared by Facebook"
+      ? "Not shared by provider"
       : profile?.email || "Not available";
   const displayName = loadingProfile ? "Loading..." : profile?.name || "Not available";
   const connectionStatus = loadingProfile
     ? "Checking..."
-    : profile?.facebookUserId
+    : profile?.soundcloudUserId
       ? "Connected"
       : "Not connected";
 
-  function handleConnectPages() {
-    if (!appId) {
-      toast.error("Add VITE_META_PAGES_APP_ID to the frontend .env, then restart Vite.");
+  async function handleConnectPages() {
+    if (!canConnectAccounts) {
+      toast.error(
+        "Add VITE_SOUNDCLOUD_CLIENT_ID (recommended) or VITE_META_PAGES_APP_ID to the frontend .env, then restart Vite."
+      );
       return;
     }
     try {
       setConnectingPages(true);
-      window.location.assign(buildFacebookPagesOAuthUrl(appId));
+      if (soundcloudClientId) {
+        const url = await buildSoundCloudAuthorizeUrl({
+          clientId: soundcloudClientId,
+          redirectPath: SETTINGS_ROUTE_PATH,
+          authorizeBaseUrl: import.meta.env.VITE_SOUNDCLOUD_AUTHORIZE_URL,
+          session: {
+            providerKey: "settings_oauth_provider",
+            stateKey: SC_SETTINGS_STATE_KEY,
+            verifierKey: SC_SETTINGS_VERIFIER_KEY,
+          },
+        });
+        window.location.assign(url);
+        return;
+      }
+      window.location.assign(buildFacebookPagesOAuthUrl(metaPagesAppId));
     } catch (e: unknown) {
       setConnectingPages(false);
-      toast.error(e instanceof Error ? e.message : "Could not start Facebook Page connection");
+      toast.error(e instanceof Error ? e.message : "Could not start SoundCloud account connection");
     }
   }
 
@@ -173,7 +241,7 @@ export function Settings() {
     setSelectingPageId(pageId);
     try {
       const res = await api.selectManagedPage(pageId);
-      toast.success(res.page.name ? `Selected ${res.page.name}` : "Facebook Page selected");
+      toast.success(res.page.name ? `Selected ${res.page.name}` : "SoundCloud account selected");
       await Promise.all([refreshProfile(), refreshPages()]);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not save selected Page");
@@ -200,14 +268,14 @@ export function Settings() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
         <p className="mt-1 text-muted-foreground">
-          Connect Facebook, pick a managed Page, and use that Page for actions.
+          Connect SoundCloud, pick a managed account, and use it for actions.
         </p>
       </div>
 
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-foreground">Account</CardTitle>
-          <CardDescription>Current signed-in Facebook user and selected automation Page.</CardDescription>
+          <CardDescription>Current signed-in SoundCloud user and selected automation account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
@@ -220,9 +288,9 @@ export function Settings() {
               <p className="mt-1 text-sm text-foreground">{displayEmail}</p>
             </div>
             <div className="rounded-md border border-border bg-secondary/20 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Facebook</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">SoundCloud</p>
               <div className="mt-1">
-                <Badge variant={profile?.facebookUserId ? "default" : "outline"}>{connectionStatus}</Badge>
+                <Badge variant={profile?.soundcloudUserId ? "default" : "outline"}>{connectionStatus}</Badge>
               </div>
             </div>
           </div>
@@ -232,7 +300,7 @@ export function Settings() {
               <div className="space-y-1">
                 <p className="font-medium text-foreground">Selected Page</p>
                 <p className="text-sm text-muted-foreground">
-                  {selectedPage?.name || profile?.facebookPageName || "No Page selected yet."}
+                  {selectedPage?.name || profile?.soundcloudActingAccountName || "No account selected yet."}
                 </p>
               </div>
               {selectedPage ? (
@@ -259,39 +327,45 @@ export function Settings() {
 
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-foreground">Facebook Pages</CardTitle>
+          <CardTitle className="text-foreground">SoundCloud Accounts</CardTitle>
           <CardDescription>
-            Link Facebook with page permissions, then choose which managed Page should perform likes, comments, and shares.
+            Link SoundCloud and choose which account should perform likes, comments, and shares.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" className="gap-2" onClick={handleConnectPages} disabled={connectingPages || !appId}>
-              {connectingPages ? <Loader2 className="h-4 w-4 animate-spin" /> : <Facebook className="h-4 w-4" />}
-              {selectedPage ? "Reconnect Facebook Pages" : "Connect Facebook Pages"}
+            <Button
+              type="button"
+              className="gap-2"
+              onClick={() => void handleConnectPages()}
+              disabled={connectingPages || !canConnectAccounts}
+            >
+              {connectingPages ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
+              {selectedPage ? "Reconnect SoundCloud Accounts" : "Connect SoundCloud Accounts"}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => void refreshPages()}
-              disabled={loadingPages || !profile?.facebookUserId}
+              disabled={loadingPages || !profile?.soundcloudUserId}
             >
               {loadingPages ? "Refreshing..." : "Refresh Pages"}
             </Button>
-            {!profile?.facebookUserId ? (
+            {!profile?.soundcloudUserId ? (
               <Button variant="outline" asChild>
-                <Link to="/login">Log in with Facebook first</Link>
+                <Link to="/login">Log in with SoundCloud first</Link>
               </Button>
             ) : null}
           </div>
 
-          {!appId ? <p className="text-sm text-muted-foreground">Facebook Pages connection is temporarily unavailable.</p> : null}
+            {!canConnectAccounts ? (
+              <p className="text-sm text-muted-foreground">Account connection is not configured (missing client IDs in .env).</p>
+            ) : null}
 
           {loadingPages ? <p className="text-sm text-muted-foreground">Loading managed Pages...</p> : null}
           {!loadingPages && pages.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No managed Pages found yet. Connect Facebook Pages above and make sure the Facebook user actually manages
-              a Page.
+              No managed accounts found yet. Connect SoundCloud above and make sure the signed-in account has access.
             </p>
           ) : null}
 
@@ -335,12 +409,12 @@ export function Settings() {
           <CardDescription>Important before you use Earn Credits with Page automation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>Likes, comments, and shares are attempted as the selected Facebook Page, not as your personal account.</p>
+          <p>Likes, comments, and shares are attempted as the selected SoundCloud account, not as your personal account.</p>
           <p>
             Undo uses the same selected Page. If you change the selected Page later, old actions may no longer be
             reversible from the platform.
           </p>
-          <p>If Meta rejects a Page action, the button will show the Graph API error returned by Facebook.</p>
+          <p>If the platform rejects an action, the button will show the API error returned by the backend.</p>
         </CardContent>
       </Card>
     </div>

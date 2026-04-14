@@ -8,9 +8,9 @@ type Props = {
 };
 
 /**
- * Loads Open Graph preview (image / video thumbnail) for a Facebook post URL via the API proxy.
+ * Loads Open Graph preview (image / video thumbnail) for a post URL via the API proxy.
  */
-export function FacebookPostMedia({ postUrl, className = "" }: Props) {
+export function SoundCloudPostMedia({ postUrl, className = "" }: Props) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isVideo, setIsVideo] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ export function FacebookPostMedia({ postUrl, className = "" }: Props) {
     setIsVideo(false);
 
     api
-      .getFacebookPostPreview(postUrl)
+      .getSoundCloudPostPreview(postUrl)
       .then((r) => {
         if (!cancelled) {
           setImageUrl(r.imageUrl);
@@ -73,7 +73,7 @@ export function FacebookPostMedia({ postUrl, className = "" }: Props) {
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center">
           <ImageIcon className="h-10 w-10 text-muted-foreground/60 transition-colors group-hover:text-muted-foreground" />
           <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground">
-            Preview unavailable · open on Facebook
+            Preview unavailable - open post
           </span>
         </div>
       )}

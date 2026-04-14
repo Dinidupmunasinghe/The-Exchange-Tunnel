@@ -1,9 +1,8 @@
+const crypto = require("crypto");
 const db = require("../models");
 const sequelize = require("../config/database");
-const {
-  resolveFacebookPostIdFromUrl,
-  resolveToNumericPostId
-} = require("../services/facebookService");
+const { resolveExternalPostIdFromUrl, resolveToNumericPostId } = require("../services/soundcloudService");
+const scNative = require("../services/soundcloudNativeService");
 const { decrypt } = require("../utils/crypto");
 const { ENGAGEMENT_TYPES } = require("../constants/engagement");
 const { spendCredits, refundCredits } = require("../services/creditService");
@@ -20,29 +19,28 @@ function parseOptionalSchedule(iso) {
   return d;
 }
 
+function isLikelyFacebookPostUrl(url) {
+  return /^https?:\/\/(www\.)?(facebook\.com|m\.facebook\.com|fb\.com|fb\.watch)/i.test(String(url || ""));
+}
+
+function stableNonFacebookPostKey(url) {
+  const h = crypto.createHash("sha256").update(String(url || "").trim()).digest("hex").slice(0, 48);
+  return `sc_${h}`;
+}
+
 async function createCampaign(req, res) {
-  const {
-    name,
-    facebookPostId: selectedPostIdRaw,
-    facebookPostUrl,
-    engagementType,
-    creditsPerEngagement,
-    maxEngagements,
-    scheduledLaunchAt: scheduleRaw
-  } = req.body;
+  const body = req.body;
+  const name = body.name;
+  const selectedPostIdRaw = body.soundcloudPostId ?? body.facebookPostId;
+  const soundcloudPostUrl = body.soundcloudPostUrl ?? body.facebookPostUrl;
+  const { engagementType, creditsPerEngagement, maxEngagements, scheduledLaunchAt: scheduleRaw } = body;
+
+  if (!soundcloudPostUrl || typeof soundcloudPostUrl !== "string") {
+    return res.status(400).json({ message: "soundcloudPostUrl is required" });
+  }
 
   if (!ENGAGEMENT_TYPES.includes(engagementType)) {
     return res.status(400).json({ message: "Invalid engagement type" });
-  }
-
-  const selectedPostId =
-    typeof selectedPostIdRaw === "string" && /^\d+(_\d+)?$/.test(selectedPostIdRaw.trim())
-      ? selectedPostIdRaw.trim()
-      : null;
-
-  const rawPostId = selectedPostId || (await resolveFacebookPostIdFromUrl(facebookPostUrl));
-  if (!rawPostId) {
-    return res.status(400).json({ message: "Invalid Facebook post URL" });
   }
 
   const scheduledLaunchAt = parseOptionalSchedule(scheduleRaw);
@@ -57,6 +55,31 @@ async function createCampaign(req, res) {
   if (!owner) {
     return res.status(401).json({ message: "User not found" });
   }
+
+  const selectedPostId =
+    typeof selectedPostIdRaw === "string" && /^\d+(_\d+)?$/.test(selectedPostIdRaw.trim())
+      ? selectedPostIdRaw.trim()
+      : null;
+
+  let rawPostId = selectedPostId;
+  if (!rawPostId && isLikelyFacebookPostUrl(soundcloudPostUrl)) {
+    rawPostId = await resolveExternalPostIdFromUrl(soundcloudPostUrl);
+  }
+  if (!rawPostId && scNative.isLikelySoundCloudTrackUrl(soundcloudPostUrl)) {
+    if (!owner.soundcloudActingAccountTokenEncrypted) {
+      return res.status(400).json({
+        message: "Select your SoundCloud acting account in Settings before creating a track campaign."
+      });
+    }
+    const actTok = decrypt(owner.soundcloudActingAccountTokenEncrypted);
+    const resolved = await scNative.resolveTrackUrl(actTok, soundcloudPostUrl);
+    if (resolved) {
+      rawPostId = resolved;
+    }
+  }
+  if (!rawPostId) {
+    rawPostId = stableNonFacebookPostKey(soundcloudPostUrl);
+  }
   if (owner.credits < totalBudget) {
     return res.status(400).json({
       message: `Insufficient credits — this campaign needs ${totalBudget} upfront (${creditsPerEngagement} × ${maxEngagements} slots) but you have ${owner.credits}. Earn credits or lower the budget slider.`,
@@ -65,26 +88,24 @@ async function createCampaign(req, res) {
     });
   }
 
-  if (!owner.facebookPageId || !owner.facebookPageAccessTokenEncrypted) {
+  if (!owner.soundcloudActingAccountId || !owner.soundcloudActingAccountTokenEncrypted) {
     return res.status(400).json({
-      message: "Connect and select your Facebook Page in Settings before creating a campaign."
+      message: "Connect and select your acting account in Settings before creating a campaign."
     });
   }
 
-  // Resolve pfbid → numeric post ID now, using the connected Page token.
-  // This accepts permalink.php Page URLs by matching them against the Page's own feed.
-  let facebookPostId = rawPostId;
-  if (!selectedPostId && /^pfbid/i.test(rawPostId)) {
-    const ownerPageToken = decrypt(owner.facebookPageAccessTokenEncrypted);
-    const numeric = await resolveToNumericPostId(rawPostId, ownerPageToken, facebookPostUrl);
+  let soundcloudPostId = rawPostId;
+  if (isLikelyFacebookPostUrl(soundcloudPostUrl) && !selectedPostId && /^pfbid/i.test(String(rawPostId))) {
+    const ownerPageToken = decrypt(owner.soundcloudActingAccountTokenEncrypted);
+    const numeric = await resolveToNumericPostId(rawPostId, ownerPageToken, soundcloudPostUrl);
     if (!numeric || numeric === rawPostId) {
       return res.status(400).json({
         message:
-          "Could not verify this Facebook post URL against your selected Page. " +
-          "Make sure the post belongs to the Page currently selected in Settings, then open the post on Facebook and copy its direct link again."
+          "Could not verify this post URL against your selected acting account. " +
+          "For Facebook posts, ensure the post belongs to the account selected in Settings, then copy its direct link again."
       });
     }
-    facebookPostId = numeric;
+    soundcloudPostId = numeric;
   }
 
   const createdCampaign = await sequelize.transaction(async (transaction) => {
@@ -92,8 +113,8 @@ async function createCampaign(req, res) {
       {
         userId: req.user.id,
         name: campaignName,
-        facebookPostId,
-        facebookPostUrl,
+        soundcloudPostId,
+        soundcloudPostUrl,
         engagementType,
         creditsPerEngagement,
         maxEngagements,
@@ -141,7 +162,7 @@ async function listMyCampaigns(req, res) {
     return {
       id: campaign.id,
       name: campaign.name,
-      facebookPostUrl: campaign.facebookPostUrl,
+      soundcloudPostUrl: campaign.soundcloudPostUrl,
       engagementType: campaign.engagementType,
       creditsPerEngagement: campaign.creditsPerEngagement,
       maxEngagements: campaign.maxEngagements,

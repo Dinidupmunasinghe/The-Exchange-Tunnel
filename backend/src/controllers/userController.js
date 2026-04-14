@@ -10,9 +10,9 @@ async function getProfile(req, res) {
       "credits",
       "dailyEarnedCredits",
       "dailyEarnedAt",
-      "facebookUserId",
-      "facebookPageId",
-      "facebookPageName",
+      "soundcloudUserId",
+      "soundcloudActingAccountId",
+      "soundcloudActingAccountName",
       "createdAt"
     ]
   });

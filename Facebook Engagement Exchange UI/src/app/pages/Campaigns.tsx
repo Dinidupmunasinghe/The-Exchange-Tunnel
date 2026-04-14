@@ -69,7 +69,7 @@ export function Campaigns() {
       .catch(() => setCampaigns([]));
     api
       .getProfile()
-      .then((res) => setSelectedPageName(res.user?.facebookPageName ?? null))
+      .then((res) => setSelectedPageName(res.user?.soundcloudActingAccountName ?? null))
       .catch(() => setSelectedPageName(null));
   }, []);
 
@@ -243,7 +243,7 @@ export function Campaigns() {
 
                   <div className="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end">
                     <Button variant="outline" size="sm" asChild disabled={busy}>
-                      <a href={campaign.facebookPostUrl} target="_blank" rel="noreferrer">
+                      <a href={campaign.soundcloudPostUrl} target="_blank" rel="noreferrer">
                         <ExternalLink className="mr-2 h-4 w-4" />
                         View post
                       </a>
@@ -253,7 +253,7 @@ export function Campaigns() {
                       variant="outline"
                       size="sm"
                       disabled={busy}
-                      onClick={() => copyPostUrl(campaign.facebookPostUrl)}
+                      onClick={() => copyPostUrl(campaign.soundcloudPostUrl)}
                     >
                       <Copy className="mr-2 h-4 w-4" />
                       Copy URL

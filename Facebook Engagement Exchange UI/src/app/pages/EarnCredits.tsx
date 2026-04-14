@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ThumbsUp, MessageCircle, Share2, ExternalLink, Coins, RefreshCw } from "lucide-react";
-import { FacebookPostMedia } from "../components/FacebookPostMedia";
+import { SoundCloudPostMedia } from "../components/SoundCloudPostMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -25,7 +25,7 @@ type TaskRow = {
   campaign?: {
     id: number;
     name?: string;
-    facebookPostUrl: string;
+    soundcloudPostUrl: string;
     createdAt?: string;
   };
   campaignId?: number;
@@ -70,7 +70,7 @@ export function EarnCredits() {
   const loadProfileStatus = useCallback(async () => {
     try {
       const res = await api.getProfile();
-      setHasSelectedPage(Boolean(res.user?.facebookPageId));
+      setHasSelectedPage(Boolean(res.user?.soundcloudActingAccountId));
     } catch {
       setHasSelectedPage(null);
     }
@@ -135,7 +135,7 @@ export function EarnCredits() {
     try {
       if (action === "like" && hasEngagement(myEngagements, campaignId, "like")) {
         await api.revertEngagement({ campaignId, actionKind: "like" });
-        toast.success("Like removed on Facebook", { description: "Credits returned to the poster." });
+        toast.success("Like removed on SoundCloud", { description: "Credits returned to the poster." });
         const refreshed = await api.getTasks();
         setTasks(refreshed.tasks as TaskRow[]);
         setMyEngagements(refreshed.myEngagements ?? []);
@@ -184,7 +184,7 @@ export function EarnCredits() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Earn Credits</h1>
-          <p className="mt-1 text-muted-foreground">Same actions as on Facebook — one completion per button per post</p>
+          <p className="mt-1 text-muted-foreground">Same actions as on SoundCloud - one completion per button per post</p>
         </div>
         <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void loadTasks()}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -195,14 +195,14 @@ export function EarnCredits() {
       <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
         <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-sm leading-relaxed text-muted-foreground">
-          <span className="font-medium text-foreground">Actions use your selected Facebook Page</span> from
-          Settings. Like can be tapped again to undo and refund the poster. Comment uses a short default Page comment,
-          and share publishes the post URL from that selected Page.
+          <span className="font-medium text-foreground">Actions use your selected SoundCloud account</span> from
+          Settings. Like can be tapped again to undo and refund the poster. Comment uses a short default comment,
+          and share publishes the post URL from that acting account.
         </p>
       </div>
       {hasSelectedPage === false ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          No Facebook Page selected.{" "}
+          No SoundCloud account selected.{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
             Go to Settings
           </Link>{" "}
@@ -252,7 +252,7 @@ export function EarnCredits() {
                       <p className="text-sm text-muted-foreground">{postedAgo}</p>
                     </div>
                     <Button variant="ghost" size="icon" className="shrink-0" asChild>
-                      <a href={campaign.facebookPostUrl} target="_blank" rel="noreferrer" aria-label="Open post">
+                      <a href={campaign.soundcloudPostUrl} target="_blank" rel="noreferrer" aria-label="Open post">
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     </Button>
@@ -265,12 +265,12 @@ export function EarnCredits() {
                   <span className="font-semibold">{getEngagementLabel(et)}</span>
                   {" — "}
                   {hint ??
-                    "Each button runs once per post for your selected Facebook Page. Use Settings to pick the acting Page."}
+                    "Each button runs once per post for your selected SoundCloud account. Use Settings to pick the acting account."}
                 </p>
               </div>
 
               <div className="mx-4 mb-4 ml-14 mr-4">
-                <FacebookPostMedia postUrl={campaign.facebookPostUrl} />
+                <SoundCloudPostMedia postUrl={campaign.soundcloudPostUrl} />
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-border bg-secondary/10 px-4 py-3 pl-14">

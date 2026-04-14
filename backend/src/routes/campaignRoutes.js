@@ -1,5 +1,5 @@
 const express = require("express");
-const { body, param } = require("express-validator");
+const { body, param, oneOf } = require("express-validator");
 const {
   createCampaign,
   listMyCampaigns,
@@ -15,12 +15,23 @@ router.post(
   "/",
   [
     body("name").optional().trim().isLength({ max: 160 }).withMessage("Name too long"),
+    body("soundcloudPostId")
+      .optional()
+      .isString()
+      .matches(/^(\d+(_\d+)?|sc_[a-f0-9]+)$/)
+      .withMessage("soundcloudPostId must be a numeric post id or sc_ hash key"),
     body("facebookPostId")
       .optional()
       .isString()
       .matches(/^\d+(_\d+)?$/)
-      .withMessage("facebookPostId must be a numeric Facebook post id"),
-    body("facebookPostUrl").isURL().withMessage("Valid Facebook post URL is required"),
+      .withMessage("facebookPostId must be a numeric post id"),
+    oneOf(
+      [
+        body("soundcloudPostUrl").isURL().withMessage("Invalid soundcloudPostUrl"),
+        body("facebookPostUrl").isURL().withMessage("Invalid facebookPostUrl")
+      ],
+      { message: "soundcloudPostUrl or facebookPostUrl must be a valid URL" }
+    ),
     body("engagementType").isIn(ENGAGEMENT_TYPES).withMessage("Invalid engagement type"),
     body("creditsPerEngagement").isInt({ min: 1, max: 500 }),
     body("maxEngagements").isInt({ min: 1, max: 1000 }),

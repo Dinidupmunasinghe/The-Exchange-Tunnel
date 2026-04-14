@@ -1,6 +1,6 @@
 const express = require("express");
 const { body } = require("express-validator");
-const { register, login, facebookLogin } = require("../controllers/authController");
+const { register, login, soundcloudLogin } = require("../controllers/authController");
 const validateRequest = require("../middleware/validateRequest");
 const { authLimiter } = require("../middleware/rateLimiters");
 
@@ -30,15 +30,16 @@ router.post(
 );
 
 router.post(
-  "/facebook",
+  "/soundcloud",
   authLimiter,
   [
-    body("accessToken").optional().isString().isLength({ min: 20 }),
-    body("code").optional().isString().isLength({ min: 10 }),
-    body("redirectUri").optional().isString().isLength({ min: 8 })
+    body("accessToken").optional().isString().isLength({ min: 10 }),
+    body("code").optional().isString().isLength({ min: 4 }),
+    body("redirectUri").optional().isString().isLength({ min: 8 }),
+    body("codeVerifier").optional().isString().isLength({ min: 43, max: 128 })
   ],
   validateRequest,
-  facebookLogin
+  soundcloudLogin
 );
 
 module.exports = router;

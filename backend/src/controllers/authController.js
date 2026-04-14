@@ -4,9 +4,10 @@ const jwt = require("jsonwebtoken");
 const db = require("../models");
 const env = require("../config/env");
 const {
-  fetchFacebookProfileByAccessToken,
-  exchangeFacebookCodeForUserAccessToken
-} = require("../services/facebookService");
+  fetchOAuthProfileByAccessToken,
+  exchangeSoundCloudOAuthCodeForAccessToken
+} = require("../services/soundcloudService");
+const scNative = require("../services/soundcloudNativeService");
 
 function createToken(user) {
   return jwt.sign({ sub: user.id, email: user.email }, env.jwt.secret, {
@@ -55,81 +56,107 @@ async function login(req, res) {
 }
 
 /**
- * Login or register via Facebook user access token (Facebook Login on the client).
- * Verifies the token with Graph API (and optionally debug_token when Meta app secret is set).
+ * Login or register: SoundCloud OAuth 2.1 (PKCE + code) when configured, else legacy Meta Graph token/code.
  */
-async function facebookLogin(req, res) {
+async function soundcloudLogin(req, res) {
   let accessToken = req.body.accessToken;
-  const { code, redirectUri } = req.body;
+  const { code, redirectUri, codeVerifier } = req.body;
 
   if (!accessToken && code && redirectUri) {
-    try {
-      accessToken = await exchangeFacebookCodeForUserAccessToken(code, redirectUri, "login");
-    } catch (err) {
-      return res.status(401).json({ message: err.message || "Facebook code exchange failed" });
+    if (scNative.isConfigured() && codeVerifier) {
+      try {
+        const tok = await scNative.exchangeAuthorizationCode({
+          code,
+          redirectUri,
+          codeVerifier
+        });
+        accessToken = tok.access_token;
+      } catch (err) {
+        return res.status(401).json({ message: err.message || "SoundCloud code exchange failed" });
+      }
+    } else {
+      try {
+        accessToken = await exchangeSoundCloudOAuthCodeForAccessToken(code, redirectUri, "login");
+      } catch (err) {
+        return res.status(401).json({ message: err.message || "OAuth code exchange failed" });
+      }
     }
   }
 
-  if (!accessToken || typeof accessToken !== "string" || accessToken.length < 20) {
+  if (!accessToken || typeof accessToken !== "string" || accessToken.length < 10) {
     return res.status(400).json({
-      message: "Send Facebook accessToken, or code plus redirectUri (same URL you used in the OAuth dialog)."
+      message:
+        "Send accessToken, or code plus redirectUri. For SoundCloud OAuth 2.1, also send codeVerifier from the PKCE flow."
     });
   }
 
-  let profile;
+  let profile = null;
   try {
-    profile = await fetchFacebookProfileByAccessToken(accessToken, "login");
-  } catch (err) {
-    return res.status(401).json({ message: err.message || "Invalid Facebook token" });
+    profile = await scNative.fetchAuthenticatedUser(accessToken);
+  } catch {
+    profile = null;
+  }
+  if (!profile) {
+    try {
+      profile = await fetchOAuthProfileByAccessToken(accessToken, "login");
+    } catch (err) {
+      return res.status(401).json({ message: err.message || "Invalid access token" });
+    }
   }
 
-  if (!profile || !profile.id) {
-    return res.status(401).json({ message: "Could not read Facebook profile" });
+  if (!profile || profile.id == null) {
+    return res.status(401).json({ message: "Could not read OAuth profile" });
   }
 
-  const fbId = String(profile.id);
+  const oauthId = String(profile.id);
+  const displayName =
+    profile.username || profile.name || profile.permalink || (profile.first_name ? String(profile.first_name) : null);
   const email =
     profile.email && String(profile.email).includes("@")
       ? String(profile.email).toLowerCase()
-      : `fb_${fbId}@users.facebook.exchange`;
+      : `sc_${oauthId}@users.soundcloud.exchange`;
 
-  let user = await db.User.findOne({ where: { facebookUserId: fbId } });
+  let user = await db.User.findOne({ where: { soundcloudUserId: oauthId } });
   if (!user) {
     user = await db.User.findOne({ where: { email } });
   }
 
   if (!user) {
-    // Random password hash — sign-in is via Facebook only for this account.
     const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
     user = await db.User.create({
       email,
       passwordHash,
-      name: profile.name || null,
-      facebookUserId: fbId,
+      name: displayName || null,
+      soundcloudUserId: oauthId,
       credits: 500
     });
   } else {
-    user.facebookUserId = fbId;
-    if (profile.name && !user.name) {
-      user.name = profile.name;
+    user.soundcloudUserId = oauthId;
+    if (displayName && !user.name) {
+      user.name = displayName;
     }
   }
 
-  user.setFacebookToken(accessToken);
+  user.setSoundCloudToken(accessToken);
   await user.save();
 
   const token = createToken(user);
   return res.json({
-    message: "Facebook login successful",
+    message: "SoundCloud login successful",
     token,
     user: {
       id: user.id,
       email: user.email,
       name: user.name,
       credits: user.credits,
-      facebookUserId: user.facebookUserId
+      soundcloudUserId: user.soundcloudUserId
     }
   });
 }
 
-module.exports = { register, login, facebookLogin };
+/** @deprecated Use soundcloudLogin */
+async function facebookLogin(req, res) {
+  return soundcloudLogin(req, res);
+}
+
+module.exports = { register, login, soundcloudLogin, facebookLogin };

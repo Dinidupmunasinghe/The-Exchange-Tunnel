@@ -3,7 +3,7 @@ export function DataDeletion() {
     <div className="h-screen overflow-y-auto bg-background text-foreground">
       <div className="mx-auto max-w-3xl px-4 py-10 md:px-6">
         <h1 className="text-3xl font-bold">Exchange Tunnel Data Deletion Instructions</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: April 8, 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: April 14, 2026</p>
 
         <div className="mt-8 space-y-6 text-sm leading-6 text-muted-foreground">
           <section>
@@ -24,7 +24,8 @@ export function DataDeletion() {
               with subject: <strong>Data Deletion Request</strong>.
             </p>
             <p className="mt-2">
-              Include your registered email and (if available) Facebook account ID used with Exchange Tunnel.
+              Include your registered email and, if you know it, your SoundCloud profile URL or numeric user id as
+              shown in the app or on soundcloud.com. That helps us match the correct account.
             </p>
           </section>
 
@@ -39,8 +40,8 @@ export function DataDeletion() {
           <section>
             <h2 className="text-lg font-semibold text-foreground">What gets deleted</h2>
             <p>
-              We delete or anonymize account profile data and linked Facebook tokens from active systems. Backups are
-              deleted according to rolling retention schedules.
+              We delete or anonymize account profile data and linked SoundCloud (and any legacy provider) tokens from
+              active systems. Backups are deleted according to rolling retention schedules.
             </p>
           </section>
         </div>

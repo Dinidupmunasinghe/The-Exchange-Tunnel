@@ -56,7 +56,7 @@ export function SubmitPost() {
       .getProfile()
       .then((res) => {
         setBalance(res.user?.credits ?? 0);
-        setSelectedPageName(res.user?.facebookPageName ?? null);
+        setSelectedPageName(res.user?.soundcloudActingAccountName ?? null);
       })
       .catch(() => setBalance(null));
   }, []);
@@ -132,8 +132,8 @@ export function SubmitPost() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPost) {
-      toast.error("Choose a Facebook Page post", {
-        description: "Select one of your connected Page posts before starting the campaign."
+      toast.error("Choose a SoundCloud post", {
+        description: "Select one of your connected posts before starting the campaign."
       });
       return;
     }
@@ -172,8 +172,8 @@ export function SubmitPost() {
 
       await api.createCampaign({
         name: campaignName.trim() || undefined,
-        facebookPostId: selectedPost.id,
-        facebookPostUrl: selectedPost.permalinkUrl,
+        soundcloudPostId: selectedPost.id,
+        soundcloudPostUrl: selectedPost.permalinkUrl,
         engagementType: derivedType,
         creditsPerEngagement: cost,
         maxEngagements: estimatedEngagements,
@@ -206,11 +206,11 @@ export function SubmitPost() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Submit Post</h1>
-        <p className="text-muted-foreground mt-1">Boost your Facebook post with credits</p>
+        <p className="text-muted-foreground mt-1">Boost your SoundCloud post with credits</p>
       </div>
       {!selectedPageName ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Tip: select your Facebook Page in{" "}
+          Tip: select your SoundCloud account in{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
             Settings
           </Link>{" "}
@@ -243,11 +243,11 @@ export function SubmitPost() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <Label>Choose a Facebook Page post</Label>
+                      <Label>Choose a SoundCloud post</Label>
                       <p className="text-xs text-muted-foreground mt-1">
                         {selectedPageName
                           ? `Showing recent posts from ${selectedPageName}.`
-                          : "Select a Facebook Page in Settings first."}
+                          : "Select a SoundCloud account in Settings first."}
                       </p>
                     </div>
                     <Button
@@ -265,7 +265,7 @@ export function SubmitPost() {
 
                   {!selectedPageName ? (
                     <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-                      Connect and select your Facebook Page in{" "}
+                      Connect and select your SoundCloud account in{" "}
                       <Link to="/settings" className="font-medium text-primary underline-offset-2 hover:underline">
                         Settings
                       </Link>{" "}
@@ -286,12 +286,12 @@ export function SubmitPost() {
                     <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
                       <p>{postsError}</p>
                       <p className="mt-2 text-xs text-amber-100/80">
-                        Try refreshing, or reconnect/select the Page again in Settings if Facebook permissions changed.
+                        Try refreshing, or reconnect/select the account again in Settings if permissions changed.
                       </p>
                     </div>
                   ) : pagePosts.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-                      No recent posts found for this Page. Create a post on Facebook, then click Refresh.
+                      No recent posts found for this account. Create a post on SoundCloud, then click Refresh.
                     </div>
                   ) : (
                     <div className="max-h-[480px] space-y-3 overflow-y-auto pr-1">
@@ -326,7 +326,7 @@ export function SubmitPost() {
                               <div className="mt-3 overflow-hidden rounded-md border border-border/60 bg-black/5 p-2">
                                 <img
                                   src={post.previewImageUrl}
-                                  alt="Facebook post preview"
+                                  alt="SoundCloud post preview"
                                   className="max-h-[520px] w-full rounded object-contain"
                                 />
                               </div>
