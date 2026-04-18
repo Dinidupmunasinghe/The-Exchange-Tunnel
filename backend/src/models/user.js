@@ -1,5 +1,4 @@
-const { encrypt } = require("../utils/crypto");
-
+/** Legacy MySQL column names; attributes use Telegram names. */
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define(
     "User",
@@ -8,21 +7,20 @@ module.exports = (sequelize, DataTypes) => {
       email: { type: DataTypes.STRING(120), allowNull: false, unique: true },
       passwordHash: { type: DataTypes.STRING(255), allowNull: false },
       name: { type: DataTypes.STRING(120), allowNull: true },
-      /** OAuth subject id (stored in legacy `facebookUserId` column). */
-      soundcloudUserId: { type: DataTypes.STRING(80), allowNull: true, field: "facebookUserId" },
-      soundcloudAccessTokenEncrypted: {
+      telegramUserId: { type: DataTypes.STRING(80), allowNull: true, field: "facebookUserId" },
+      userOAuthTokenEncrypted: {
         type: DataTypes.TEXT,
         allowNull: true,
         field: "facebookAccessTokenEncrypted"
       },
-      /** Acting account for automated actions (legacy Meta "Page" id column). */
-      soundcloudActingAccountId: { type: DataTypes.STRING(80), allowNull: true, field: "facebookPageId" },
-      soundcloudActingAccountName: {
+      /** Selected Telegram channel (chat_id as string) used for your campaigns. */
+      telegramActingChannelId: { type: DataTypes.STRING(80), allowNull: true, field: "facebookPageId" },
+      telegramActingChannelTitle: {
         type: DataTypes.STRING(160),
         allowNull: true,
         field: "facebookPageName"
       },
-      soundcloudActingAccountTokenEncrypted: {
+      userActingTokenEncrypted: {
         type: DataTypes.TEXT,
         allowNull: true,
         field: "facebookPageAccessTokenEncrypted"
@@ -38,28 +36,16 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  User.prototype.setSoundCloudToken = function setSoundCloudToken(accessToken) {
-    this.soundcloudAccessTokenEncrypted = encrypt(accessToken);
+  User.prototype.setActingTelegramChannel = function setActingTelegramChannel(channel) {
+    this.telegramActingChannelId = String(channel.id);
+    this.telegramActingChannelTitle = channel.title ? String(channel.title) : null;
   };
 
-  User.prototype.setSoundCloudActingAccountToken = function setSoundCloudActingAccountToken(page) {
-    this.soundcloudActingAccountId = page.id;
-    this.soundcloudActingAccountName = page.name;
-    this.soundcloudActingAccountTokenEncrypted = encrypt(page.accessToken);
+  User.prototype.clearActingTelegramChannel = function clearActingTelegramChannel() {
+    this.telegramActingChannelId = null;
+    this.telegramActingChannelTitle = null;
+    this.userActingTokenEncrypted = null;
   };
-
-  User.prototype.clearSoundCloudActingAccount = function clearSoundCloudActingAccount() {
-    this.soundcloudActingAccountId = null;
-    this.soundcloudActingAccountName = null;
-    this.soundcloudActingAccountTokenEncrypted = null;
-  };
-
-  /** @deprecated Use setSoundCloudToken */
-  User.prototype.setFacebookToken = User.prototype.setSoundCloudToken;
-  /** @deprecated Use setSoundCloudActingAccountToken */
-  User.prototype.setFacebookPageToken = User.prototype.setSoundCloudActingAccountToken;
-  /** @deprecated Use clearSoundCloudActingAccount */
-  User.prototype.clearFacebookPage = User.prototype.clearSoundCloudActingAccount;
 
   return User;
 };

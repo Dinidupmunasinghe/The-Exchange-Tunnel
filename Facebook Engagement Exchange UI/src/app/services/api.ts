@@ -20,7 +20,6 @@ function decodeJwtPayload(token: string): { exp?: number } | null {
   }
 }
 
-/** Used on /login to decide if we should treat the user as already signed in. */
 export function isAccessTokenValid(token: string | null): boolean {
   if (!token) return false;
   const payload = decodeJwtPayload(token);
@@ -121,7 +120,6 @@ async function requestWithoutAuth<T>(path: string, options: RequestInit = {}): P
   return requestJson<T>(path, options, false);
 }
 
-/** Authenticated API calls (requires prior login). */
 async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!getToken()) {
     throw new Error("Not authenticated");
@@ -129,57 +127,26 @@ async function authRequest<T>(path: string, options: RequestInit = {}): Promise<
   return request<T>(path, options);
 }
 
-export async function loginWithSoundCloud(accessToken: string) {
-  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/soundcloud", {
+/** @see https://core.telegram.org/widgets/login */
+export async function loginWithTelegram(auth: Record<string, string | number | undefined>) {
+  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/telegram", {
     method: "POST",
-    body: JSON.stringify({ accessToken }),
+    body: JSON.stringify(auth),
   });
   setToken(data.token);
   return data;
 }
-
-/** Preferred when OAuth uses `response_type=code`. Send `codeVerifier` for SoundCloud OAuth 2.1 (PKCE). */
-export async function loginWithSoundCloudCode(
-  code: string,
-  redirectUri: string,
-  codeVerifier?: string | null
-) {
-  const body: Record<string, string> = { code, redirectUri };
-  if (codeVerifier) body.codeVerifier = codeVerifier;
-  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/soundcloud", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  setToken(data.token);
-  return data;
-}
-
-/** @deprecated Use loginWithSoundCloud */
-export const loginWithFacebook = loginWithSoundCloud;
-/** @deprecated Use loginWithSoundCloudCode */
-export const loginWithFacebookCode = loginWithSoundCloudCode;
 
 export const api = {
   getProfile: () => authRequest("/users/me") as Promise<{ user: any }>,
   getDashboard: () => authRequest("/users/dashboard") as Promise<{ stats: any }>,
-  connectSoundCloud: (payload: {
-    accessToken?: string;
-    code?: string;
-    redirectUri?: string;
-    codeVerifier?: string | null;
-  }) =>
-    authRequest("/soundcloud/connect", {
+  connectTelegramChannel: (channel: string) =>
+    authRequest("/telegram/connect", {
       method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  /** @deprecated Use connectSoundCloud */
-  connectFacebook: (payload: { accessToken?: string; code?: string; redirectUri?: string }) =>
-    authRequest("/soundcloud/connect", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+      body: JSON.stringify({ channel }),
+    }) as Promise<{ message: string; pages: any[] }>,
   getManagedPages: () =>
-    authRequest("/soundcloud/pages") as Promise<{
+    authRequest("/telegram/pages") as Promise<{
       pages: {
         id: string;
         name: string;
@@ -191,7 +158,7 @@ export const api = {
       selectedPageId: string | null;
     }>,
   selectManagedPage: (pageId: string) =>
-    authRequest("/soundcloud/pages/select", {
+    authRequest("/telegram/pages/select", {
       method: "POST",
       body: JSON.stringify({ pageId }),
     }) as Promise<{
@@ -205,20 +172,13 @@ export const api = {
       };
     }>,
   clearSelectedManagedPage: () =>
-    authRequest("/soundcloud/pages/select", {
+    authRequest("/telegram/pages/select", {
       method: "DELETE",
     }) as Promise<{ message: string }>,
   getSelectedPagePosts: () =>
-    authRequest("/soundcloud/posts") as Promise<{
+    authRequest("/telegram/posts") as Promise<{
       page: { id: string; name: string | null };
-      posts: {
-        id: string;
-        message: string;
-        createdTime: string | null;
-        permalinkUrl: string;
-        previewImageUrl: string | null;
-        statusType: string | null;
-      }[];
+      posts: { id: string; message: string; permalinkUrl: string }[];
     }>,
   getCampaigns: () => authRequest("/campaigns") as Promise<{ campaigns: any[] }>,
   updateCampaign: (id: number, payload: { action: "pause" | "resume" }) =>
@@ -232,8 +192,8 @@ export const api = {
     }),
   createCampaign: (payload: {
     name?: string;
-    soundcloudPostId?: string;
-    soundcloudPostUrl: string;
+    messageKey?: string;
+    messageUrl: string;
     engagementType:
       | "like"
       | "comment"
@@ -271,16 +231,8 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getTransactions: () => authRequest("/transactions") as Promise<{ transactions: any[] }>,
-  getSoundCloudPostPreview: (url: string) =>
-    authRequest(`/soundcloud/post-preview?${new URLSearchParams({ url }).toString()}`) as Promise<{
-      imageUrl: string | null;
-      title: string | null;
-      description: string | null;
-      isVideo?: boolean;
-    }>,
-  /** @deprecated Use getSoundCloudPostPreview */
-  getFacebookPostPreview: (url: string) =>
-    authRequest(`/soundcloud/post-preview?${new URLSearchParams({ url }).toString()}`) as Promise<{
+  getTelegramMessagePreview: (url: string) =>
+    authRequest(`/telegram/post-preview?${new URLSearchParams({ url }).toString()}`) as Promise<{
       imageUrl: string | null;
       title: string | null;
       description: string | null;

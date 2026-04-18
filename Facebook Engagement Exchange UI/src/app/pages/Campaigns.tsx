@@ -69,7 +69,11 @@ export function Campaigns() {
       .catch(() => setCampaigns([]));
     api
       .getProfile()
-      .then((res) => setSelectedPageName(res.user?.soundcloudActingAccountName ?? null))
+      .then((res) =>
+        setSelectedPageName(
+          (res.user as { telegramActingChannelTitle?: string | null })?.telegramActingChannelTitle ?? null
+        )
+      )
       .catch(() => setSelectedPageName(null));
   }, []);
 

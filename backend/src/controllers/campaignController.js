@@ -1,11 +1,9 @@
 const crypto = require("crypto");
 const db = require("../models");
 const sequelize = require("../config/database");
-const { resolveExternalPostIdFromUrl, resolveToNumericPostId } = require("../services/soundcloudService");
-const scNative = require("../services/soundcloudNativeService");
-const { decrypt } = require("../utils/crypto");
-const { ENGAGEMENT_TYPES } = require("../constants/engagement");
+const tg = require("../services/telegramService");
 const { spendCredits, refundCredits } = require("../services/creditService");
+const { ENGAGEMENT_TYPES } = require("../constants/engagement");
 
 function normalizeCampaignName(raw) {
   const s = String(raw || "").trim();
@@ -19,93 +17,89 @@ function parseOptionalSchedule(iso) {
   return d;
 }
 
-function isLikelyFacebookPostUrl(url) {
-  return /^https?:\/\/(www\.)?(facebook\.com|m\.facebook\.com|fb\.com|fb\.watch)/i.test(String(url || ""));
-}
-
-function stableNonFacebookPostKey(url) {
+function stableKeyFromUrl(url) {
   const h = crypto.createHash("sha256").update(String(url || "").trim()).digest("hex").slice(0, 48);
-  return `sc_${h}`;
+  return `tg_${h}`;
 }
 
 async function createCampaign(req, res) {
   const body = req.body;
   const name = body.name;
-  const selectedPostIdRaw = body.soundcloudPostId ?? body.facebookPostId;
-  const soundcloudPostUrl = body.soundcloudPostUrl ?? body.facebookPostUrl;
+  const messageUrl = body.messageUrl || body.soundcloudPostUrl || body.facebookPostUrl;
   const { engagementType, creditsPerEngagement, maxEngagements, scheduledLaunchAt: scheduleRaw } = body;
 
-  if (!soundcloudPostUrl || typeof soundcloudPostUrl !== "string") {
-    return res.status(400).json({ message: "soundcloudPostUrl is required" });
+  if (!messageUrl || typeof messageUrl !== "string" || !tg.isLikelyTelegramMessageUrl(messageUrl)) {
+    return res
+      .status(400)
+      .json({ message: "messageUrl is required and must be a t.me/… post link in your channel" });
+  }
+  if (!tg.isConfigured()) {
+    return res.status(503).json({ message: "Server: TELEGRAM_BOT_TOKEN is not configured" });
   }
 
   if (!ENGAGEMENT_TYPES.includes(engagementType)) {
     return res.status(400).json({ message: "Invalid engagement type" });
   }
 
+  const owner = await db.User.findByPk(req.user.id);
+  if (!owner) {
+    return res.status(401).json({ message: "User not found" });
+  }
+  if (!owner.telegramUserId) {
+    return res.status(400).json({ message: "Log in with Telegram and connect your channel in Settings" });
+  }
+  if (!owner.telegramActingChannelId) {
+    return res
+      .status(400)
+      .json({ message: "Connect your Telegram channel in Settings before creating a campaign" });
+  }
+
+  const parsed = tg.parseTmeMessageUrl(messageUrl);
+  if (!parsed) {
+    return res
+      .status(400)
+      .json({ message: "Could not parse t.me post link. Use: https://t.me/channel/123 or t.me/c/.../…" });
+  }
+  const resolved = await tg
+    .resolveChannelChatIdFromTme(parsed, String(owner.telegramActingChannelId))
+    .catch(() => null);
+  if (resolved == null) {
+    return res.status(400).json({ message: "Could not resolve channel for this post link" });
+  }
+  if (resolved.error) {
+    return res.status(400).json({ message: resolved.error });
+  }
+  if (!resolved.chatId) {
+    return res.status(400).json({ message: "Invalid Telegram link" });
+  }
+  if (String(resolved.chatId) !== String(owner.telegramActingChannelId)) {
+    return res
+      .status(400)
+      .json({ message: "The post must belong to the same channel you connected in Settings" });
+  }
+
+  const isOwnerAdmin = await tg
+    .isUserChannelAdminOrCreator(String(resolved.chatId), String(owner.telegramUserId))
+    .catch(() => false);
+  if (!isOwnerAdmin) {
+    return res.status(403).json({ message: "You must be an admin of the channel in this post link" });
+  }
+
+  const key = tg.stableKeyFromTmeMessage(parsed) || stableKeyFromUrl(messageUrl);
+
+  const totalBudget = creditsPerEngagement * maxEngagements;
+  const campaignName = normalizeCampaignName(name);
   const scheduledLaunchAt = parseOptionalSchedule(scheduleRaw);
   const now = new Date();
   const launchesLater = scheduledLaunchAt && scheduledLaunchAt > now;
   const status = launchesLater ? "pending" : "active";
 
-  const totalBudget = creditsPerEngagement * maxEngagements;
-  const campaignName = normalizeCampaignName(name);
-
-  const owner = await db.User.findByPk(req.user.id);
-  if (!owner) {
-    return res.status(401).json({ message: "User not found" });
-  }
-
-  const selectedPostId =
-    typeof selectedPostIdRaw === "string" && /^\d+(_\d+)?$/.test(selectedPostIdRaw.trim())
-      ? selectedPostIdRaw.trim()
-      : null;
-
-  let rawPostId = selectedPostId;
-  if (!rawPostId && isLikelyFacebookPostUrl(soundcloudPostUrl)) {
-    rawPostId = await resolveExternalPostIdFromUrl(soundcloudPostUrl);
-  }
-  if (!rawPostId && scNative.isLikelySoundCloudTrackUrl(soundcloudPostUrl)) {
-    if (!owner.soundcloudActingAccountTokenEncrypted) {
-      return res.status(400).json({
-        message: "Select your SoundCloud acting account in Settings before creating a track campaign."
-      });
-    }
-    const actTok = decrypt(owner.soundcloudActingAccountTokenEncrypted);
-    const resolved = await scNative.resolveTrackUrl(actTok, soundcloudPostUrl);
-    if (resolved) {
-      rawPostId = resolved;
-    }
-  }
-  if (!rawPostId) {
-    rawPostId = stableNonFacebookPostKey(soundcloudPostUrl);
-  }
   if (owner.credits < totalBudget) {
     return res.status(400).json({
-      message: `Insufficient credits — this campaign needs ${totalBudget} upfront (${creditsPerEngagement} × ${maxEngagements} slots) but you have ${owner.credits}. Earn credits or lower the budget slider.`,
+      message: `Insufficient credits — this campaign needs ${totalBudget} upfront (${creditsPerEngagement} × ${maxEngagements} slots) but you have ${owner.credits}.`,
       required: totalBudget,
       balance: owner.credits
     });
-  }
-
-  if (!owner.soundcloudActingAccountId || !owner.soundcloudActingAccountTokenEncrypted) {
-    return res.status(400).json({
-      message: "Connect and select your acting account in Settings before creating a campaign."
-    });
-  }
-
-  let soundcloudPostId = rawPostId;
-  if (isLikelyFacebookPostUrl(soundcloudPostUrl) && !selectedPostId && /^pfbid/i.test(String(rawPostId))) {
-    const ownerPageToken = decrypt(owner.soundcloudActingAccountTokenEncrypted);
-    const numeric = await resolveToNumericPostId(rawPostId, ownerPageToken, soundcloudPostUrl);
-    if (!numeric || numeric === rawPostId) {
-      return res.status(400).json({
-        message:
-          "Could not verify this post URL against your selected acting account. " +
-          "For Facebook posts, ensure the post belongs to the account selected in Settings, then copy its direct link again."
-      });
-    }
-    soundcloudPostId = numeric;
   }
 
   const createdCampaign = await sequelize.transaction(async (transaction) => {
@@ -113,8 +107,8 @@ async function createCampaign(req, res) {
       {
         userId: req.user.id,
         name: campaignName,
-        soundcloudPostId,
-        soundcloudPostUrl,
+        messageKey: key,
+        messageUrl,
         engagementType,
         creditsPerEngagement,
         maxEngagements,
@@ -139,7 +133,6 @@ async function createCampaign(req, res) {
       rewardCredits: creditsPerEngagement,
       status: "open"
     }));
-
     await db.Task.bulkCreate(taskPayload, { transaction });
     return campaign;
   });
@@ -162,7 +155,10 @@ async function listMyCampaigns(req, res) {
     return {
       id: campaign.id,
       name: campaign.name,
-      soundcloudPostUrl: campaign.soundcloudPostUrl,
+      messageUrl: campaign.messageUrl,
+      soundcloudPostUrl: campaign.messageUrl,
+      messageKey: campaign.messageKey,
+      soundcloudPostId: campaign.messageKey,
       engagementType: campaign.engagementType,
       creditsPerEngagement: campaign.creditsPerEngagement,
       maxEngagements: campaign.maxEngagements,
@@ -173,7 +169,6 @@ async function listMyCampaigns(req, res) {
       createdAt: campaign.createdAt
     };
   });
-
   return res.json({ campaigns: serialized });
 }
 
@@ -183,12 +178,10 @@ async function patchCampaign(req, res) {
   if (!Number.isFinite(id) || id < 1) {
     return res.status(400).json({ message: "Invalid campaign id" });
   }
-
   const campaign = await db.Campaign.findOne({ where: { id, userId: req.user.id } });
   if (!campaign) {
     return res.status(404).json({ message: "Campaign not found" });
   }
-
   if (action === "pause") {
     if (campaign.status === "completed") {
       return res.status(400).json({ message: "Cannot pause a completed campaign" });
@@ -203,7 +196,6 @@ async function patchCampaign(req, res) {
     await campaign.save();
     return res.json({ message: "Campaign paused", campaign });
   }
-
   if (action === "resume") {
     if (campaign.status !== "paused") {
       return res.status(400).json({ message: "Campaign is not paused" });
@@ -225,7 +217,6 @@ async function patchCampaign(req, res) {
     await campaign.save();
     return res.json({ message: "Campaign resumed", campaign });
   }
-
   return res.status(400).json({ message: "Invalid action" });
 }
 
@@ -234,29 +225,22 @@ async function deleteCampaign(req, res) {
   if (!Number.isFinite(id) || id < 1) {
     return res.status(400).json({ message: "Invalid campaign id" });
   }
-
   try {
     await sequelize.transaction(async (transaction) => {
-      const campaign = await db.Campaign.findOne({
-        where: { id, userId: req.user.id },
-        transaction
-      });
+      const campaign = await db.Campaign.findOne({ where: { id, userId: req.user.id }, transaction });
       if (!campaign) {
         const err = new Error("Campaign not found");
         err.status = 404;
         throw err;
       }
-
       const completed = await db.Task.count({
         where: { campaignId: campaign.id, status: "completed" },
         transaction
       });
       const refund = (campaign.maxEngagements - completed) * campaign.creditsPerEngagement;
-
       await db.Engagement.destroy({ where: { campaignId: campaign.id }, transaction });
       await db.Task.destroy({ where: { campaignId: campaign.id }, transaction });
       await campaign.destroy({ transaction });
-
       if (refund > 0) {
         await refundCredits({
           userId: req.user.id,
@@ -276,7 +260,6 @@ async function deleteCampaign(req, res) {
     console.error(e);
     return res.status(500).json({ message: "Could not delete campaign" });
   }
-
   return res.json({ message: "Campaign deleted" });
 }
 

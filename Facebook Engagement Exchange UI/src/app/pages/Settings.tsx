@@ -1,28 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
-import { CheckCircle2, Cloud, Loader2 } from "lucide-react";
+import { Link } from "react-router";
+import { CheckCircle2, Send, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { api } from "../services/api";
 import { toast } from "sonner";
-import { buildSoundCloudAuthorizeUrl } from "../lib/soundcloudPkce";
-
-const FB_GRAPH_VERSION = "v22.0";
-const PAGE_CONNECT_SCOPES = [
-  "public_profile",
-  "pages_show_list",
-  "pages_read_engagement",
-  "pages_manage_posts",
-  "pages_manage_engagement",
-].join(",");
-const SETTINGS_ROUTE_PATH = "/settings";
 
 type Profile = {
-  soundcloudUserId?: string;
-  soundcloudActingAccountId?: string | null;
-  soundcloudActingAccountName?: string | null;
+  telegramUserId?: string;
+  telegramActingChannelId?: string | null;
+  telegramActingChannelTitle?: string | null;
   email?: string;
   name?: string;
 };
@@ -36,36 +27,13 @@ type ManagedPage = {
   selected: boolean;
 };
 
-function buildFacebookPagesOAuthUrl(appId: string): string {
-  const redirectUri = `${window.location.origin}${SETTINGS_ROUTE_PATH}`;
-  const state = crypto.randomUUID();
-  sessionStorage.setItem("settings_oauth_provider", "facebook");
-  sessionStorage.setItem("fb_pages_oauth_state", state);
-
-  const params = new URLSearchParams({
-    client_id: appId,
-    redirect_uri: redirectUri,
-    state,
-    response_type: "code",
-    scope: PAGE_CONNECT_SCOPES,
-  });
-
-  return `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
-}
-
-const SC_SETTINGS_STATE_KEY = "sc_oauth_state_settings";
-const SC_SETTINGS_VERIFIER_KEY = "sc_pkce_verifier_settings";
-
 export function Settings() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const soundcloudClientId = (import.meta.env.VITE_SOUNDCLOUD_CLIENT_ID || "").trim();
-  const metaPagesAppId = import.meta.env.VITE_META_PAGES_APP_ID || import.meta.env.VITE_META_APP_ID || "";
-  const canConnectAccounts = Boolean(soundcloudClientId || metaPagesAppId);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pages, setPages] = useState<ManagedPage[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingPages, setLoadingPages] = useState(false);
-  const [connectingPages, setConnectingPages] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [channelInput, setChannelInput] = useState("");
   const [selectingPageId, setSelectingPageId] = useState<string | null>(null);
   const [clearingSelection, setClearingSelection] = useState(false);
 
@@ -88,9 +56,7 @@ export function Settings() {
       setPages(res.pages as ManagedPage[]);
     } catch (error: unknown) {
       setPages([]);
-      if (error instanceof Error) {
-        toast.error(error.message);
-      }
+      if (error instanceof Error) toast.error(error.message);
     } finally {
       setLoadingPages(false);
     }
@@ -101,139 +67,50 @@ export function Settings() {
   }, [refreshProfile]);
 
   useEffect(() => {
-    if (profile?.soundcloudUserId) {
-      void refreshPages();
-    }
-  }, [profile?.soundcloudUserId, refreshPages]);
-
-  useEffect(() => {
-    const error = searchParams.get("error");
-    const errorDesc = searchParams.get("error_description");
-    if (error || searchParams.get("error_code")) {
-      toast.error(errorDesc?.replace(/\+/g, " ") || error || "SoundCloud account connection failed");
-      setSearchParams({}, { replace: true });
-      return;
-    }
-
-    const code = searchParams.get("code");
-    const returnedState = searchParams.get("state");
-    if (!code) return;
-
-    const useSoundCloudPkce =
-      sessionStorage.getItem("settings_oauth_provider") === "soundcloud" ||
-      Boolean(sessionStorage.getItem(SC_SETTINGS_VERIFIER_KEY));
-
-    if (useSoundCloudPkce) {
-      const savedState = sessionStorage.getItem(SC_SETTINGS_STATE_KEY);
-      if (savedState && returnedState && savedState !== returnedState) {
-        toast.error("SoundCloud account connection expired. Please try again.");
-        sessionStorage.removeItem(SC_SETTINGS_STATE_KEY);
-        sessionStorage.removeItem(SC_SETTINGS_VERIFIER_KEY);
-        sessionStorage.removeItem("settings_oauth_provider");
-        setSearchParams({}, { replace: true });
-        return;
-      }
-      const codeVerifier = sessionStorage.getItem(SC_SETTINGS_VERIFIER_KEY);
-      sessionStorage.removeItem(SC_SETTINGS_STATE_KEY);
-      sessionStorage.removeItem(SC_SETTINGS_VERIFIER_KEY);
-      sessionStorage.removeItem("settings_oauth_provider");
-      setConnectingPages(true);
-      const redirectUri = `${window.location.origin}${SETTINGS_ROUTE_PATH}`;
-      void api
-        .connectSoundCloud({
-          code,
-          redirectUri,
-          ...(codeVerifier ? { codeVerifier } : {}),
-        })
-        .then(async () => {
-          toast.success("SoundCloud account connected");
-          await Promise.all([refreshProfile(), refreshPages()]);
-        })
-        .catch((e: unknown) => {
-          toast.error(e instanceof Error ? e.message : "Could not connect SoundCloud accounts");
-        })
-        .finally(() => {
-          setConnectingPages(false);
-          setSearchParams({}, { replace: true });
-        });
-      return;
-    }
-
-    const savedState = sessionStorage.getItem("fb_pages_oauth_state");
-    if (savedState && returnedState && savedState !== returnedState) {
-      toast.error("SoundCloud account connection expired. Please try again.");
-      sessionStorage.removeItem("fb_pages_oauth_state");
-      sessionStorage.removeItem("settings_oauth_provider");
-      setSearchParams({}, { replace: true });
-      return;
-    }
-
-    sessionStorage.removeItem("fb_pages_oauth_state");
-    sessionStorage.removeItem("settings_oauth_provider");
-    setConnectingPages(true);
-    const redirectUri = `${window.location.origin}${SETTINGS_ROUTE_PATH}`;
-    void api
-      .connectSoundCloud({ code, redirectUri })
-      .then(async () => {
-        toast.success("SoundCloud account connected");
-        await Promise.all([refreshProfile(), refreshPages()]);
-      })
-      .catch((e: unknown) => {
-        toast.error(e instanceof Error ? e.message : "Could not connect SoundCloud accounts");
-      })
-      .finally(() => {
-        setConnectingPages(false);
-        setSearchParams({}, { replace: true });
-      });
-  }, [refreshPages, refreshProfile, searchParams, setSearchParams]);
+    if (profile?.telegramUserId) void refreshPages();
+  }, [profile?.telegramUserId, refreshPages]);
 
   const selectedPage = useMemo(
-    () => pages.find((page) => page.id === profile?.soundcloudActingAccountId) ?? null,
-    [pages, profile?.soundcloudActingAccountId]
+    () => pages.find((page) => page.id === profile?.telegramActingChannelId) ?? null,
+    [pages, profile?.telegramActingChannelId]
   );
+
   const hasPlaceholderEmail = Boolean(
     profile?.email &&
-      (profile.email.endsWith("@users.facebook.exchange") || profile.email.endsWith("@users.soundcloud.exchange"))
+      (profile.email.endsWith("@users.telegram.exchange") || profile.email.endsWith("@users.facebook.exchange"))
   );
   const displayEmail = loadingProfile
     ? "Loading..."
     : hasPlaceholderEmail
-      ? "Not shared by provider"
+      ? "Not shared (Telegram login placeholder)"
       : profile?.email || "Not available";
   const displayName = loadingProfile ? "Loading..." : profile?.name || "Not available";
   const connectionStatus = loadingProfile
     ? "Checking..."
-    : profile?.soundcloudUserId
+    : profile?.telegramUserId
       ? "Connected"
       : "Not connected";
 
-  async function handleConnectPages() {
-    if (!canConnectAccounts) {
-      toast.error(
-        "Add VITE_SOUNDCLOUD_CLIENT_ID (recommended) or VITE_META_PAGES_APP_ID to the frontend .env, then restart Vite."
-      );
+  async function handleConnectChannel() {
+    const c = channelInput.trim();
+    if (!c) {
+      toast.error("Enter @channel, your channel t.me/…, or a numeric id");
       return;
     }
+    if (!profile?.telegramUserId) {
+      toast.error("Log in with Telegram first (Login page).");
+      return;
+    }
+    setConnecting(true);
     try {
-      setConnectingPages(true);
-      if (soundcloudClientId) {
-        const url = await buildSoundCloudAuthorizeUrl({
-          clientId: soundcloudClientId,
-          redirectPath: SETTINGS_ROUTE_PATH,
-          authorizeBaseUrl: import.meta.env.VITE_SOUNDCLOUD_AUTHORIZE_URL,
-          session: {
-            providerKey: "settings_oauth_provider",
-            stateKey: SC_SETTINGS_STATE_KEY,
-            verifierKey: SC_SETTINGS_VERIFIER_KEY,
-          },
-        });
-        window.location.assign(url);
-        return;
-      }
-      window.location.assign(buildFacebookPagesOAuthUrl(metaPagesAppId));
+      await api.connectTelegramChannel(c);
+      toast.success("Channel connected. Add the bot to your channel as admin if you have not already.");
+      setChannelInput("");
+      await Promise.all([refreshProfile(), refreshPages()]);
     } catch (e: unknown) {
-      setConnectingPages(false);
-      toast.error(e instanceof Error ? e.message : "Could not start SoundCloud account connection");
+      toast.error(e instanceof Error ? e.message : "Connection failed");
+    } finally {
+      setConnecting(false);
     }
   }
 
@@ -241,23 +118,23 @@ export function Settings() {
     setSelectingPageId(pageId);
     try {
       const res = await api.selectManagedPage(pageId);
-      toast.success(res.page.name ? `Selected ${res.page.name}` : "SoundCloud account selected");
+      toast.success(res.page.name ? `Selected ${res.page.name}` : "Channel selected");
       await Promise.all([refreshProfile(), refreshPages()]);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Could not save selected Page");
+      toast.error(error instanceof Error ? error.message : "Could not save");
     } finally {
       setSelectingPageId(null);
     }
   }
 
-  async function handleClearSelectedPage() {
+  async function handleClearSelected() {
     setClearingSelection(true);
     try {
-      const res = await api.clearSelectedManagedPage();
-      toast.success(res.message || "Selected page removed");
+      await api.clearSelectedManagedPage();
+      toast.success("Channel selection cleared");
       await Promise.all([refreshProfile(), refreshPages()]);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Could not remove selected Page");
+      toast.error(error instanceof Error ? error.message : "Could not remove");
     } finally {
       setClearingSelection(false);
     }
@@ -268,14 +145,14 @@ export function Settings() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
         <p className="mt-1 text-muted-foreground">
-          Connect SoundCloud, pick a managed account, and use it for actions.
+          Link Telegram, connect the channel you promote, and use it for campaigns and tasks.
         </p>
       </div>
 
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-foreground">Account</CardTitle>
-          <CardDescription>Current signed-in SoundCloud user and selected automation account.</CardDescription>
+          <CardDescription>Current Telegram user and selected channel.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
@@ -288,9 +165,9 @@ export function Settings() {
               <p className="mt-1 text-sm text-foreground">{displayEmail}</p>
             </div>
             <div className="rounded-md border border-border bg-secondary/20 p-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">SoundCloud</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Telegram</p>
               <div className="mt-1">
-                <Badge variant={profile?.soundcloudUserId ? "default" : "outline"}>{connectionStatus}</Badge>
+                <Badge variant={profile?.telegramUserId ? "default" : "outline"}>{connectionStatus}</Badge>
               </div>
             </div>
           </div>
@@ -298,25 +175,25 @@ export function Settings() {
           <div className="rounded-lg border border-border bg-secondary/30 p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="space-y-1">
-                <p className="font-medium text-foreground">Selected Page</p>
+                <p className="font-medium text-foreground">Active channel</p>
                 <p className="text-sm text-muted-foreground">
-                  {selectedPage?.name || profile?.soundcloudActingAccountName || "No account selected yet."}
+                  {selectedPage?.name || profile?.telegramActingChannelTitle || "Not connected yet."}
                 </p>
               </div>
               {selectedPage ? (
                 <div className="flex items-center gap-2">
                   <Badge>
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Active for actions
+                    Used for your campaigns
                   </Badge>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => void handleClearSelectedPage()}
+                    onClick={() => void handleClearSelected()}
                     disabled={clearingSelection}
                   >
-                    {clearingSelection ? "Removing..." : "Remove"}
+                    {clearingSelection ? "…" : "Remove"}
                   </Button>
                 </div>
               ) : null}
@@ -327,48 +204,41 @@ export function Settings() {
 
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-foreground">SoundCloud Accounts</CardTitle>
+          <CardTitle className="text-foreground">Telegram channel</CardTitle>
           <CardDescription>
-            Link SoundCloud and choose which account should perform likes, comments, and shares.
+            Add your bot to the channel as an administrator, then connect it here. Use e.g. <code className="text-xs">@mychannel</code> or{" "}
+            <code className="text-xs">https://t.me/mychannel</code>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              className="gap-2"
-              onClick={() => void handleConnectPages()}
-              disabled={connectingPages || !canConnectAccounts}
-            >
-              {connectingPages ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
-              {selectedPage ? "Reconnect SoundCloud Accounts" : "Connect SoundCloud Accounts"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void refreshPages()}
-              disabled={loadingPages || !profile?.soundcloudUserId}
-            >
-              {loadingPages ? "Refreshing..." : "Refresh Pages"}
-            </Button>
-            {!profile?.soundcloudUserId ? (
+          <div className="space-y-2 max-w-md">
+            <Label htmlFor="ch">Channel</Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="ch"
+                placeholder="@channel or t.me/…"
+                value={channelInput}
+                onChange={(e) => setChannelInput(e.target.value)}
+                disabled={connecting || !profile?.telegramUserId}
+              />
+              <Button
+                type="button"
+                className="gap-2 shrink-0"
+                onClick={() => void handleConnectChannel()}
+                disabled={connecting || !profile?.telegramUserId}
+              >
+                {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {selectedPage ? "Update channel" : "Connect channel"}
+              </Button>
+            </div>
+            {!profile?.telegramUserId ? (
               <Button variant="outline" asChild>
-                <Link to="/login">Log in with SoundCloud first</Link>
+                <Link to="/login">Log in with Telegram</Link>
               </Button>
             ) : null}
           </div>
 
-            {!canConnectAccounts ? (
-              <p className="text-sm text-muted-foreground">Account connection is not configured (missing client IDs in .env).</p>
-            ) : null}
-
-          {loadingPages ? <p className="text-sm text-muted-foreground">Loading managed Pages...</p> : null}
-          {!loadingPages && pages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No managed accounts found yet. Connect SoundCloud above and make sure the signed-in account has access.
-            </p>
-          ) : null}
-
+          {loadingPages ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
           <div className="space-y-3">
             {pages.map((page) => {
               const selecting = selectingPageId === page.id;
@@ -377,16 +247,9 @@ export function Settings() {
                   key={page.id}
                   className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/30 p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-foreground">{page.name}</p>
-                      {page.selected ? <Badge>Selected</Badge> : null}
-                      {page.category ? <Badge variant="outline">{page.category}</Badge> : null}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Page ID {page.id}
-                      {page.tasks.length > 0 ? ` · Tasks: ${page.tasks.join(", ")}` : ""}
-                    </p>
+                  <div>
+                    <p className="font-medium text-foreground">{page.name}</p>
+                    <p className="text-sm text-muted-foreground">ID {page.id}</p>
                   </div>
                   <Button
                     type="button"
@@ -394,27 +257,12 @@ export function Settings() {
                     disabled={selecting || page.selected}
                     onClick={() => void handleSelectPage(page.id)}
                   >
-                    {selecting ? "Saving..." : page.selected ? "Selected" : "Use this Page"}
+                    {selecting ? "…" : page.selected ? "Active" : "Select"}
                   </Button>
                 </div>
               );
             })}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-foreground">How actions work</CardTitle>
-          <CardDescription>Important before you use Earn Credits with Page automation.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>Likes, comments, and shares are attempted as the selected SoundCloud account, not as your personal account.</p>
-          <p>
-            Undo uses the same selected Page. If you change the selected Page later, old actions may no longer be
-            reversible from the platform.
-          </p>
-          <p>If the platform rejects an action, the button will show the API error returned by the backend.</p>
         </CardContent>
       </Card>
     </div>

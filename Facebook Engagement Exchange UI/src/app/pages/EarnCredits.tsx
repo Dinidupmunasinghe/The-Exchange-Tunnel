@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ThumbsUp, MessageCircle, Share2, ExternalLink, Coins, RefreshCw } from "lucide-react";
-import { SoundCloudPostMedia } from "../components/SoundCloudPostMedia";
+import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -25,6 +25,7 @@ type TaskRow = {
   campaign?: {
     id: number;
     name?: string;
+    messageUrl?: string;
     soundcloudPostUrl: string;
     createdAt?: string;
   };
@@ -65,14 +66,14 @@ export function EarnCredits() {
   const [myEngagements, setMyEngagements] = useState<MyEngagementRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [hasSelectedPage, setHasSelectedPage] = useState<boolean | null>(null);
+  const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
 
   const loadProfileStatus = useCallback(async () => {
     try {
       const res = await api.getProfile();
-      setHasSelectedPage(Boolean(res.user?.soundcloudActingAccountId));
+      setHasTelegram(Boolean((res.user as { telegramUserId?: string | null })?.telegramUserId));
     } catch {
-      setHasSelectedPage(null);
+      setHasTelegram(null);
     }
   }, []);
 
@@ -135,7 +136,7 @@ export function EarnCredits() {
     try {
       if (action === "like" && hasEngagement(myEngagements, campaignId, "like")) {
         await api.revertEngagement({ campaignId, actionKind: "like" });
-        toast.success("Like removed on SoundCloud", { description: "Credits returned to the poster." });
+        toast.success("Reverted in app", { description: "Credits returned. Remove the reaction in Telegram if needed." });
         const refreshed = await api.getTasks();
         setTasks(refreshed.tasks as TaskRow[]);
         setMyEngagements(refreshed.myEngagements ?? []);
@@ -154,17 +155,15 @@ export function EarnCredits() {
       }
 
       const proofText =
-        action === "comment"
-          ? "Great post, thanks for sharing."
-          : action === "share"
-            ? undefined
-            : undefined;
+        action === "like"
+          ? undefined
+          : "I completed the requested action on the Telegram public post in this channel, per campaign instructions.";
 
       await api.completeTask({
         taskId: task.id,
         engagementType,
         actionKind: action,
-        ...(proofText ? { proofText } : {})
+        ...(proofText ? { proofText } : {}),
       });
       toast.success(`Earned ${task.rewardCredits} credits`, {
         description: `Recorded · ${action} · task #${task.id}`
@@ -184,7 +183,7 @@ export function EarnCredits() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Earn Credits</h1>
-          <p className="mt-1 text-muted-foreground">Same actions as on SoundCloud - one completion per button per post</p>
+          <p className="mt-1 text-muted-foreground">One completion per button; join the channel, then use the app</p>
         </div>
         <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void loadTasks()}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -195,18 +194,18 @@ export function EarnCredits() {
       <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
         <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-sm leading-relaxed text-muted-foreground">
-          <span className="font-medium text-foreground">Actions use your selected SoundCloud account</span> from
-          Settings. Like can be tapped again to undo and refund the poster. Comment uses a short default comment,
-          and share publishes the post URL from that acting account.
+          <span className="font-medium text-foreground">Log in with Telegram</span> so we can verify you joined the
+          target channel. Like can be undone in-app. Comment/Share need a short proof (auto-filled) after you do the
+          action in Telegram.
         </p>
       </div>
-      {hasSelectedPage === false ? (
+      {hasTelegram === false ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          No SoundCloud account selected.{" "}
-          <Link to="/settings" className="font-medium underline underline-offset-2">
-            Go to Settings
+          Sign in with Telegram on{" "}
+          <Link to="/login" className="font-medium underline underline-offset-2">
+            Login
           </Link>{" "}
-          to select a Page before earning credits.
+          first. The app checks your Telegram user id and channel membership.
         </div>
       ) : null}
 
@@ -252,7 +251,12 @@ export function EarnCredits() {
                       <p className="text-sm text-muted-foreground">{postedAgo}</p>
                     </div>
                     <Button variant="ghost" size="icon" className="shrink-0" asChild>
-                      <a href={campaign.soundcloudPostUrl} target="_blank" rel="noreferrer" aria-label="Open post">
+                      <a
+                        href={campaign.soundcloudPostUrl || campaign.messageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Open post"
+                      >
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     </Button>
@@ -264,13 +268,12 @@ export function EarnCredits() {
                 <p className="text-sm leading-relaxed text-foreground">
                   <span className="font-semibold">{getEngagementLabel(et)}</span>
                   {" — "}
-                  {hint ??
-                    "Each button runs once per post for your selected SoundCloud account. Use Settings to pick the acting account."}
+                  {hint ?? "Join the channel, then use the button here once you have completed the action in Telegram."}
                 </p>
               </div>
 
               <div className="mx-4 mb-4 ml-14 mr-4">
-                <SoundCloudPostMedia postUrl={campaign.soundcloudPostUrl} />
+                <TelegramMessageMedia postUrl={campaign.soundcloudPostUrl || campaign.messageUrl || ""} />
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-border bg-secondary/10 px-4 py-3 pl-14">
@@ -284,7 +287,7 @@ export function EarnCredits() {
                       : "rounded-full border-primary/25 bg-background/80 pr-3 hover:bg-primary/10"
                   }
                   onClick={() => void handleAction(cid, campaignTasks, et, "like")}
-                  disabled={!bundleAllowsAction(et, "like") || busy !== null || hasSelectedPage === false}
+                  disabled={!bundleAllowsAction(et, "like") || busy !== null || hasTelegram === false}
                 >
                   <ThumbsUp className={`mr-2 h-4 w-4 ${liked ? "fill-current" : ""}`} />
                   {liked ? "Liked" : "Like"}
@@ -308,7 +311,7 @@ export function EarnCredits() {
                       : "rounded-full border-blue-500/25 bg-background/80 pr-3 hover:bg-blue-500/10"
                   }
                   onClick={() => void handleAction(cid, campaignTasks, et, "comment")}
-                  disabled={!bundleAllowsAction(et, "comment") || commented || busy !== null || hasSelectedPage === false}
+                  disabled={!bundleAllowsAction(et, "comment") || commented || busy !== null || hasTelegram === false}
                 >
                   <MessageCircle className="mr-2 h-4 w-4" />
                   Comment
@@ -326,7 +329,7 @@ export function EarnCredits() {
                       : "rounded-full border-purple-500/25 bg-background/80 pr-3 hover:bg-purple-500/10"
                   }
                   onClick={() => void handleAction(cid, campaignTasks, et, "share")}
-                  disabled={!bundleAllowsAction(et, "share") || shared || busy !== null || hasSelectedPage === false}
+                  disabled={!bundleAllowsAction(et, "share") || shared || busy !== null || hasTelegram === false}
                 >
                   <Share2 className="mr-2 h-4 w-4" />
                   Share

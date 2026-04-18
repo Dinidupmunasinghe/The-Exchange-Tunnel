@@ -5,8 +5,9 @@ module.exports = (sequelize, DataTypes) => {
       id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
       userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       name: { type: DataTypes.STRING(160), allowNull: false, defaultValue: "Untitled campaign" },
-      soundcloudPostId: { type: DataTypes.STRING(255), allowNull: false, field: "facebookPostId" },
-      soundcloudPostUrl: { type: DataTypes.STRING(512), allowNull: false, field: "facebookPostUrl" },
+      /** Stable key, e.g. t_username_5 or tc_internal_5 */
+      messageKey: { type: DataTypes.STRING(255), allowNull: false, field: "facebookPostId" },
+      messageUrl: { type: DataTypes.STRING(512), allowNull: false, field: "facebookPostUrl" },
       engagementType: { type: DataTypes.STRING(32), allowNull: false },
       scheduledLaunchAt: { type: DataTypes.DATE, allowNull: true },
       creditsPerEngagement: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },

@@ -1,6 +1,6 @@
 const express = require("express");
 const { body } = require("express-validator");
-const { register, login, soundcloudLogin } = require("../controllers/authController");
+const { register, login, telegramAuth } = require("../controllers/authController");
 const validateRequest = require("../middleware/validateRequest");
 const { authLimiter } = require("../middleware/rateLimiters");
 
@@ -30,16 +30,16 @@ router.post(
 );
 
 router.post(
-  "/soundcloud",
+  "/telegram",
   authLimiter,
   [
-    body("accessToken").optional().isString().isLength({ min: 10 }),
-    body("code").optional().isString().isLength({ min: 4 }),
-    body("redirectUri").optional().isString().isLength({ min: 8 }),
-    body("codeVerifier").optional().isString().isLength({ min: 43, max: 128 })
+    body("hash").isString().isLength({ min: 1 }),
+    body("id")
+      .custom((v) => v != null && v !== "" && (typeof v === "number" || (typeof v === "string" && v.length < 20)))
+      .withMessage("id is required from Telegram")
   ],
   validateRequest,
-  soundcloudLogin
+  telegramAuth
 );
 
 module.exports = router;

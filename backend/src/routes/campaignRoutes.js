@@ -15,22 +15,14 @@ router.post(
   "/",
   [
     body("name").optional().trim().isLength({ max: 160 }).withMessage("Name too long"),
-    body("soundcloudPostId")
-      .optional()
-      .isString()
-      .matches(/^(\d+(_\d+)?|sc_[a-f0-9]+)$/)
-      .withMessage("soundcloudPostId must be a numeric post id or sc_ hash key"),
-    body("facebookPostId")
-      .optional()
-      .isString()
-      .matches(/^\d+(_\d+)?$/)
-      .withMessage("facebookPostId must be a numeric post id"),
+    body("messageKey").optional().isString().isLength({ min: 4, max: 256 }),
     oneOf(
       [
-        body("soundcloudPostUrl").isURL().withMessage("Invalid soundcloudPostUrl"),
-        body("facebookPostUrl").isURL().withMessage("Invalid facebookPostUrl")
+        body("messageUrl").isURL().withMessage("messageUrl must be a valid t.me/… post URL"),
+        body("soundcloudPostUrl").isURL().withMessage("messageUrl (legacy field) must be a valid URL"),
+        body("facebookPostUrl").isURL().withMessage("messageUrl (legacy field) must be a valid URL")
       ],
-      { message: "soundcloudPostUrl or facebookPostUrl must be a valid URL" }
+      { message: "messageUrl must be a valid t.me/… post URL" }
     ),
     body("engagementType").isIn(ENGAGEMENT_TYPES).withMessage("Invalid engagement type"),
     body("creditsPerEngagement").isInt({ min: 1, max: 500 }),

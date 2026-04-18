@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ImageIcon, Play } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 import { api } from "../services/api";
 
 type Props = {
@@ -7,12 +7,9 @@ type Props = {
   className?: string;
 };
 
-/**
- * Loads Open Graph preview (image / video thumbnail) for a post URL via the API proxy.
- */
-export function SoundCloudPostMedia({ postUrl, className = "" }: Props) {
+/** t.me / OpenGraph preview for a Telegram public post link. */
+export function TelegramMessageMedia({ postUrl, className = "" }: Props) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [isVideo, setIsVideo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -21,15 +18,10 @@ export function SoundCloudPostMedia({ postUrl, className = "" }: Props) {
     setLoading(true);
     setImageUrl(null);
     setImgFailed(false);
-    setIsVideo(false);
-
     api
-      .getSoundCloudPostPreview(postUrl)
+      .getTelegramMessagePreview(postUrl)
       .then((r) => {
-        if (!cancelled) {
-          setImageUrl(r.imageUrl);
-          setIsVideo(Boolean(r.isVideo));
-        }
+        if (!cancelled) setImageUrl(r.imageUrl);
       })
       .catch(() => {
         if (!cancelled) setImageUrl(null);
@@ -37,7 +29,6 @@ export function SoundCloudPostMedia({ postUrl, className = "" }: Props) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
     return () => {
       cancelled = true;
     };
@@ -53,28 +44,17 @@ export function SoundCloudPostMedia({ postUrl, className = "" }: Props) {
           <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
         </div>
       ) : showImage ? (
-        <>
-          <img
-            src={imageUrl!}
-            alt=""
-            className="h-full w-full object-cover"
-            referrerPolicy="no-referrer"
-            onError={() => setImgFailed(true)}
-          />
-          {isVideo ? (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/55 text-white shadow-lg">
-                <Play className="h-7 w-7 fill-current pl-1" />
-              </div>
-            </div>
-          ) : null}
-        </>
+        <img
+          src={imageUrl!}
+          alt=""
+          className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+          onError={() => setImgFailed(true)}
+        />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center">
-          <ImageIcon className="h-10 w-10 text-muted-foreground/60 transition-colors group-hover:text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground">
-            Preview unavailable - open post
-          </span>
+          <ImageIcon className="h-10 w-10 text-muted-foreground/60" />
+          <span className="text-xs font-medium text-muted-foreground">Open in Telegram</span>
         </div>
       )}
     </a>

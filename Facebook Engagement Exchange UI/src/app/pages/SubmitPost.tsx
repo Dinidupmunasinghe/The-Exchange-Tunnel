@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Coins, Info, CheckCircle, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
+import { Coins, Info, CheckCircle, CalendarDays } from "lucide-react";
 import { format, isBefore, setHours, setMinutes, startOfDay } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -10,7 +10,6 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
-import { Skeleton } from "../components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
@@ -27,14 +26,9 @@ const defaultSelection: Record<BaseEngagementKind, boolean> = {
   share: false
 };
 
-type PagePost = {
-  id: string;
-  message: string;
-  createdTime: string | null;
-  permalinkUrl: string;
-  previewImageUrl: string | null;
-  statusType: string | null;
-};
+function isTme(str: string) {
+  return /^https?:\/\/(www\.)?t\.me\//i.test(String(str).trim());
+}
 
 export function SubmitPost() {
   const [campaignName, setCampaignName] = useState("");
@@ -45,60 +39,23 @@ export function SubmitPost() {
   const [creditBudget, setCreditBudget] = useState([100]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
-  const [selectedPageName, setSelectedPageName] = useState<string | null>(null);
-  const [pagePosts, setPagePosts] = useState<PagePost[]>([]);
-  const [selectedPostId, setSelectedPostId] = useState("");
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
-  const [postsError, setPostsError] = useState<string | null>(null);
+  const [channelTitle, setChannelTitle] = useState<string | null>(null);
+  const [messageUrl, setMessageUrl] = useState("");
 
   useEffect(() => {
     api
       .getProfile()
       .then((res) => {
         setBalance(res.user?.credits ?? 0);
-        setSelectedPageName(res.user?.soundcloudActingAccountName ?? null);
+        setChannelTitle(res.user?.telegramActingChannelTitle ?? res.user?.telegramActingAccountName ?? null);
       })
       .catch(() => setBalance(null));
   }, []);
-
-  const loadPagePosts = async () => {
-    if (!selectedPageName) {
-      setPagePosts([]);
-      setSelectedPostId("");
-      setPostsError(null);
-      return;
-    }
-    setIsLoadingPosts(true);
-    setPostsError(null);
-    try {
-      const res = await api.getSelectedPagePosts();
-      setPagePosts(res.posts || []);
-      setSelectedPostId((current) => {
-        if (current && (res.posts || []).some((post) => post.id === current)) {
-          return current;
-        }
-        return res.posts?.[0]?.id || "";
-      });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Could not load Page posts";
-      setPostsError(msg);
-      setPagePosts([]);
-      setSelectedPostId("");
-    } finally {
-      setIsLoadingPosts(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPagePosts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPageName]);
 
   const derivedType = selectionToEngagementType(selection);
   const selectedEngagement = derivedType ? ENGAGEMENT_OPTIONS.find((t) => t.id === derivedType) : undefined;
   const cost = selectedEngagement?.cost || 1;
   const estimatedEngagements = derivedType ? Math.floor(creditBudget[0] / cost) : 0;
-  /** Upfront charge: credits per slot × number of slots (not the raw slider value). */
   const totalCharge = derivedType ? cost * estimatedEngagements : 0;
 
   const maxSpend = balance != null ? Math.min(500, balance) : 500;
@@ -127,76 +84,62 @@ export function SubmitPost() {
   }, [scheduleDate, scheduleTime]);
 
   const isScheduled = Boolean(scheduledAt);
-  const selectedPost = pagePosts.find((post) => post.id === selectedPostId) || null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPost) {
-      toast.error("Choose a SoundCloud post", {
-        description: "Select one of your connected posts before starting the campaign."
-      });
+    const u = messageUrl.trim();
+    if (!isTme(u)) {
+      toast.error("Use a t.me/… post link from your channel", { description: "e.g. https://t.me/yourchannel/42" });
+      return;
+    }
+    if (!channelTitle) {
+      toast.error("Connect your channel in Settings first", { description: "Add the bot, then connect @channel." });
       return;
     }
     if (!derivedType) {
-      toast.error("Choose at least one engagement type", {
-        description: "Select like, comment, and/or share."
-      });
+      toast.error("Choose at least one action");
       return;
     }
     if (estimatedEngagements < 1) {
-      toast.error("Increase your budget", {
-        description: `This combination needs at least ${cost} credits for one slot.`
-      });
+      toast.error("Increase your budget", { description: `Need at least ${cost} credits for one slot.` });
       return;
     }
     if (balance != null && totalCharge > balance) {
-      toast.error("Not enough credits", {
-        description: `You need ${totalCharge} credits reserved (${cost} × ${estimatedEngagements} slots) but have ${balance}. Earn more on Earn Credits or reduce the budget.`
-      });
+      toast.error("Not enough credits");
       return;
     }
     setIsSubmitting(true);
-
     try {
       let scheduledLaunchAt: string | undefined;
       if (scheduledAt) {
         if (scheduledAt.getTime() <= Date.now()) {
-          toast.error("Schedule must be in the future", {
-            description: "Pick a later date or time."
-          });
+          toast.error("Schedule must be in the future");
           setIsSubmitting(false);
           return;
         }
         scheduledLaunchAt = scheduledAt.toISOString();
       }
-
       await api.createCampaign({
         name: campaignName.trim() || undefined,
-        soundcloudPostId: selectedPost.id,
-        soundcloudPostUrl: selectedPost.permalinkUrl,
+        messageUrl: u,
         engagementType: derivedType,
         creditsPerEngagement: cost,
         maxEngagements: estimatedEngagements,
         ...(scheduledLaunchAt ? { scheduledLaunchAt } : {})
       });
-
       const later = Boolean(scheduledAt);
-      toast.success(later ? "Campaign scheduled" : "Campaign started!", {
-        description: later
-          ? `Launch at ${scheduledAt!.toLocaleString()} — ${estimatedEngagements} ${selectedEngagement?.name.toLowerCase()}.`
-          : `Your post is live for ${estimatedEngagements} ${selectedEngagement?.name.toLowerCase()}.`
-      });
+      toast.success(later ? "Campaign scheduled" : "Campaign started");
       setScheduleDate(undefined);
       setScheduleTime("09:00");
       setCampaignName("");
       setSelection(defaultSelection);
       setCreditBudget([100]);
-      api.getProfile().then((res) => setBalance(res.user?.credits ?? 0));
+      setMessageUrl("");
+      const res = await api.getProfile();
+      setBalance(res.user?.credits ?? 0);
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Failed to create campaign";
-      toast.error(msg.includes("Insufficient") ? "Insufficient credits" : "Could not create campaign", {
-        description: msg
-      });
+      const msg = error instanceof Error ? error.message : "Failed";
+      toast.error("Could not create campaign", { description: msg });
     } finally {
       setIsSubmitting(false);
     }
@@ -205,24 +148,23 @@ export function SubmitPost() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Submit Post</h1>
-        <p className="text-muted-foreground mt-1">Boost your SoundCloud post with credits</p>
+        <h1 className="text-3xl font-bold text-foreground">Submit post</h1>
+        <p className="text-muted-foreground mt-1">Promote a Telegram channel post (t.me/… link) with credits.</p>
       </div>
-      {!selectedPageName ? (
+      {!channelTitle ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Tip: select your SoundCloud account in{" "}
+          Connect the channel in{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
             Settings
           </Link>{" "}
-          so your account is fully ready for page-based actions.
+          (add the bot as admin) before running a campaign.
         </div>
       ) : null}
-
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-foreground">Campaign Details</CardTitle>
+              <CardTitle className="text-foreground">Campaign</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -231,122 +173,31 @@ export function SubmitPost() {
                   <Input
                     id="campaignName"
                     type="text"
-                    placeholder="e.g. Spring launch promo"
+                    placeholder="e.g. Launch week"
                     value={campaignName}
                     onChange={(e) => setCampaignName(e.target.value)}
                     maxLength={160}
                     className="bg-secondary border-0"
                   />
-                  <p className="text-xs text-muted-foreground">Optional — shown in My Campaigns.</p>
                 </div>
-
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <Label>Choose a SoundCloud post</Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {selectedPageName
-                          ? `Showing recent posts from ${selectedPageName}.`
-                          : "Select a SoundCloud account in Settings first."}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={loadPagePosts}
-                      disabled={!selectedPageName || isLoadingPosts}
-                    >
-                      <RefreshCw className={cn("mr-2 h-4 w-4", isLoadingPosts && "animate-spin")} />
-                      Refresh
-                    </Button>
-                  </div>
-
-                  {!selectedPageName ? (
-                    <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-                      Connect and select your SoundCloud account in{" "}
-                      <Link to="/settings" className="font-medium text-primary underline-offset-2 hover:underline">
-                        Settings
-                      </Link>{" "}
-                      to load posts here.
-                    </div>
-                  ) : isLoadingPosts ? (
-                    <div className="space-y-3">
-                      {[0, 1, 2].map((item) => (
-                        <div key={item} className="rounded-lg border border-border p-4 space-y-3">
-                          <Skeleton className="h-4 w-1/3" />
-                          <Skeleton className="h-4 w-full" />
-                          <Skeleton className="h-4 w-5/6" />
-                          <Skeleton className="h-32 w-full" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : postsError ? (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-                      <p>{postsError}</p>
-                      <p className="mt-2 text-xs text-amber-100/80">
-                        Try refreshing, or reconnect/select the account again in Settings if permissions changed.
-                      </p>
-                    </div>
-                  ) : pagePosts.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-                      No recent posts found for this account. Create a post on SoundCloud, then click Refresh.
-                    </div>
-                  ) : (
-                    <div className="max-h-[480px] space-y-3 overflow-y-auto pr-1">
-                      {pagePosts.map((post) => {
-                        const active = post.id === selectedPostId;
-                        const caption = post.message?.trim() || "Photo/video post without caption";
-                        return (
-                          <button
-                            key={post.id}
-                            type="button"
-                            onClick={() => setSelectedPostId(post.id)}
-                            className={cn(
-                              "w-full rounded-lg border p-4 text-left transition-colors",
-                              active ? "border-primary bg-primary/10" : "border-border bg-secondary/20 hover:bg-secondary/40"
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <p className="line-clamp-3 text-sm font-medium text-foreground">{caption}</p>
-                                <p className="mt-2 text-xs text-muted-foreground">
-                                  {post.createdTime ? new Date(post.createdTime).toLocaleString() : "Recent post"}
-                                  {post.statusType ? ` • ${post.statusType.replace(/_/g, " ")}` : ""}
-                                </p>
-                              </div>
-                              {active ? (
-                                <span className="rounded-full bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground">
-                                  Selected
-                                </span>
-                              ) : null}
-                            </div>
-                            {post.previewImageUrl ? (
-                              <div className="mt-3 overflow-hidden rounded-md border border-border/60 bg-black/5 p-2">
-                                <img
-                                  src={post.previewImageUrl}
-                                  alt="SoundCloud post preview"
-                                  className="max-h-[520px] w-full rounded object-contain"
-                                />
-                              </div>
-                            ) : null}
-                            <div className="mt-3 flex items-center justify-between gap-3">
-                              <span className="truncate text-xs text-muted-foreground">{post.permalinkUrl}</span>
-                              <span className="inline-flex items-center text-xs font-medium text-primary">
-                                Open
-                                <ExternalLink className="ml-1 h-3.5 w-3.5" />
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <Label htmlFor="tme">t.me post link</Label>
+                  <Input
+                    id="tme"
+                    type="url"
+                    placeholder="https://t.me/yourchannel/12"
+                    value={messageUrl}
+                    onChange={(e) => setMessageUrl(e.target.value)}
+                    className="bg-secondary border-0 font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {channelTitle
+                      ? `Using connected channel. Post must be from: ${channelTitle}.`
+                      : "Connect a channel in Settings first."}
+                  </p>
                 </div>
-
                 <div className="space-y-2">
-                  <Label>Schedule launch (optional)</Label>
+                  <Label>Schedule (optional)</Label>
                   <div className="flex flex-wrap items-center gap-2">
                     <Popover open={scheduleOpen} onOpenChange={setScheduleOpen}>
                       <PopoverTrigger asChild>
@@ -359,9 +210,7 @@ export function SubmitPost() {
                           )}
                         >
                           <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-70" />
-                          {scheduledAt
-                            ? format(scheduledAt, "MMM d, yyyy · h:mm a")
-                            : "Pick date & time"}
+                          {scheduledAt ? format(scheduledAt, "MMM d, yyyy · h:mm a") : "Pick date & time"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -370,14 +219,9 @@ export function SubmitPost() {
                           selected={scheduleDate}
                           onSelect={(d) => setScheduleDate(d)}
                           disabled={(day) => isBefore(startOfDay(day), startOfDay(new Date()))}
-                          initialFocus
                         />
-                        <div className="border-t border-border p-3 space-y-2">
-                          <Label htmlFor="schedule-time" className="text-xs text-muted-foreground">
-                            Time
-                          </Label>
+                        <div className="border-t border-border p-3">
                           <Input
-                            id="schedule-time"
                             type="time"
                             value={scheduleTime}
                             onChange={(e) => setScheduleTime(e.target.value)}
@@ -391,7 +235,6 @@ export function SubmitPost() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="text-muted-foreground"
                         onClick={() => {
                           setScheduleDate(undefined);
                           setScheduleTime("09:00");
@@ -401,15 +244,10 @@ export function SubmitPost() {
                       </Button>
                     ) : null}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Open the calendar to choose a day, set the time below it, then click away to close. Leave unset to
-                    start immediately; scheduled campaigns stay pending until launch.
-                  </p>
                 </div>
-
                 <div className="space-y-3">
-                  <Label>Engagement types</Label>
-                  <p className="text-xs text-muted-foreground -mt-1">Select one or more. Pricing follows the combination (e.g. all three = one bundled task).</p>
+                  <Label>Action bundle</Label>
+                  <p className="text-xs text-muted-foreground -mt-1">Same credit model: workers complete the bundle you pick.</p>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {BASE_ENGAGEMENT_CHOICES.map((opt) => {
                       const id = `eng-${opt.id}`;
@@ -417,20 +255,18 @@ export function SubmitPost() {
                       return (
                         <div
                           key={opt.id}
-                          className={
-                            "flex items-start gap-3 rounded-lg border-2 p-4 transition-colors " +
-                            (on ? "border-primary bg-primary/10" : "border-border bg-secondary/30")
-                          }
+                          className={cn(
+                            "flex items-start gap-3 rounded-lg border-2 p-4",
+                            on ? "border-primary bg-primary/10" : "border-border bg-secondary/30"
+                          )}
                         >
-                          <Checkbox
-                            id={id}
-                            checked={on}
-                            onCheckedChange={() => toggleKind(opt.id)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <Label htmlFor={id} className="flex cursor-pointer items-center gap-2 font-medium text-foreground">
-                              <span className="text-xl">{opt.icon}</span>
-                              {opt.name}
+                          <Checkbox id={id} checked={on} onCheckedChange={() => toggleKind(opt.id)} />
+                          <div className="min-w-0">
+                            <Label
+                              htmlFor={id}
+                              className="font-medium text-foreground flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="text-xl">{opt.icon}</span> {opt.name}
                             </Label>
                             <p className="text-xs text-muted-foreground mt-1">{opt.costHint}</p>
                           </div>
@@ -439,53 +275,45 @@ export function SubmitPost() {
                     })}
                   </div>
                 </div>
-
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <Label>Budget target</Label>
-                    <span className="text-sm font-bold text-primary">{creditBudget[0]} credits</span>
+                    <Label>Budget (credits)</Label>
+                    <span className="text-sm font-bold text-primary">{creditBudget[0]}</span>
                   </div>
                   <Slider
                     value={creditBudget}
                     onValueChange={(v) => {
-                      const raw = v[0];
-                      const clamped = Math.min(maxSpend, Math.max(minSpend, raw));
-                      setCreditBudget([clamped]);
+                      const c = Math.min(maxSpend, Math.max(minSpend, v[0]));
+                      setCreditBudget([c]);
                     }}
                     max={maxSpend}
                     min={minSpend}
-                    step={maxSpend < 50 ? 1 : 10}
+                    step={10}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{minSpend} credits</span>
-                    <span>{maxSpend} credits</span>
-                    {balance != null ? (
-                      <span className="text-amber-600/90 dark:text-amber-400/90">Your balance caps this</span>
-                    ) : null}
-                  </div>
                 </div>
-
                 <Button
                   type="submit"
                   className="w-full"
                   size="lg"
                   disabled={
-                    !selectedPostId ||
+                    !isTme(messageUrl) ||
+                    !channelTitle ||
                     isSubmitting ||
                     !derivedType ||
                     (balance != null && totalCharge > balance)
                   }
                 >
                   {isSubmitting ? (
-                    <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      {isScheduled ? "Scheduling…" : "Starting campaign…"}
-                    </>
+                    isScheduled ? (
+                      "Scheduling…"
+                    ) : (
+                      "Starting…"
+                    )
                   ) : (
                     <>
                       <CheckCircle className="mr-2 h-5 w-5" />
-                      {isScheduled ? "Schedule campaign" : "Start campaign"}
+                      {isScheduled ? "Schedule" : "Start campaign"}
                     </>
                   )}
                 </Button>
@@ -493,87 +321,47 @@ export function SubmitPost() {
             </CardContent>
           </Card>
         </div>
-
         <div className="space-y-4">
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-foreground">Campaign estimate</CardTitle>
+              <CardTitle>Estimate</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Selected post</span>
-                  <span className="font-medium text-foreground text-right">
-                    {selectedPost ? "Ready" : "Choose a post"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Combination</span>
-                  <span className="font-medium text-foreground text-right">
-                    {selectedEngagement?.name ?? "—"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Cost per completion</span>
-                  <span className="font-medium text-foreground">{derivedType ? cost : "—"} credits</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Reserved upfront</span>
-                  <span className="font-medium text-foreground">{derivedType ? totalCharge : "—"} credits</span>
-                </div>
-                {derivedType && balance != null && totalCharge > balance ? (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Need {totalCharge - balance} more credits, or lower the budget.
-                  </p>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Type</span>
+                <span className="font-medium text-right">{selectedEngagement?.name ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Per slot</span>
+                <span className="font-medium">{cost} cr</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Reserved</span>
+                <span className="font-medium">{totalCharge} cr</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Slots</span>
+                <span className="text-2xl font-bold text-primary">{derivedType ? estimatedEngagements : "—"}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 flex gap-2">
+              <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground">Earners must join the channel; the app checks membership with your bot.</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 flex items-center gap-3">
+              <Coins className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-xs text-muted-foreground">Balance</p>
+                <p className="text-xl font-bold">{balance != null ? `${balance} cr` : "—"}</p>
+                {balance != null && balance < 200 ? (
+                  <Link to="/earn" className="text-xs text-primary underline">
+                    Earn credits
+                  </Link>
                 ) : null}
-              </div>
-
-              <div className="border-t border-border pt-4">
-                <div className="rounded-lg bg-primary/10 p-4">
-                  <p className="text-xs text-muted-foreground">Estimated slots</p>
-                  <p className="text-3xl font-bold text-primary mt-1">{derivedType ? estimatedEngagements : "—"}</p>
-                  <p className="text-sm text-muted-foreground">{selectedEngagement?.name ?? "Pick at least one type"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-blue-500/20 bg-blue-500/5">
-            <CardContent className="p-4">
-              <div className="flex gap-3">
-                <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">Multi-select</p>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• Each slot is one proof submission for the whole combination you chose</li>
-                    <li>• Earn Credits enables every action that matches your selection</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Coins className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">Available balance</p>
-                  <p className="text-xl font-bold text-foreground">
-                    {balance != null ? `${balance.toLocaleString()} credits` : "—"}
-                  </p>
-                  {balance != null && balance < 500 ? (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Low balance?{" "}
-                      <Link to="/earn" className="text-primary font-medium underline-offset-2 hover:underline">
-                        Earn credits
-                      </Link>{" "}
-                      first — campaigns lock the full slot total up front.
-                    </p>
-                  ) : null}
-                </div>
               </div>
             </CardContent>
           </Card>

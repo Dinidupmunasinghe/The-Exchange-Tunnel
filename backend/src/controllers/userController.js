@@ -10,9 +10,9 @@ async function getProfile(req, res) {
       "credits",
       "dailyEarnedCredits",
       "dailyEarnedAt",
-      "soundcloudUserId",
-      "soundcloudActingAccountId",
-      "soundcloudActingAccountName",
+      "telegramUserId",
+      "telegramActingChannelId",
+      "telegramActingChannelTitle",
       "createdAt"
     ]
   });
