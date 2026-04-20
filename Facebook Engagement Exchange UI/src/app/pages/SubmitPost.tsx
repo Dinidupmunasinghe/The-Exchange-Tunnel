@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Coins, Info, CheckCircle, CalendarDays } from "lucide-react";
+import { Coins, Info, CheckCircle, CalendarDays, Clock3 } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -10,6 +10,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
 import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
@@ -28,6 +29,8 @@ const defaultSelection: Record<BaseEngagementKind, boolean> = {
 
 const BOT_AT = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "ExchangeTunnelApp_bot").trim();
 const BOT_DISPLAY = BOT_AT.startsWith("@") ? BOT_AT : `@${BOT_AT}`;
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
 function isTme(str: string) {
   return /^https?:\/\/(www\.)?t\.me\//i.test(String(str).trim());
@@ -79,6 +82,9 @@ export function SubmitPost() {
   const toggleKind = (kind: BaseEngagementKind) => {
     setSelection((prev) => ({ ...prev, [kind]: !prev[kind] }));
   };
+  const [scheduleHour, scheduleMinute] = scheduleTime.split(":");
+  const updateScheduleHour = (h: string) => setScheduleTime(`${h}:${scheduleMinute ?? "00"}`);
+  const updateScheduleMinute = (m: string) => setScheduleTime(`${scheduleHour ?? "00"}:${m}`);
 
   const scheduledAt = useMemo(() => {
     if (!scheduleDate) return null;
@@ -292,17 +298,35 @@ export function SubmitPost() {
                         </PopoverContent>
                       </Popover>
                     </div>
-                    <div className="min-w-[140px] space-y-1">
-                      <Label htmlFor="scheduleTime" className="text-xs text-muted-foreground">
-                        Time
-                      </Label>
-                      <Input
-                        id="scheduleTime"
-                        type="time"
-                        value={scheduleTime}
-                        onChange={(e) => setScheduleTime(e.target.value)}
-                        className="bg-secondary border-0 [color-scheme:dark]"
-                      />
+                    <div className="min-w-[180px] space-y-1">
+                      <Label className="text-xs text-muted-foreground">Time</Label>
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md bg-secondary px-2 py-1.5">
+                        <Select value={scheduleHour || "09"} onValueChange={updateScheduleHour}>
+                          <SelectTrigger className="h-8 border-0 bg-transparent px-2">
+                            <SelectValue placeholder="HH" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-64">
+                            {HOURS.map((h) => (
+                              <SelectItem key={h} value={h}>
+                                {h}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Clock3 className="h-4 w-4 text-muted-foreground" />
+                        <Select value={scheduleMinute || "00"} onValueChange={updateScheduleMinute}>
+                          <SelectTrigger className="h-8 border-0 bg-transparent px-2">
+                            <SelectValue placeholder="MM" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-64">
+                            {MINUTES.map((m) => (
+                              <SelectItem key={m} value={m}>
+                                {m}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                     {scheduleDate ? (
                       <Button
