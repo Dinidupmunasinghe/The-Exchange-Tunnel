@@ -7,6 +7,15 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { Textarea } from "../components/ui/textarea";
 import { toast } from "sonner";
 import { api } from "../services/api";
 import {
@@ -33,6 +42,12 @@ type TaskRow = {
 };
 
 type MyEngagementRow = { id: number; campaignId: number; taskId: number; actionKind: string };
+type PendingComment = {
+  campaignId: number;
+  taskId: number;
+  engagementType: string;
+  rewardCredits: number;
+};
 
 function campaignInitials(title: string): string {
   const t = title.trim();
@@ -75,6 +90,10 @@ export function EarnCredits() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false);
+  const [commentProof, setCommentProof] = useState("");
+  const [pendingComment, setPendingComment] = useState<PendingComment | null>(null);
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -139,6 +158,40 @@ export function EarnCredits() {
         return topB - topA;
       });
   }, [tasks]);
+
+  const handleCommentSubmit = async () => {
+    if (!pendingComment) return;
+    const proofText = commentProof.trim();
+    if (proofText.length < 10) {
+      toast.error("Comment proof is required (at least 10 characters).");
+      return;
+    }
+    const key = `${pendingComment.campaignId}-comment`;
+    setSubmittingComment(true);
+    setBusy(key);
+    try {
+      await api.completeTask({
+        taskId: pendingComment.taskId,
+        engagementType: pendingComment.engagementType,
+        actionKind: "comment",
+        proofText,
+      });
+      toast.success(`Earned ${pendingComment.rewardCredits} credits`, {
+        description: `Recorded · comment · task #${pendingComment.taskId}`,
+      });
+      setCommentDialogOpen(false);
+      setCommentProof("");
+      setPendingComment(null);
+      const refreshed = await api.getTasks();
+      setTasks(refreshed.tasks as TaskRow[]);
+      setMyEngagements(refreshed.myEngagements ?? []);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not update engagement");
+    } finally {
+      setSubmittingComment(false);
+      setBusy(null);
+    }
+  };
 
   const handleAction = async (
     campaignId: number,
@@ -209,27 +262,17 @@ export function EarnCredits() {
         return;
       }
 
-      const proofText =
-        action === "subscribe"
-          ? undefined
-          : window.prompt("Paste the exact comment text you posted on Telegram (min 10 chars):", "")?.trim();
-      if (action === "comment" && (!proofText || proofText.length < 10)) {
-        toast.error("Comment proof is required (at least 10 characters).");
+      if (action === "comment") {
+        setPendingComment({
+          campaignId,
+          taskId: task.id,
+          engagementType,
+          rewardCredits: task.rewardCredits,
+        });
+        setCommentProof("");
+        setCommentDialogOpen(true);
         return;
       }
-
-      await api.completeTask({
-        taskId: task.id,
-        engagementType,
-        actionKind: action,
-        ...(proofText ? { proofText } : {}),
-      });
-      toast.success(`Earned ${task.rewardCredits} credits`, {
-          description: `Recorded · ${action} · task #${task.id}`
-      });
-      const refreshed = await api.getTasks();
-      setTasks(refreshed.tasks as TaskRow[]);
-      setMyEngagements(refreshed.myEngagements ?? []);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not update engagement");
     } finally {
@@ -380,6 +423,55 @@ export function EarnCredits() {
           );
         })}
       </div>
+
+      <Dialog
+        open={commentDialogOpen}
+        onOpenChange={(open) => {
+          if (submittingComment) return;
+          setCommentDialogOpen(open);
+          if (!open) {
+            setCommentProof("");
+            setPendingComment(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit Comment Proof</DialogTitle>
+            <DialogDescription>
+              Paste the exact comment you posted on Telegram. Minimum 10 characters.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              value={commentProof}
+              onChange={(e) => setCommentProof(e.target.value)}
+              placeholder="Paste your Telegram comment text here..."
+              maxLength={500}
+              className="min-h-28"
+              disabled={submittingComment}
+            />
+            <p className="text-xs text-muted-foreground">{commentProof.trim().length}/500</p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCommentDialogOpen(false);
+                setCommentProof("");
+                setPendingComment(null);
+              }}
+              disabled={submittingComment}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void handleCommentSubmit()} disabled={submittingComment}>
+              {submittingComment ? "Submitting..." : "Submit proof"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
