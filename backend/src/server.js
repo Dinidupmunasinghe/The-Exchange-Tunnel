@@ -48,7 +48,7 @@ async function bootstrap() {
     }, 60 * 1000);
     setInterval(() => {
       auditSubscribeEngagements().catch(() => undefined);
-    }, 2 * 60 * 1000);
+    }, 30 * 1000);
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: { origin: env.corsOrigin, methods: ["GET", "POST"] }
