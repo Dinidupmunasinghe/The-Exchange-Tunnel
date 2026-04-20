@@ -298,12 +298,12 @@ export function SubmitPost() {
                         </PopoverContent>
                       </Popover>
                     </div>
-                    <div className="min-w-[180px] space-y-1">
+                    <div className="min-w-[240px] space-y-1">
                       <Label className="text-xs text-muted-foreground">Time</Label>
-                      <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2 rounded-md bg-secondary px-2 py-1.5">
-                        <Clock3 className="h-4 w-4 text-muted-foreground ml-1" />
+                      <div className="flex h-9 items-center gap-2 rounded-md bg-secondary px-3">
+                        <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <Select value={scheduleHour || "09"} onValueChange={updateScheduleHour}>
-                          <SelectTrigger className="h-8 border-0 bg-transparent px-2">
+                          <SelectTrigger className="h-8 w-[76px] border-0 bg-transparent px-2 shadow-none focus-visible:ring-0">
                             <SelectValue placeholder="HH" />
                           </SelectTrigger>
                           <SelectContent className="max-h-64">
@@ -315,7 +315,7 @@ export function SubmitPost() {
                           </SelectContent>
                         </Select>
                         <Select value={scheduleMinute || "00"} onValueChange={updateScheduleMinute}>
-                          <SelectTrigger className="h-8 border-0 bg-transparent px-2">
+                          <SelectTrigger className="h-8 w-[76px] border-0 bg-transparent px-2 shadow-none focus-visible:ring-0">
                             <SelectValue placeholder="MM" />
                           </SelectTrigger>
                           <SelectContent className="max-h-64">
