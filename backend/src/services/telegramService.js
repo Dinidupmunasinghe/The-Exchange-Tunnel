@@ -157,16 +157,33 @@ async function getChat(chatId) {
  */
 async function isUserMemberOrAdminOfChat(channelChatId, userTelegramId) {
   if (!isConfigured() || !channelChatId || userTelegramId == null) return false;
+  const detail = await getUserChatMemberStatus(channelChatId, userTelegramId);
+  return detail.ok;
+}
+
+/**
+ * Returns detailed membership check result for better UX/debugging.
+ * @param {string|number} channelChatId
+ * @param {string|number} userTelegramId
+ */
+async function getUserChatMemberStatus(channelChatId, userTelegramId) {
+  if (!isConfigured() || !channelChatId || userTelegramId == null) {
+    return { ok: false, status: null, error: "Bot is not configured" };
+  }
   try {
     const data = await botRequest("getChatMember", {
       chat_id: String(channelChatId),
       user_id: String(userTelegramId)
     });
     const st = data.result && data.result.status;
-    if (st === "left" || st === "kicked" || st === "error" || !st) return false;
-    return st === "member" || st === "administrator" || st === "creator" || st === "restricted";
-  } catch {
-    return false;
+    if (st === "left" || st === "kicked" || st === "error" || !st) {
+      return { ok: false, status: st || null, error: `Status is ${st || "unknown"}` };
+    }
+    const ok = st === "member" || st === "administrator" || st === "creator" || st === "restricted";
+    return { ok, status: st, error: ok ? null : `Status is ${st}` };
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    return { ok: false, status: null, error: raw || "Telegram getChatMember failed" };
   }
 }
 
@@ -259,6 +276,7 @@ module.exports = {
   resolveChannelChatIdFromTme,
   getChat,
   isUserMemberOrAdminOfChat,
+  getUserChatMemberStatus,
   isUserChannelAdminOrCreator,
   chatMatchesIdOrUsername,
   fetchTmePagePreview
