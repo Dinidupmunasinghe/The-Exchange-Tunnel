@@ -1,6 +1,13 @@
 const express = require("express");
 const { body } = require("express-validator");
-const { register, login, telegramAuth } = require("../controllers/authController");
+const {
+  register,
+  login,
+  telegramAuth,
+  telegramDeeplinkStart,
+  telegramDeeplinkPoll
+} = require("../controllers/authController");
+const { handleTelegramWebhook } = require("../controllers/telegramWebhookController");
 const validateRequest = require("../middleware/validateRequest");
 const { authLimiter } = require("../middleware/rateLimiters");
 
@@ -41,5 +48,14 @@ router.post(
   validateRequest,
   telegramAuth
 );
+
+/** Deep-link login: start (returns token + t.me URL) */
+router.post("/telegram-deeplink/start", authLimiter, telegramDeeplinkStart);
+
+/** Deep-link login: poll (frontend calls every 2 s until status=ok or expired) */
+router.get("/telegram-deeplink/poll", telegramDeeplinkPoll);
+
+/** Telegram Bot webhook — receives /start login_<token> messages from the bot */
+router.post("/telegram-webhook", handleTelegramWebhook);
 
 module.exports = router;

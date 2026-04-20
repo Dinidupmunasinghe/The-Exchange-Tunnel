@@ -23,7 +23,9 @@ const env = {
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
   /** Telegram: bot token = Login Widget HMAC key + getChat / getChatMember. */
   telegram: {
-    botToken: process.env.TELEGRAM_BOT_TOKEN || ""
+    botToken: process.env.TELEGRAM_BOT_TOKEN || "",
+    botName: process.env.TELEGRAM_BOT_NAME || "",
+    webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || ""
   },
   limits: {
     dailyEarnLimit: Number(process.env.DAILY_EARN_LIMIT || 500),

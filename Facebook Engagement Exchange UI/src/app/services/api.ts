@@ -137,6 +137,45 @@ export async function loginWithTelegram(auth: Record<string, string | number | u
   return data;
 }
 
+/** Email + password login */
+export async function loginWithEmail(email: string, password: string) {
+  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  setToken(data.token);
+  return data;
+}
+
+/** Email + password register */
+export async function registerWithEmail(email: string, password: string, name?: string) {
+  const data = await requestWithoutAuth<{ token: string; user: unknown }>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password, name }),
+  });
+  setToken(data.token);
+  return data;
+}
+
+/** Deep-link login step 1: get a one-time token + t.me URL */
+export async function startTelegramDeeplinkLogin() {
+  return requestWithoutAuth<{ token: string; expiresInMs: number }>("/auth/telegram-deeplink/start", {
+    method: "POST",
+  });
+}
+
+type DeeplinkPollResult =
+  | { status: "pending" }
+  | { status: "expired"; message?: string }
+  | { status: "ok"; token: string; user: unknown };
+
+/** Deep-link login step 2: poll until status = ok | expired */
+export async function pollTelegramDeeplinkLogin(token: string): Promise<DeeplinkPollResult> {
+  return requestWithoutAuth<DeeplinkPollResult>(
+    `/auth/telegram-deeplink/poll?token=${encodeURIComponent(token)}`
+  );
+}
+
 export const api = {
   getProfile: () => authRequest("/users/me") as Promise<{ user: any }>,
   getDashboard: () => authRequest("/users/dashboard") as Promise<{ stats: any }>,
