@@ -4,7 +4,7 @@ const sequelize = require("../config/database");
 const tg = require("../services/telegramService");
 const { verifyEngagement } = require("../services/engagementVerification");
 const { earnCredits, refundCredits, reverseEarnCredits } = require("../services/creditService");
-const { ENGAGEMENT_TYPES, bundleAllowsAction } = require("../constants/engagement");
+const { ENGAGEMENT_TYPES, ACTION_KINDS, bundleAllowsAction } = require("../constants/engagement");
 
 function isSuspiciousSubmission(proofText) {
   if (!proofText) return true;
@@ -35,7 +35,7 @@ async function submitTaskCompletion(req, res) {
   const { taskId, engagementType, proofText: proofRaw, actionKind } = req.body;
   const proofText = typeof proofRaw === "string" ? proofRaw : "";
 
-  if (!["like", "comment", "share"].includes(actionKind)) {
+  if (!ACTION_KINDS.includes(actionKind)) {
     return res.status(400).json({ message: "Invalid action kind" });
   }
   if (!ENGAGEMENT_TYPES.includes(engagementType)) {
@@ -81,8 +81,13 @@ async function submitTaskCompletion(req, res) {
         error.status = 400;
         throw error;
       }
+      const storedActionKind = actionKind === "subscribe" ? null : actionKind;
+      const dupWhere =
+        engagementType === "subscribe"
+          ? { userId: req.user.id, campaignId: task.campaignId, engagementType: "subscribe" }
+          : { userId: req.user.id, campaignId: task.campaignId, actionKind: storedActionKind };
       const dup = await db.Engagement.findOne({
-        where: { userId: req.user.id, campaignId: task.campaignId, actionKind },
+        where: dupWhere,
         transaction
       });
       if (dup) {
@@ -162,7 +167,8 @@ async function submitTaskCompletion(req, res) {
       task.assignedAt = task.assignedAt || new Date();
       await task.save({ transaction });
 
-      const metaId = `tg-mem-${tUid}-${channelId}`;
+      const metaId =
+        actionKind === "subscribe" ? `tg-sub-${tUid}-${channelId}` : `tg-mem-${tUid}-${channelId}`;
 
       await db.Engagement.create(
         {
@@ -170,10 +176,13 @@ async function submitTaskCompletion(req, res) {
           campaignId: task.campaignId,
           taskId: task.id,
           engagementType,
-          actionKind,
+          actionKind: storedActionKind,
           metaEngagementId: metaId,
           verificationStatus: "verified",
-          verificationDetails: "Telegram: channel membership + proof rules"
+          verificationDetails:
+            actionKind === "subscribe"
+              ? "Telegram: channel membership verified for subscribe campaign"
+              : "Telegram: channel membership + proof rules"
         },
         { transaction }
       );
@@ -185,7 +194,10 @@ async function submitTaskCompletion(req, res) {
       await earnCredits({
         userId: req.user.id,
         amount: task.rewardCredits,
-        reason: `Earned from ${actionKind} on campaign #${task.campaignId} (task #${task.id})`,
+        reason:
+          actionKind === "subscribe"
+            ? `Earned from channel subscribe on campaign #${task.campaignId} (task #${task.id})`
+            : `Earned from ${actionKind} on campaign #${task.campaignId} (task #${task.id})`,
         referenceType: "task",
         referenceId: task.id,
         transaction

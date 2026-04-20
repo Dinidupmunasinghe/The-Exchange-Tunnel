@@ -26,13 +26,9 @@ async function createCampaign(req, res) {
   const body = req.body;
   const name = body.name;
   const messageUrl = body.messageUrl || body.soundcloudPostUrl || body.facebookPostUrl;
+  const channelUrl = body.channelUrl;
   const { engagementType, creditsPerEngagement, maxEngagements, scheduledLaunchAt: scheduleRaw } = body;
 
-  if (!messageUrl || typeof messageUrl !== "string" || !tg.isLikelyTelegramMessageUrl(messageUrl)) {
-    return res
-      .status(400)
-      .json({ message: "messageUrl is required and must be a t.me/… post link in your channel" });
-  }
   if (!tg.isConfigured()) {
     return res.status(503).json({ message: "Server: TELEGRAM_BOT_TOKEN is not configured" });
   }
@@ -54,38 +50,67 @@ async function createCampaign(req, res) {
       .json({ message: "Connect your Telegram channel in Settings before creating a campaign" });
   }
 
-  const parsed = tg.parseTmeMessageUrl(messageUrl);
-  if (!parsed) {
-    return res
-      .status(400)
-      .json({ message: "Could not parse t.me post link. Use: https://t.me/channel/123 or t.me/c/.../…" });
-  }
-  const resolved = await tg
-    .resolveChannelChatIdFromTme(parsed, String(owner.telegramActingChannelId))
-    .catch(() => null);
-  if (resolved == null) {
-    return res.status(400).json({ message: "Could not resolve channel for this post link" });
-  }
-  if (resolved.error) {
-    return res.status(400).json({ message: resolved.error });
-  }
-  if (!resolved.chatId) {
-    return res.status(400).json({ message: "Invalid Telegram link" });
-  }
-  if (String(resolved.chatId) !== String(owner.telegramActingChannelId)) {
-    return res
-      .status(400)
-      .json({ message: "The post must belong to the same channel you connected in Settings" });
+  let finalMessageUrl = messageUrl;
+  let key;
+
+  if (engagementType === "subscribe") {
+    const selectedChannelId = String(owner.telegramActingChannelId);
+    const channelInfo = await tg.getChat(selectedChannelId).catch(() => null);
+    if (!channelInfo || !channelInfo.id) {
+      return res.status(400).json({ message: "Could not load your connected channel from Telegram" });
+    }
+    if (!channelInfo.username) {
+      return res.status(400).json({
+        message:
+          "Subscribe campaigns require a public channel username. Set one in Telegram (e.g. @mychannel), then try again."
+      });
+    }
+    if (channelUrl && typeof channelUrl === "string" && tg.isLikelyTelegramMessageUrl(channelUrl)) {
+      const parsedChannel = tg.parseTmeMessageUrl(channelUrl);
+      if (parsedChannel && parsedChannel.kind === "public" && parsedChannel.messageId) {
+        return res.status(400).json({ message: "Subscribe campaigns need a channel link, not a post link" });
+      }
+    }
+    finalMessageUrl = `https://t.me/${channelInfo.username}`;
+    key = `sub_${selectedChannelId}`;
+  } else {
+    if (!messageUrl || typeof messageUrl !== "string" || !tg.isLikelyTelegramMessageUrl(messageUrl)) {
+      return res
+        .status(400)
+        .json({ message: "messageUrl is required and must be a t.me/… post link in your channel" });
+    }
+    const parsed = tg.parseTmeMessageUrl(messageUrl);
+    if (!parsed) {
+      return res
+        .status(400)
+        .json({ message: "Could not parse t.me post link. Use: https://t.me/channel/123 or t.me/c/.../…" });
+    }
+    const resolved = await tg
+      .resolveChannelChatIdFromTme(parsed, String(owner.telegramActingChannelId))
+      .catch(() => null);
+    if (resolved == null) {
+      return res.status(400).json({ message: "Could not resolve channel for this post link" });
+    }
+    if (resolved.error) {
+      return res.status(400).json({ message: resolved.error });
+    }
+    if (!resolved.chatId) {
+      return res.status(400).json({ message: "Invalid Telegram link" });
+    }
+    if (String(resolved.chatId) !== String(owner.telegramActingChannelId)) {
+      return res
+        .status(400)
+        .json({ message: "The post must belong to the same channel you connected in Settings" });
+    }
+    key = tg.stableKeyFromTmeMessage(parsed) || stableKeyFromUrl(messageUrl);
   }
 
   const isOwnerAdmin = await tg
-    .isUserChannelAdminOrCreator(String(resolved.chatId), String(owner.telegramUserId))
+    .isUserChannelAdminOrCreator(String(owner.telegramActingChannelId), String(owner.telegramUserId))
     .catch(() => false);
   if (!isOwnerAdmin) {
-    return res.status(403).json({ message: "You must be an admin of the channel in this post link" });
+    return res.status(403).json({ message: "You must be an admin of the connected channel" });
   }
-
-  const key = tg.stableKeyFromTmeMessage(parsed) || stableKeyFromUrl(messageUrl);
 
   const totalBudget = creditsPerEngagement * maxEngagements;
   const campaignName = normalizeCampaignName(name);
@@ -108,7 +133,7 @@ async function createCampaign(req, res) {
         userId: req.user.id,
         name: campaignName,
         messageKey: key,
-        messageUrl,
+        messageUrl: finalMessageUrl,
         engagementType,
         creditsPerEngagement,
         maxEngagements,

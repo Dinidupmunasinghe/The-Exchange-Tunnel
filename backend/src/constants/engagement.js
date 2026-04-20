@@ -1,5 +1,6 @@
 /** Allowed campaign / task engagement bundles (single action or combinations, or all three). */
 const ENGAGEMENT_TYPES = [
+  "subscribe",
   "like",
   "comment",
   "share",
@@ -9,11 +10,13 @@ const ENGAGEMENT_TYPES = [
   "all"
 ];
 
-const ACTION_KINDS = ["like", "comment", "share"];
+const ACTION_KINDS = ["subscribe", "like", "comment", "share"];
 
 /** Single-button actions the earner can take (subset of bundle). */
 function bundleAllowsAction(engagementType, action) {
   switch (engagementType) {
+    case "subscribe":
+      return action === "subscribe";
     case "like":
       return action === "like";
     case "comment":

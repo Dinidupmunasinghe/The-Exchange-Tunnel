@@ -34,6 +34,7 @@ function isTme(str: string) {
 }
 
 export function SubmitPost() {
+  const [campaignMode, setCampaignMode] = useState<"subscribe" | "engagement">("subscribe");
   const [campaignName, setCampaignName] = useState("");
   const [selection, setSelection] = useState<Record<BaseEngagementKind, boolean>>(defaultSelection);
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
@@ -56,10 +57,12 @@ export function SubmitPost() {
   }, []);
 
   const derivedType = selectionToEngagementType(selection);
+  const effectiveType = campaignMode === "subscribe" ? "subscribe" : derivedType;
   const selectedEngagement = derivedType ? ENGAGEMENT_OPTIONS.find((t) => t.id === derivedType) : undefined;
-  const cost = selectedEngagement?.cost || 1;
-  const estimatedEngagements = derivedType ? Math.floor(creditBudget[0] / cost) : 0;
-  const totalCharge = derivedType ? cost * estimatedEngagements : 0;
+  const subscribeOption = ENGAGEMENT_OPTIONS.find((t) => t.id === "subscribe");
+  const cost = campaignMode === "subscribe" ? (subscribeOption?.cost ?? 5) : (selectedEngagement?.cost ?? 1);
+  const estimatedEngagements = effectiveType ? Math.floor(creditBudget[0] / cost) : 0;
+  const totalCharge = effectiveType ? cost * estimatedEngagements : 0;
 
   const maxSpend = balance != null ? Math.min(500, balance) : 500;
   const minSpend = maxSpend < 50 ? maxSpend : 50;
@@ -91,15 +94,15 @@ export function SubmitPost() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const u = messageUrl.trim();
-    if (!isTme(u)) {
-      toast.error("Use a t.me/… post link from your channel", { description: "e.g. https://t.me/yourchannel/42" });
-      return;
-    }
     if (!channelTitle) {
       toast.error("Connect your channel in Settings first", { description: "Add the bot, then connect @channel." });
       return;
     }
-    if (!derivedType) {
+    if (campaignMode === "engagement" && !isTme(u)) {
+      toast.error("Use a t.me/… post link from your channel", { description: "e.g. https://t.me/yourchannel/42" });
+      return;
+    }
+    if (campaignMode === "engagement" && !derivedType) {
       toast.error("Choose at least one action");
       return;
     }
@@ -124,8 +127,8 @@ export function SubmitPost() {
       }
       await api.createCampaign({
         name: campaignName.trim() || undefined,
-        messageUrl: u,
-        engagementType: derivedType,
+        ...(campaignMode === "subscribe" ? { channelUrl: u || undefined } : { messageUrl: u }),
+        engagementType: effectiveType!,
         creditsPerEngagement: cost,
         maxEngagements: estimatedEngagements,
         ...(scheduledLaunchAt ? { scheduledLaunchAt } : {})
@@ -136,6 +139,7 @@ export function SubmitPost() {
       setScheduleTime("09:00");
       setCampaignName("");
       setSelection(defaultSelection);
+      setCampaignMode("subscribe");
       setCreditBudget([100]);
       setMessageUrl("");
       const res = await api.getProfile();
@@ -152,7 +156,9 @@ export function SubmitPost() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Submit post</h1>
-        <p className="text-muted-foreground mt-1">Promote a Telegram channel post (t.me/… link) with credits.</p>
+        <p className="text-muted-foreground mt-1">
+          Run either a subscriber campaign for your connected channel or a post engagement campaign.
+        </p>
       </div>
       {!channelTitle ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
@@ -177,6 +183,33 @@ export function SubmitPost() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
+                  <Label>Campaign goal</Label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setCampaignMode("subscribe")}
+                      className={cn(
+                        "rounded-lg border p-3 text-left",
+                        campaignMode === "subscribe" ? "border-primary bg-primary/10" : "border-border bg-secondary/20"
+                      )}
+                    >
+                      <p className="font-medium text-foreground">Get subscribers</p>
+                      <p className="text-xs text-muted-foreground">Workers join your connected channel.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCampaignMode("engagement")}
+                      className={cn(
+                        "rounded-lg border p-3 text-left",
+                        campaignMode === "engagement" ? "border-primary bg-primary/10" : "border-border bg-secondary/20"
+                      )}
+                    >
+                      <p className="font-medium text-foreground">Boost a post</p>
+                      <p className="text-xs text-muted-foreground">Workers like/comment/share one t.me post.</p>
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="campaignName">Campaign name</Label>
                   <Input
                     id="campaignName"
@@ -189,18 +222,24 @@ export function SubmitPost() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="tme">t.me post link</Label>
+                  <Label htmlFor="tme">{campaignMode === "subscribe" ? "Channel link (optional)" : "t.me post link"}</Label>
                   <Input
                     id="tme"
                     type="url"
-                    placeholder="https://t.me/yourchannel/12"
+                    placeholder={
+                      campaignMode === "subscribe"
+                        ? "https://t.me/yourchannel (optional)"
+                        : "https://t.me/yourchannel/12"
+                    }
                     value={messageUrl}
                     onChange={(e) => setMessageUrl(e.target.value)}
                     className="bg-secondary border-0 font-mono text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
                     {channelTitle
-                      ? `Using connected channel. Post must be from: ${channelTitle}.`
+                      ? campaignMode === "subscribe"
+                        ? `Using connected channel: ${channelTitle}. Leave this empty to auto-use your channel username.`
+                        : `Using connected channel. Post must be from: ${channelTitle}.`
                       : "Connect a channel in Settings first."}
                   </p>
                 </div>
@@ -253,36 +292,42 @@ export function SubmitPost() {
                     ) : null}
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <Label>Action bundle</Label>
-                  <p className="text-xs text-muted-foreground -mt-1">Same credit model: workers complete the bundle you pick.</p>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {BASE_ENGAGEMENT_CHOICES.map((opt) => {
-                      const id = `eng-${opt.id}`;
-                      const on = selection[opt.id];
-                      return (
-                        <div
-                          key={opt.id}
-                          className={cn(
-                            "flex items-start gap-3 rounded-lg border-2 p-4",
-                            on ? "border-primary bg-primary/10" : "border-border bg-secondary/30"
-                          )}
-                        >
-                          <Checkbox id={id} checked={on} onCheckedChange={() => toggleKind(opt.id)} />
-                          <div className="min-w-0">
-                            <Label
-                              htmlFor={id}
-                              className="font-medium text-foreground flex items-center gap-2 cursor-pointer"
-                            >
-                              <span className="text-xl">{opt.icon}</span> {opt.name}
-                            </Label>
-                            <p className="text-xs text-muted-foreground mt-1">{opt.costHint}</p>
+                {campaignMode === "engagement" ? (
+                  <div className="space-y-3">
+                    <Label>Action bundle</Label>
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      Same credit model: workers complete the bundle you pick.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {BASE_ENGAGEMENT_CHOICES.map((opt) => {
+                        const id = `eng-${opt.id}`;
+                        const on = selection[opt.id];
+                        return (
+                          <div
+                            key={opt.id}
+                            className={cn(
+                              "flex items-start gap-3 rounded-lg border-2 p-4",
+                              on ? "border-primary bg-primary/10" : "border-border bg-secondary/30"
+                            )}
+                          >
+                            <Checkbox id={id} checked={on} onCheckedChange={() => toggleKind(opt.id)} />
+                            <div className="min-w-0">
+                              <Label htmlFor={id} className="font-medium text-foreground flex items-center gap-2 cursor-pointer">
+                                <span className="text-xl">{opt.icon}</span> {opt.name}
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-1">{opt.costHint}</p>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-lg border border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
+                    Subscriber campaign selected. Workers will join your connected channel and tap{" "}
+                    <strong className="text-foreground">Subscribe</strong> in the earn feed.
+                  </div>
+                )}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label>Budget (credits)</Label>
@@ -305,10 +350,10 @@ export function SubmitPost() {
                   className="w-full"
                   size="lg"
                   disabled={
-                    !isTme(messageUrl) ||
+                    (campaignMode === "engagement" && !isTme(messageUrl)) ||
                     !channelTitle ||
                     isSubmitting ||
-                    !derivedType ||
+                    !effectiveType ||
                     (balance != null && totalCharge > balance)
                   }
                 >
@@ -337,7 +382,9 @@ export function SubmitPost() {
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Type</span>
-                <span className="font-medium text-right">{selectedEngagement?.name ?? "—"}</span>
+                <span className="font-medium text-right">
+                  {campaignMode === "subscribe" ? "Subscribers" : selectedEngagement?.name ?? "—"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Per slot</span>
@@ -349,14 +396,17 @@ export function SubmitPost() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Slots</span>
-                <span className="text-2xl font-bold text-primary">{derivedType ? estimatedEngagements : "—"}</span>
+                <span className="text-2xl font-bold text-primary">{effectiveType ? estimatedEngagements : "—"}</span>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 flex gap-2">
               <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">Earners must join the channel; the app checks membership with your bot.</p>
+              <p className="text-xs text-muted-foreground">
+                Earners must join the channel; the app checks membership with your bot. For post campaigns, they also perform
+                the selected actions.
+              </p>
             </CardContent>
           </Card>
           <Card>

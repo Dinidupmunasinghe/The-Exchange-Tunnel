@@ -1,5 +1,5 @@
 const express = require("express");
-const { body, param, oneOf } = require("express-validator");
+const { body, param } = require("express-validator");
 const {
   createCampaign,
   listMyCampaigns,
@@ -16,14 +16,8 @@ router.post(
   [
     body("name").optional().trim().isLength({ max: 160 }).withMessage("Name too long"),
     body("messageKey").optional().isString().isLength({ min: 4, max: 256 }),
-    oneOf(
-      [
-        body("messageUrl").isURL().withMessage("messageUrl must be a valid t.me/… post URL"),
-        body("soundcloudPostUrl").isURL().withMessage("messageUrl (legacy field) must be a valid URL"),
-        body("facebookPostUrl").isURL().withMessage("messageUrl (legacy field) must be a valid URL")
-      ],
-      { message: "messageUrl must be a valid t.me/… post URL" }
-    ),
+    body("messageUrl").optional().isURL().withMessage("messageUrl must be a valid URL"),
+    body("channelUrl").optional().isURL().withMessage("channelUrl must be a valid URL"),
     body("engagementType").isIn(ENGAGEMENT_TYPES).withMessage("Invalid engagement type"),
     body("creditsPerEngagement").isInt({ min: 1, max: 500 }),
     body("maxEngagements").isInt({ min: 1, max: 1000 }),

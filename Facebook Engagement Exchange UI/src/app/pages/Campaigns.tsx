@@ -160,7 +160,7 @@ export function Campaigns() {
         <Card className="border-border bg-card">
           <CardContent className="p-6">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Engagements</p>
+                          <p className="text-sm text-muted-foreground">Total Completions</p>
               <p className="text-3xl font-bold text-foreground">{totalEngagements}</p>
             </div>
           </CardContent>
@@ -249,7 +249,7 @@ export function Campaigns() {
                     <Button variant="outline" size="sm" asChild disabled={busy}>
                       <a href={campaign.soundcloudPostUrl} target="_blank" rel="noreferrer">
                         <ExternalLink className="mr-2 h-4 w-4" />
-                        View post
+                        {campaign.engagementType === "subscribe" ? "View channel" : "View post"}
                       </a>
                     </Button>
                     <Button

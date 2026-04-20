@@ -232,8 +232,10 @@ export const api = {
   createCampaign: (payload: {
     name?: string;
     messageKey?: string;
-    messageUrl: string;
+    messageUrl?: string;
+    channelUrl?: string;
     engagementType:
+      | "subscribe"
       | "like"
       | "comment"
       | "share"
@@ -257,7 +259,7 @@ export const api = {
   completeTask: (payload: {
     taskId: number;
     engagementType: string;
-    actionKind: "like" | "comment" | "share";
+    actionKind: "subscribe" | "like" | "comment" | "share";
     proofText?: string;
   }) =>
     authRequest("/tasks/complete", {

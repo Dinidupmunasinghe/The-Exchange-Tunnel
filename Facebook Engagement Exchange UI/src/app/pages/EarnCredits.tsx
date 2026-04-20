@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ThumbsUp, MessageCircle, Share2, ExternalLink, Coins, RefreshCw } from "lucide-react";
+import { ThumbsUp, MessageCircle, Share2, ExternalLink, Coins, RefreshCw, BellPlus } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
@@ -21,6 +21,7 @@ type TaskRow = {
   engagementType: string;
   rewardCredits: number;
   status?: string;
+  assignedUserId?: number | null;
   createdAt?: string;
   campaign?: {
     id: number;
@@ -59,6 +60,10 @@ function hasEngagement(rows: MyEngagementRow[], campaignId: number, kind: BaseEn
 function firstOpenTask(tasks: TaskRow[]): TaskRow | undefined {
   const sorted = [...tasks].sort((a, b) => a.id - b.id);
   return sorted.find((t) => t.status === "open" || t.status === "assigned");
+}
+
+function hasCompletedTask(tasks: TaskRow[]): boolean {
+  return tasks.some((t) => t.status === "completed");
 }
 
 export function EarnCredits() {
@@ -127,7 +132,7 @@ export function EarnCredits() {
     campaignId: number,
     campaignTasks: TaskRow[],
     engagementType: string,
-    action: BaseEngagementKind
+    action: "subscribe" | BaseEngagementKind
   ) => {
     if (!bundleAllowsAction(engagementType, action)) return;
 
@@ -143,7 +148,7 @@ export function EarnCredits() {
         return;
       }
 
-      if (hasEngagement(myEngagements, campaignId, action)) {
+      if (action !== "subscribe" && hasEngagement(myEngagements, campaignId, action)) {
         toast.info("You already recorded this action.");
         return;
       }
@@ -155,9 +160,11 @@ export function EarnCredits() {
       }
 
       const proofText =
-        action === "like"
+        action === "subscribe"
           ? undefined
-          : "I completed the requested action on the Telegram public post in this channel, per campaign instructions.";
+          : action === "like"
+            ? undefined
+            : "I completed the requested action on the Telegram public post in this channel, per campaign instructions.";
 
       await api.completeTask({
         taskId: task.id,
@@ -166,7 +173,7 @@ export function EarnCredits() {
         ...(proofText ? { proofText } : {}),
       });
       toast.success(`Earned ${task.rewardCredits} credits`, {
-        description: `Recorded · ${action} · task #${task.id}`
+          description: `Recorded · ${action} · task #${task.id}`
       });
       const refreshed = await api.getTasks();
       setTasks(refreshed.tasks as TaskRow[]);
@@ -232,6 +239,8 @@ export function EarnCredits() {
           const liked = hasEngagement(myEngagements, cid, "like");
           const commented = hasEngagement(myEngagements, cid, "comment");
           const shared = hasEngagement(myEngagements, cid, "share");
+          const subscribed = hasCompletedTask(campaignTasks);
+          const isSubscribeCampaign = et === "subscribe";
 
           return (
             <Card
@@ -268,7 +277,10 @@ export function EarnCredits() {
                 <p className="text-sm leading-relaxed text-foreground">
                   <span className="font-semibold">{getEngagementLabel(et)}</span>
                   {" — "}
-                  {hint ?? "Join the channel, then use the button here once you have completed the action in Telegram."}
+                  {hint ??
+                    (isSubscribeCampaign
+                      ? "Open the channel, join it in Telegram, then tap Subscribe in-app."
+                      : "Join the channel, then use the button here once you have completed the action in Telegram.")}
                 </p>
               </div>
 
@@ -277,6 +289,23 @@ export function EarnCredits() {
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-border bg-secondary/10 px-4 py-3 pl-14">
+                {isSubscribeCampaign ? (
+                  <Button
+                    type="button"
+                    variant={subscribed ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-full pr-3"
+                    onClick={() => void handleAction(cid, campaignTasks, et, "subscribe")}
+                    disabled={subscribed || busy !== null || hasTelegram === false}
+                  >
+                    <BellPlus className="mr-2 h-4 w-4" />
+                    {subscribed ? "Subscribed" : "Subscribe"}
+                    <Badge className="ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15">
+                      +{reward}
+                    </Badge>
+                  </Button>
+                ) : null}
+                {!isSubscribeCampaign ? (
                 <Button
                   type="button"
                   variant={liked ? "default" : "outline"}
@@ -301,6 +330,8 @@ export function EarnCredits() {
                     {liked ? "tap to undo" : `+${reward}`}
                   </Badge>
                 </Button>
+                ) : null}
+                {!isSubscribeCampaign ? (
                 <Button
                   type="button"
                   variant={commented ? "default" : "outline"}
@@ -319,6 +350,8 @@ export function EarnCredits() {
                     +{reward}
                   </Badge>
                 </Button>
+                ) : null}
+                {!isSubscribeCampaign ? (
                 <Button
                   type="button"
                   variant={shared ? "default" : "outline"}
@@ -337,6 +370,7 @@ export function EarnCredits() {
                     +{reward}
                   </Badge>
                 </Button>
+                ) : null}
               </div>
             </Card>
           );

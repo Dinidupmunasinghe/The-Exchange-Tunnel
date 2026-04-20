@@ -1,4 +1,5 @@
 export type EngagementTypeId =
+  | "subscribe"
   | "like"
   | "comment"
   | "share"
@@ -41,6 +42,7 @@ export const ENGAGEMENT_OPTIONS: {
   cost: number;
   icon: string;
 }[] = [
+  { id: "subscribe", name: "Subscribers", cost: 5, icon: "🔔" },
   { id: "like", name: "Likes", cost: 5, icon: "👍" },
   { id: "comment", name: "Comments", cost: 10, icon: "💬" },
   { id: "share", name: "Shares", cost: 15, icon: "🔄" },
@@ -58,6 +60,8 @@ export function getEngagementLabel(type: string): string {
 /** Short hint on Earn Credits for why some action buttons are disabled. */
 export function getBundleActionHint(engagementType: string): string | null {
   switch (engagementType) {
+    case "subscribe":
+      return "This campaign pays for channel subscriptions only.";
     case "like":
       return "This campaign only pays for likes — the poster didn’t buy comments or shares.";
     case "comment":
@@ -79,9 +83,11 @@ export function getBundleActionHint(engagementType: string): string | null {
 
 export function bundleAllowsAction(
   engagementType: string,
-  action: "like" | "comment" | "share"
+  action: "subscribe" | "like" | "comment" | "share"
 ): boolean {
   switch (engagementType) {
+    case "subscribe":
+      return action === "subscribe";
     case "like":
       return action === "like";
     case "comment":
