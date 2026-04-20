@@ -4,6 +4,7 @@ const app = require("./app");
 const env = require("./config/env");
 const db = require("./models");
 const { activateDueCampaigns } = require("./services/campaignScheduler");
+const { auditSubscribeEngagements } = require("./services/subscriptionAuditService");
 
 async function addColumnIfMissing(queryInterface, tableName, columnName, definition) {
   const columns = await queryInterface.describeTable(tableName);
@@ -41,9 +42,13 @@ async function bootstrap() {
     await ensureDevSchema();
     await db.sequelize.sync(env.dbSyncAlter ? { alter: true } : undefined);
     await activateDueCampaigns();
+    await auditSubscribeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
     setInterval(() => {
       activateDueCampaigns().catch(() => undefined);
     }, 60 * 1000);
+    setInterval(() => {
+      auditSubscribeEngagements().catch(() => undefined);
+    }, 2 * 60 * 1000);
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: { origin: env.corsOrigin, methods: ["GET", "POST"] }
