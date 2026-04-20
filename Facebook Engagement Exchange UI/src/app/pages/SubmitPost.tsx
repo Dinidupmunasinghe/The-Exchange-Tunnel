@@ -222,26 +222,36 @@ export function SubmitPost() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="tme">{campaignMode === "subscribe" ? "Channel link (optional)" : "t.me post link"}</Label>
-                  <Input
-                    id="tme"
-                    type="url"
-                    placeholder={
-                      campaignMode === "subscribe"
-                        ? "https://t.me/yourchannel (optional)"
-                        : "https://t.me/yourchannel/12"
-                    }
-                    value={messageUrl}
-                    onChange={(e) => setMessageUrl(e.target.value)}
-                    className="bg-secondary border-0 font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {channelTitle
-                      ? campaignMode === "subscribe"
-                        ? `Using connected channel: ${channelTitle}. Leave this empty to auto-use your channel username.`
-                        : `Using connected channel. Post must be from: ${channelTitle}.`
-                      : "Connect a channel in Settings first."}
-                  </p>
+                  {campaignMode === "subscribe" ? (
+                    <>
+                      <Label>Connected channel</Label>
+                      <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2 text-sm">
+                        <span className="font-medium text-foreground">
+                          {channelTitle || "No channel connected"}
+                        </span>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Subscriber campaigns automatically use your connected channel from Settings.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Label htmlFor="tme">t.me post link</Label>
+                      <Input
+                        id="tme"
+                        type="url"
+                        placeholder="https://t.me/yourchannel/12"
+                        value={messageUrl}
+                        onChange={(e) => setMessageUrl(e.target.value)}
+                        className="bg-secondary border-0 font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {channelTitle
+                          ? `Using connected channel. Post must be from: ${channelTitle}.`
+                          : "Connect a channel in Settings first."}
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Schedule (optional)</Label>
