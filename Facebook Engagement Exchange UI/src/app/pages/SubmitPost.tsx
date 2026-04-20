@@ -300,7 +300,8 @@ export function SubmitPost() {
                     </div>
                     <div className="min-w-[180px] space-y-1">
                       <Label className="text-xs text-muted-foreground">Time</Label>
-                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md bg-secondary px-2 py-1.5">
+                      <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2 rounded-md bg-secondary px-2 py-1.5">
+                        <Clock3 className="h-4 w-4 text-muted-foreground ml-1" />
                         <Select value={scheduleHour || "09"} onValueChange={updateScheduleHour}>
                           <SelectTrigger className="h-8 border-0 bg-transparent px-2">
                             <SelectValue placeholder="HH" />
@@ -313,7 +314,6 @@ export function SubmitPost() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <Clock3 className="h-4 w-4 text-muted-foreground" />
                         <Select value={scheduleMinute || "00"} onValueChange={updateScheduleMinute}>
                           <SelectTrigger className="h-8 border-0 bg-transparent px-2">
                             <SelectValue placeholder="MM" />
