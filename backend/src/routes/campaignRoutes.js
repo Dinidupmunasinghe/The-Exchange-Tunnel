@@ -11,6 +11,7 @@ const { ENGAGEMENT_TYPES } = require("../constants/engagement");
 
 const router = express.Router();
 
+// Supports both post-engagement and subscribe campaign creation payloads.
 router.post(
   "/",
   [
