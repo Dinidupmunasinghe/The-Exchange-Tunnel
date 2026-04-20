@@ -313,17 +313,17 @@ export function EarnCredits() {
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1 space-y-1">
+                    <div className="min-w-0 flex-1">
                       <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">{title}</h2>
                       <p className="text-sm text-muted-foreground">{postedAgo}</p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Associated tasks</p>
-                        <Badge variant="outline" className="mt-1 border-primary/30 bg-primary/10 text-primary">
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Associated tasks</span>
+                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
                           {isSubscribeCampaign ? "Subscribe" : getEngagementLabel(et)}
                         </Badge>
                       </div>
+                    </div>
+                    <div className="flex items-start gap-3">
                       <Button variant="ghost" size="icon" className="shrink-0" asChild>
                         <a
                           href={campaign.soundcloudPostUrl || campaign.messageUrl}
