@@ -315,17 +315,15 @@ export function EarnCredits() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">{title}</h2>
-                      <div className="mt-0.5 flex flex-wrap items-start gap-2">
-                        <p className="text-sm text-muted-foreground">{postedAgo}</p>
-                        <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2 py-1">
-                          <span className="text-xs text-muted-foreground">Associated tasks</span>
-                          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                            {isSubscribeCampaign ? "Subscribe" : getEngagementLabel(et)}
-                          </Badge>
-                        </div>
-                      </div>
+                      <p className="mt-0.5 text-sm text-muted-foreground">{postedAgo}</p>
                     </div>
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-2">
+                      <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2 py-1">
+                        <span className="text-xs text-muted-foreground">Associated tasks</span>
+                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                          {isSubscribeCampaign ? "Subscribe" : getEngagementLabel(et)}
+                        </Badge>
+                      </div>
                       <Button variant="ghost" size="icon" className="shrink-0" asChild>
                         <a
                           href={campaign.soundcloudPostUrl || campaign.messageUrl}
