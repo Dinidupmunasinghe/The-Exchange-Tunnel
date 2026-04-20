@@ -86,31 +86,40 @@ export function EarnCredits() {
     }
   }, []);
 
-  const loadTasks = useCallback(async () => {
-    setLoading(true);
+  const loadTasks = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.getTasks();
       setTasks(res.tasks as TaskRow[]);
       setMyEngagements(res.myEngagements ?? []);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Could not load tasks");
+      if (!silent) {
+        toast.error(error instanceof Error ? error.message : "Could not load tasks");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadTasks();
+    void loadTasks(false);
     void loadProfileStatus();
   }, [loadTasks, loadProfileStatus]);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") void loadTasks();
+      if (document.visibilityState === "visible") void loadTasks(true);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [loadTasks]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (busy === null) void loadTasks(true);
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, [busy, loadTasks]);
 
   const taskGroups = useMemo(() => {
     const map = new Map<number, TaskRow[]>();
@@ -325,18 +334,20 @@ export function EarnCredits() {
               </div>
 
               <div className="px-4 pb-3 pl-14">
-                <p className="text-sm leading-relaxed text-foreground">
-                  <span className="font-semibold">{getEngagementLabel(et)}</span>
-                  {" — "}
-                  {hint ??
-                    (isSubscribeCampaign
-                      ? "Open the channel, subscribe in Telegram, then tap Subscribe in-app."
-                      : "Subscribe to the channel, then use the button here once you have completed the action in Telegram.")}
-                </p>
-              </div>
-
-              <div className="mx-4 mb-4 ml-14 mr-4">
-                <TelegramMessageMedia postUrl={campaign.soundcloudPostUrl || campaign.messageUrl || ""} />
+                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <p className="text-sm leading-relaxed text-foreground sm:flex-1">
+                    <span className="font-semibold">{getEngagementLabel(et)}</span>
+                    {" — "}
+                    {hint ??
+                      (isSubscribeCampaign
+                        ? "Open the channel, subscribe in Telegram, then tap Subscribe in-app."
+                        : "Subscribe to the channel, then use the button here once you have completed the action in Telegram.")}
+                  </p>
+                  <TelegramMessageMedia
+                    postUrl={campaign.soundcloudPostUrl || campaign.messageUrl || ""}
+                    className="w-[170px] shrink-0 self-start"
+                  />
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-border bg-secondary/10 px-4 py-3 pl-14">

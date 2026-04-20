@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Search, Bell, Coins } from "lucide-react";
 import { Button } from "./ui/button";
@@ -18,12 +18,32 @@ export function TopBar() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ name?: string; email?: string; credits?: number } | null>(null);
 
-  useEffect(() => {
-    api
-      .getProfile()
-      .then((res) => setProfile(res.user))
-      .catch(() => setProfile(null));
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await api.getProfile();
+      setProfile(res.user);
+    } catch {
+      setProfile(null);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadProfile();
+    };
+    const timer = window.setInterval(() => {
+      void loadProfile();
+    }, 15000);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadProfile]);
 
   const initials = (() => {
     const n = profile?.name || profile?.email || "U";
