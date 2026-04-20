@@ -66,6 +66,10 @@ function hasCompletedTask(tasks: TaskRow[]): boolean {
   return tasks.some((t) => t.status === "completed");
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function EarnCredits() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [myEngagements, setMyEngagements] = useState<MyEngagementRow[]>([]);
@@ -139,6 +143,53 @@ export function EarnCredits() {
     const key = `${campaignId}-${action}`;
     setBusy(key);
     try {
+      if (action === "subscribe") {
+        const subscribeTask = firstOpenTask(campaignTasks);
+        if (!subscribeTask) {
+          toast.error("No open subscribe task right now — refresh and try again.");
+          return;
+        }
+        const campaignLink =
+          subscribeTask.campaign?.messageUrl || subscribeTask.campaign?.soundcloudPostUrl || undefined;
+        if (campaignLink) {
+          window.open(campaignLink, "_blank", "noopener,noreferrer");
+          toast.info("Opened Telegram channel", {
+            description: "Subscribe there, come back, and we will auto-check for ~20 seconds.",
+          });
+        }
+
+        const maxAttempts = 8;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          try {
+            await api.completeTask({
+              taskId: subscribeTask.id,
+              engagementType,
+              actionKind: "subscribe",
+            });
+            toast.success(`Earned ${subscribeTask.rewardCredits} credits`, {
+              description: `Recorded · subscribe · task #${subscribeTask.id}`,
+            });
+            const refreshed = await api.getTasks();
+            setTasks(refreshed.tasks as TaskRow[]);
+            setMyEngagements(refreshed.myEngagements ?? []);
+            return;
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Could not verify yet";
+            const isTransient =
+              msg.includes("Could not confirm your subscription") ||
+              msg.includes("user not found") ||
+              msg.includes("not subscribed");
+            if (!isTransient) throw err;
+          }
+          await sleep(2500);
+        }
+
+        toast.error("Subscription not detected yet", {
+          description: "After subscribing in Telegram, tap Subscribe again to retry verification.",
+        });
+        return;
+      }
+
       if (action === "like" && hasEngagement(myEngagements, campaignId, "like")) {
         await api.revertEngagement({ campaignId, actionKind: "like" });
         toast.success("Reverted in app", { description: "Credits returned. Remove the reaction in Telegram if needed." });
@@ -299,7 +350,7 @@ export function EarnCredits() {
                     disabled={subscribed || busy !== null || hasTelegram === false}
                   >
                     <BellPlus className="mr-2 h-4 w-4" />
-                    {subscribed ? "Subscribed" : "Subscribe"}
+                    {subscribed ? "Subscribed" : busy === `${cid}-subscribe` ? "Checking..." : "Subscribe"}
                     <Badge className="ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15">
                       +{reward}
                     </Badge>
