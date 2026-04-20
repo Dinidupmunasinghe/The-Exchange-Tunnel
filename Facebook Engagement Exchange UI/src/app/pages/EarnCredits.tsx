@@ -254,6 +254,16 @@ export function EarnCredits() {
       }
 
       if (action === "comment") {
+        const campaignLink = task.campaign?.messageUrl || task.campaign?.soundcloudPostUrl || "";
+        if (campaignLink) {
+          const opened = window.open(campaignLink, "_blank", "noopener,noreferrer");
+          if (!opened) {
+            window.location.href = campaignLink;
+          }
+          toast.info("Opened Telegram post", {
+            description: "Post your comment there, then return here and submit proof.",
+          });
+        }
         setPendingComment({
           campaignId,
           taskId: task.id,
