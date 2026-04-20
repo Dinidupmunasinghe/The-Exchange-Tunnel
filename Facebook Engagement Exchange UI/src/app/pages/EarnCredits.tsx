@@ -7,14 +7,6 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
 import { Textarea } from "../components/ui/textarea";
 import { toast } from "sonner";
 import { api } from "../services/api";
@@ -90,7 +82,6 @@ export function EarnCredits() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
-  const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [commentProof, setCommentProof] = useState("");
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(null);
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -179,7 +170,6 @@ export function EarnCredits() {
       toast.success(`Earned ${pendingComment.rewardCredits} credits`, {
         description: `Recorded · comment · task #${pendingComment.taskId}`,
       });
-      setCommentDialogOpen(false);
       setCommentProof("");
       setPendingComment(null);
       const refreshed = await api.getTasks();
@@ -200,9 +190,6 @@ export function EarnCredits() {
     action: "subscribe" | BaseEngagementKind
   ) => {
     if (!bundleAllowsAction(engagementType, action)) return;
-
-    const key = `${campaignId}-${action}`;
-    setBusy(key);
     try {
       if (action === "subscribe") {
         const subscribeTask = firstOpenTask(campaignTasks);
@@ -210,6 +197,8 @@ export function EarnCredits() {
           toast.error("No open subscribe task right now — refresh and try again.");
           return;
         }
+        const key = `${campaignId}-subscribe`;
+        setBusy(key);
         const campaignLink =
           subscribeTask.campaign?.messageUrl || subscribeTask.campaign?.soundcloudPostUrl || undefined;
         if (campaignLink) {
@@ -233,6 +222,7 @@ export function EarnCredits() {
             const refreshed = await api.getTasks();
             setTasks(refreshed.tasks as TaskRow[]);
             setMyEngagements(refreshed.myEngagements ?? []);
+            setBusy(null);
             return;
           } catch (err) {
             const msg = err instanceof Error ? err.message : "Could not verify yet";
@@ -248,6 +238,7 @@ export function EarnCredits() {
         toast.error("Subscription not detected yet", {
           description: "After subscribing in Telegram, tap Subscribe again to retry verification.",
         });
+        setBusy(null);
         return;
       }
 
@@ -270,12 +261,10 @@ export function EarnCredits() {
           rewardCredits: task.rewardCredits,
         });
         setCommentProof("");
-        setCommentDialogOpen(true);
         return;
       }
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not update engagement");
-    } finally {
       setBusy(null);
     }
   };
@@ -419,59 +408,50 @@ export function EarnCredits() {
                 </Button>
                 ) : null}
               </div>
+              {!isSubscribeCampaign && pendingComment?.campaignId === cid ? (
+                <div className="border-t border-border bg-secondary/5 px-4 py-3 pl-14">
+                  <p className="mb-2 text-sm font-medium text-foreground">Paste your Telegram comment proof</p>
+                  <div className="space-y-2">
+                    <Textarea
+                      value={commentProof}
+                      onChange={(e) => setCommentProof(e.target.value)}
+                      placeholder="Paste the exact comment text you posted on Telegram (min 10 chars)"
+                      maxLength={500}
+                      className="min-h-24"
+                      disabled={submittingComment}
+                    />
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">{commentProof.trim().length}/500</p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCommentProof("");
+                            setPendingComment(null);
+                          }}
+                          disabled={submittingComment}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => void handleCommentSubmit()}
+                          disabled={submittingComment}
+                        >
+                          {submittingComment ? "Submitting..." : "Submit proof"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </Card>
           );
         })}
       </div>
-
-      <Dialog
-        open={commentDialogOpen}
-        onOpenChange={(open) => {
-          if (submittingComment) return;
-          setCommentDialogOpen(open);
-          if (!open) {
-            setCommentProof("");
-            setPendingComment(null);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Submit Comment Proof</DialogTitle>
-            <DialogDescription>
-              Paste the exact comment you posted on Telegram. Minimum 10 characters.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Textarea
-              value={commentProof}
-              onChange={(e) => setCommentProof(e.target.value)}
-              placeholder="Paste your Telegram comment text here..."
-              maxLength={500}
-              className="min-h-28"
-              disabled={submittingComment}
-            />
-            <p className="text-xs text-muted-foreground">{commentProof.trim().length}/500</p>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setCommentDialogOpen(false);
-                setCommentProof("");
-                setPendingComment(null);
-              }}
-              disabled={submittingComment}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => void handleCommentSubmit()} disabled={submittingComment}>
-              {submittingComment ? "Submitting..." : "Submit proof"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
