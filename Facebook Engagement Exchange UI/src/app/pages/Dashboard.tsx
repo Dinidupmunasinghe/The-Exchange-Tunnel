@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, ThumbsUp, MessageCircle, Share2, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { StatsCard } from "../components/StatsCard";
+import { DashboardChannelHint } from "../components/ChannelConnectGuide";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../services/api";
 
@@ -85,6 +86,11 @@ export function Dashboard() {
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground mt-1">Welcome back! Here's your overview</p>
       </div>
+
+      <DashboardChannelHint
+        hasChannel={Boolean(profile?.telegramActingChannelId)}
+        telegramConnected={Boolean(profile?.telegramUserId)}
+      />
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

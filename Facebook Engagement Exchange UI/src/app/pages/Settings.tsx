@@ -9,6 +9,11 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { api } from "../services/api";
 import { toast } from "sonner";
+import {
+  ChannelConnectPrerequisites,
+  ChannelConnectVisualGuide,
+  UserGoalPicker,
+} from "../components/ChannelConnectGuide";
 
 type Profile = {
   telegramUserId?: string;
@@ -145,9 +150,21 @@ export function Settings() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
         <p className="mt-1 text-muted-foreground">
-          Link Telegram, connect the channel you promote, and use it for campaigns and tasks.
+          Choose how you use the platform, then link a channel only if you run campaigns.
         </p>
       </div>
+
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-foreground">How you use Exchange Tunnel</CardTitle>
+          <CardDescription>
+            Browse-only users never need to add the bot to a channel. Promoters must add the bot as admin once per channel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <UserGoalPicker />
+        </CardContent>
+      </Card>
 
       <Card className="border-border bg-card">
         <CardHeader>
@@ -206,11 +223,13 @@ export function Settings() {
         <CardHeader>
           <CardTitle className="text-foreground">Telegram channel</CardTitle>
           <CardDescription>
-            Add your bot to the channel as an administrator, then connect it here. Use e.g. <code className="text-xs">@mychannel</code> or{" "}
-            <code className="text-xs">https://t.me/mychannel</code>.
+            Required only to <strong>run campaigns</strong> for a channel. Use e.g.{" "}
+            <code className="text-xs">@mychannel</code> or <code className="text-xs">https://t.me/mychannel</code>.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          <ChannelConnectPrerequisites disabled={!profile?.telegramUserId} />
+          <ChannelConnectVisualGuide />
           <div className="space-y-2 max-w-md">
             <Label htmlFor="ch">Channel</Label>
             <div className="flex flex-col gap-2 sm:flex-row">

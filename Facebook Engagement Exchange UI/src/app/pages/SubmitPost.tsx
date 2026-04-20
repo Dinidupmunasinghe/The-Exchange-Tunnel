@@ -26,6 +26,9 @@ const defaultSelection: Record<BaseEngagementKind, boolean> = {
   share: false
 };
 
+const BOT_AT = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "ExchangeTunnelApp_bot").trim();
+const BOT_DISPLAY = BOT_AT.startsWith("@") ? BOT_AT : `@${BOT_AT}`;
+
 function isTme(str: string) {
   return /^https?:\/\/(www\.)?t\.me\//i.test(String(str).trim());
 }
@@ -153,11 +156,16 @@ export function SubmitPost() {
       </div>
       {!channelTitle ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Connect the channel in{" "}
-          <Link to="/settings" className="font-medium underline underline-offset-2">
-            Settings
-          </Link>{" "}
-          (add the bot as admin) before running a campaign.
+          <p className="font-medium text-amber-50">Campaigns need a linked channel</p>
+          <p className="mt-1 text-amber-100/90">
+            In{" "}
+            <Link to="/settings" className="font-medium underline underline-offset-2">
+              Settings
+            </Link>
+            , add <strong>{BOT_DISPLAY}</strong> as an admin on your channel first, then connect{" "}
+            <code className="rounded bg-black/20 px-1 font-mono text-xs">@yourchannel</code>. See the step-by-step guide
+            there. Only browsing/earning? Pick &quot;Earn &amp; browse&quot; on Settings — no bot admin needed.
+          </p>
         </div>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-3">
