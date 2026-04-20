@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Coins, Info, CheckCircle, CalendarDays } from "lucide-react";
-import { format, isBefore, setHours, setMinutes, startOfDay } from "date-fns";
+import { Coins, Info, CheckCircle } from "lucide-react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Button } from "../components/ui/button";
 import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
-import { Calendar } from "../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { toast } from "sonner";
 import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
@@ -37,9 +35,8 @@ export function SubmitPost() {
   const [campaignMode, setCampaignMode] = useState<"subscribe" | "engagement">("subscribe");
   const [campaignName, setCampaignName] = useState("");
   const [selection, setSelection] = useState<Record<BaseEngagementKind, boolean>>(defaultSelection);
-  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
+  const [scheduleDateText, setScheduleDateText] = useState("");
   const [scheduleTime, setScheduleTime] = useState("09:00");
-  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [creditBudget, setCreditBudget] = useState([100]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
@@ -80,14 +77,13 @@ export function SubmitPost() {
     setSelection((prev) => ({ ...prev, [kind]: !prev[kind] }));
   };
 
+  const todayDate = format(new Date(), "yyyy-MM-dd");
   const scheduledAt = useMemo(() => {
-    if (!scheduleDate) return null;
-    const parts = scheduleTime.split(":");
-    const h = parseInt(parts[0] ?? "0", 10);
-    const m = parseInt(parts[1] ?? "0", 10);
-    if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
-    return setMinutes(setHours(startOfDay(scheduleDate), h), m);
-  }, [scheduleDate, scheduleTime]);
+    if (!scheduleDateText) return null;
+    const parsed = new Date(`${scheduleDateText}T${scheduleTime || "00:00"}:00`);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  }, [scheduleDateText, scheduleTime]);
 
   const isScheduled = Boolean(scheduledAt);
 
@@ -135,7 +131,7 @@ export function SubmitPost() {
       });
       const later = Boolean(scheduledAt);
       toast.success(later ? "Campaign scheduled" : "Campaign started");
-      setScheduleDate(undefined);
+      setScheduleDateText("");
       setScheduleTime("09:00");
       setCampaignName("");
       setSelection(defaultSelection);
@@ -255,45 +251,39 @@ export function SubmitPost() {
                 </div>
                 <div className="space-y-2">
                   <Label>Schedule (optional)</Label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Popover open={scheduleOpen} onOpenChange={setScheduleOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={cn(
-                            "min-w-[240px] justify-start text-left font-normal bg-secondary border-0",
-                            !scheduleDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-70" />
-                          {scheduledAt ? format(scheduledAt, "MMM d, yyyy · h:mm a") : "Pick date & time"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={scheduleDate}
-                          onSelect={(d) => setScheduleDate(d)}
-                          disabled={(day) => isBefore(startOfDay(day), startOfDay(new Date()))}
-                        />
-                        <div className="border-t border-border p-3">
-                          <Input
-                            type="time"
-                            value={scheduleTime}
-                            onChange={(e) => setScheduleTime(e.target.value)}
-                            className="bg-secondary border-0"
-                          />
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    {scheduleDate ? (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-[180px] space-y-1">
+                      <Label htmlFor="scheduleDate" className="text-xs text-muted-foreground">
+                        Date
+                      </Label>
+                      <Input
+                        id="scheduleDate"
+                        type="date"
+                        min={todayDate}
+                        value={scheduleDateText}
+                        onChange={(e) => setScheduleDateText(e.target.value)}
+                        className="bg-secondary border-0"
+                      />
+                    </div>
+                    <div className="min-w-[140px] space-y-1">
+                      <Label htmlFor="scheduleTime" className="text-xs text-muted-foreground">
+                        Time
+                      </Label>
+                      <Input
+                        id="scheduleTime"
+                        type="time"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        className="bg-secondary border-0"
+                      />
+                    </div>
+                    {scheduleDateText ? (
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setScheduleDate(undefined);
+                          setScheduleDateText("");
                           setScheduleTime("09:00");
                         }}
                       >
@@ -301,6 +291,9 @@ export function SubmitPost() {
                       </Button>
                     ) : null}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    {scheduledAt ? `Will launch at ${format(scheduledAt, "MMM d, yyyy · h:mm a")}` : "Leave empty to launch immediately."}
+                  </p>
                 </div>
                 {campaignMode === "engagement" ? (
                   <div className="space-y-3">
