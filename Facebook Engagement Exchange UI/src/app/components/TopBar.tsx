@@ -69,10 +69,14 @@ export function TopBar() {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 ring-offset-background transition-shadow hover:ring-2 hover:ring-brand/40 hover:ring-offset-2">
-              <Avatar>
-                <AvatarFallback className="bg-brand text-brand-foreground">{initials}</AvatarFallback>
+            <Button
+              variant="ghost"
+              className="h-10 gap-2 rounded-full px-2 ring-offset-background transition-shadow hover:ring-2 hover:ring-brand/40 hover:ring-offset-2"
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-brand text-brand-foreground text-xs">{initials}</AvatarFallback>
               </Avatar>
+              <span className="text-sm font-medium text-foreground">Account</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -83,7 +87,7 @@ export function TopBar() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate("/settings")}>Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings")}>Account Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>Log out</DropdownMenuItem>
           </DropdownMenuContent>

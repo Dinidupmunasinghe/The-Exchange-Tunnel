@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Coins, Info, CheckCircle } from "lucide-react";
+import { Coins, Info, CheckCircle, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -8,6 +8,8 @@ import { Label } from "../components/ui/label";
 import { Button } from "../components/ui/button";
 import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
+import { Calendar } from "../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { toast } from "sonner";
 import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
@@ -35,8 +37,9 @@ export function SubmitPost() {
   const [campaignMode, setCampaignMode] = useState<"subscribe" | "engagement">("subscribe");
   const [campaignName, setCampaignName] = useState("");
   const [selection, setSelection] = useState<Record<BaseEngagementKind, boolean>>(defaultSelection);
-  const [scheduleDateText, setScheduleDateText] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [creditBudget, setCreditBudget] = useState([100]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
@@ -77,13 +80,16 @@ export function SubmitPost() {
     setSelection((prev) => ({ ...prev, [kind]: !prev[kind] }));
   };
 
-  const todayDate = format(new Date(), "yyyy-MM-dd");
   const scheduledAt = useMemo(() => {
-    if (!scheduleDateText) return null;
-    const parsed = new Date(`${scheduleDateText}T${scheduleTime || "00:00"}:00`);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return parsed;
-  }, [scheduleDateText, scheduleTime]);
+    if (!scheduleDate) return null;
+    const [hRaw, mRaw] = scheduleTime.split(":");
+    const h = Number.parseInt(hRaw ?? "0", 10);
+    const m = Number.parseInt(mRaw ?? "0", 10);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    const d = new Date(scheduleDate);
+    d.setHours(h, m, 0, 0);
+    return d;
+  }, [scheduleDate, scheduleTime]);
 
   const isScheduled = Boolean(scheduledAt);
 
@@ -131,7 +137,7 @@ export function SubmitPost() {
       });
       const later = Boolean(scheduledAt);
       toast.success(later ? "Campaign scheduled" : "Campaign started");
-      setScheduleDateText("");
+      setScheduleDate(undefined);
       setScheduleTime("09:00");
       setCampaignName("");
       setSelection(defaultSelection);
@@ -252,18 +258,39 @@ export function SubmitPost() {
                 <div className="space-y-2">
                   <Label>Schedule (optional)</Label>
                   <div className="flex flex-wrap items-end gap-2">
-                    <div className="min-w-[180px] space-y-1">
-                      <Label htmlFor="scheduleDate" className="text-xs text-muted-foreground">
-                        Date
-                      </Label>
-                      <Input
-                        id="scheduleDate"
-                        type="date"
-                        min={todayDate}
-                        value={scheduleDateText}
-                        onChange={(e) => setScheduleDateText(e.target.value)}
-                        className="bg-secondary border-0"
-                      />
+                    <div className="min-w-[240px] space-y-1">
+                      <Label className="text-xs text-muted-foreground">Date</Label>
+                      <Popover open={scheduleOpen} onOpenChange={setScheduleOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal bg-secondary border-0",
+                              !scheduleDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-70" />
+                            {scheduleDate ? format(scheduleDate, "MMM d, yyyy") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={scheduleDate}
+                            onSelect={(d) => {
+                              setScheduleDate(d);
+                              if (d) setScheduleOpen(false);
+                            }}
+                            disabled={(day) => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              return day < today;
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="min-w-[140px] space-y-1">
                       <Label htmlFor="scheduleTime" className="text-xs text-muted-foreground">
@@ -277,13 +304,13 @@ export function SubmitPost() {
                         className="bg-secondary border-0"
                       />
                     </div>
-                    {scheduleDateText ? (
+                    {scheduleDate ? (
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setScheduleDateText("");
+                          setScheduleDate(undefined);
                           setScheduleTime("09:00");
                         }}
                       >
