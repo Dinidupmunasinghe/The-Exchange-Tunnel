@@ -315,8 +315,8 @@ export function EarnCredits() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">{title}</h2>
-                      <p className="text-sm text-muted-foreground">{postedAgo}</p>
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-muted-foreground">{postedAgo}</p>
                         <span className="text-xs text-muted-foreground">Associated tasks</span>
                         <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
                           {isSubscribeCampaign ? "Subscribe" : getEngagementLabel(et)}
