@@ -22,9 +22,7 @@ import {
 } from "../lib/engagement";
 
 const defaultSelection: Record<BaseEngagementKind, boolean> = {
-  like: true,
-  comment: false,
-  share: false
+  comment: true
 };
 
 const BOT_AT = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "ExchangeTunnelApp_bot").trim();
@@ -219,7 +217,7 @@ export function SubmitPost() {
                       )}
                     >
                       <p className="font-medium text-foreground">Boost a post</p>
-                      <p className="text-xs text-muted-foreground">Workers like/comment/share one t.me post.</p>
+                      <p className="text-xs text-muted-foreground">Workers comment on one t.me post.</p>
                     </button>
                   </div>
                 </div>
@@ -354,11 +352,11 @@ export function SubmitPost() {
                 </div>
                 {campaignMode === "engagement" ? (
                   <div className="space-y-3">
-                    <Label>Action bundle</Label>
+                    <Label>Action</Label>
                     <p className="text-xs text-muted-foreground -mt-1">
-                      Same credit model: workers complete the bundle you pick.
+                      Comments only. Like and Share are disabled for verification reliability.
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-1">
                       {BASE_ENGAGEMENT_CHOICES.map((opt) => {
                         const id = `eng-${opt.id}`;
                         const on = selection[opt.id];
@@ -465,7 +463,7 @@ export function SubmitPost() {
               <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />
               <p className="text-xs text-muted-foreground">
                 Earners must subscribe to the channel; the app confirms subscription with your bot. For post campaigns, they
-                also perform the selected actions.
+                must post a verifiable comment and submit comment proof.
               </p>
             </CardContent>
           </Card>

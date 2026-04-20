@@ -21,8 +21,7 @@ router.post(
     body("actionKind").isIn(ACTION_KINDS),
     body("proofText").optional().isString().isLength({ max: 500 }),
     body("proofText").custom((value, { req }) => {
-      if (req.body.actionKind === "like" || req.body.actionKind === "share" || req.body.actionKind === "subscribe")
-        return true;
+      if (req.body.actionKind === "subscribe") return true;
       if (!value || String(value).trim().length < 10) {
         throw new Error("Proof text must be at least 10 characters for this action");
       }
@@ -38,7 +37,7 @@ router.post(
   taskSubmitLimiter,
   [
     body("campaignId").isInt({ min: 1 }),
-    body("actionKind").isIn(["like", "comment", "share"])
+    body("actionKind").isIn(["comment"])
   ],
   validateRequest,
   revertEngagement

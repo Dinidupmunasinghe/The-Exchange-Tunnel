@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ThumbsUp, MessageCircle, Share2, ExternalLink, Coins, RefreshCw, BellPlus } from "lucide-react";
+import { MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
@@ -198,15 +198,6 @@ export function EarnCredits() {
         return;
       }
 
-      if (action === "like" && hasEngagement(myEngagements, campaignId, "like")) {
-        await api.revertEngagement({ campaignId, actionKind: "like" });
-        toast.success("Reverted in app", { description: "Credits returned. Remove the reaction in Telegram if needed." });
-        const refreshed = await api.getTasks();
-        setTasks(refreshed.tasks as TaskRow[]);
-        setMyEngagements(refreshed.myEngagements ?? []);
-        return;
-      }
-
       if (action !== "subscribe" && hasEngagement(myEngagements, campaignId, action)) {
         toast.info("You already recorded this action.");
         return;
@@ -221,9 +212,11 @@ export function EarnCredits() {
       const proofText =
         action === "subscribe"
           ? undefined
-          : action === "like"
-            ? undefined
-            : "I completed the requested action on the Telegram public post in this channel, per campaign instructions.";
+          : window.prompt("Paste the exact comment text you posted on Telegram (min 10 chars):", "")?.trim();
+      if (action === "comment" && (!proofText || proofText.length < 10)) {
+        toast.error("Comment proof is required (at least 10 characters).");
+        return;
+      }
 
       await api.completeTask({
         taskId: task.id,
@@ -261,8 +254,7 @@ export function EarnCredits() {
         <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-sm leading-relaxed text-muted-foreground">
           <span className="font-medium text-foreground">Log in with Telegram</span> so we can verify your subscription to
-          the target channel. Like can be undone in-app. Comment/Share need a short proof (auto-filled) after you do the
-          action in Telegram.
+          the target channel. Comments require proof text so the action can be reviewed.
         </p>
       </div>
       {hasTelegram === false ? (
@@ -294,9 +286,7 @@ export function EarnCredits() {
           const postedAgo = relativeCampaignTime(campaign.createdAt);
           const initials = campaignInitials(title);
           const cid = campaign.id;
-          const liked = hasEngagement(myEngagements, cid, "like");
           const commented = hasEngagement(myEngagements, cid, "comment");
-          const shared = hasEngagement(myEngagements, cid, "share");
           const subscribed = hasCompletedTask(campaignTasks);
           const isSubscribeCampaign = et === "subscribe";
 
@@ -368,32 +358,6 @@ export function EarnCredits() {
                 {!isSubscribeCampaign ? (
                 <Button
                   type="button"
-                  variant={liked ? "default" : "outline"}
-                  size="sm"
-                  className={
-                    liked
-                      ? "rounded-full pr-3"
-                      : "rounded-full border-primary/25 bg-background/80 pr-3 hover:bg-primary/10"
-                  }
-                  onClick={() => void handleAction(cid, campaignTasks, et, "like")}
-                  disabled={!bundleAllowsAction(et, "like") || busy !== null || hasTelegram === false}
-                >
-                  <ThumbsUp className={`mr-2 h-4 w-4 ${liked ? "fill-current" : ""}`} />
-                  {liked ? "Liked" : "Like"}
-                  <Badge
-                    className={
-                      liked
-                        ? "ml-2 rounded-full bg-primary-foreground/20 px-2 text-primary-foreground hover:bg-primary-foreground/20"
-                        : "ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15"
-                    }
-                  >
-                    {liked ? "tap to undo" : `+${reward}`}
-                  </Badge>
-                </Button>
-                ) : null}
-                {!isSubscribeCampaign ? (
-                <Button
-                  type="button"
                   variant={commented ? "default" : "outline"}
                   size="sm"
                   className={
@@ -407,26 +371,6 @@ export function EarnCredits() {
                   <MessageCircle className="mr-2 h-4 w-4" />
                   Comment
                   <Badge className="ml-2 rounded-full bg-blue-500/15 px-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/15">
-                    +{reward}
-                  </Badge>
-                </Button>
-                ) : null}
-                {!isSubscribeCampaign ? (
-                <Button
-                  type="button"
-                  variant={shared ? "default" : "outline"}
-                  size="sm"
-                  className={
-                    shared
-                      ? "rounded-full pr-3"
-                      : "rounded-full border-purple-500/25 bg-background/80 pr-3 hover:bg-purple-500/10"
-                  }
-                  onClick={() => void handleAction(cid, campaignTasks, et, "share")}
-                  disabled={!bundleAllowsAction(et, "share") || shared || busy !== null || hasTelegram === false}
-                >
-                  <Share2 className="mr-2 h-4 w-4" />
-                  Share
-                  <Badge className="ml-2 rounded-full bg-purple-500/15 px-2 text-purple-600 dark:text-purple-400 hover:bg-purple-500/15">
                     +{reward}
                   </Badge>
                 </Button>

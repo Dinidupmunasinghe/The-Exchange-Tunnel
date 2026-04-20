@@ -197,14 +197,6 @@ async function submitTaskCompletion(req, res) {
         error.status = 400;
         throw error;
       }
-      if (actionKind === "share" && isSuspiciousSubmission(proofText)) {
-        const error = new Error("Repost/forward: describe what you did (at least 10 characters) in the proof");
-        error.status = 400;
-        throw error;
-      }
-      if (actionKind === "like") {
-        // "Like" = react/heart or similar — membership already verified; proof optional
-      }
 
       const verifiedViaProvider = true;
       const verification = await verifyEngagement({
@@ -340,7 +332,7 @@ async function getAvailableTasks(req, res) {
 
 async function revertEngagement(req, res) {
   const { campaignId, actionKind } = req.body;
-  if (!["like", "comment", "share"].includes(actionKind)) {
+  if (!["comment"].includes(actionKind)) {
     return res.status(400).json({ message: "Invalid action kind" });
   }
   try {
@@ -402,7 +394,7 @@ async function revertEngagement(req, res) {
     });
     return res.json({
       message:
-        "Engagement reverted in the app; remove your like/comment/forward in Telegram if you can. Credits were returned to the poster."
+        "Engagement reverted in the app; remove your Telegram comment if needed. Credits were returned to the poster."
     });
   } catch (err) {
     const status = err.status || 500;

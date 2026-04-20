@@ -234,15 +234,7 @@ export const api = {
     messageKey?: string;
     messageUrl?: string;
     channelUrl?: string;
-    engagementType:
-      | "subscribe"
-      | "like"
-      | "comment"
-      | "share"
-      | "like_comment"
-      | "like_share"
-      | "comment_share"
-      | "all";
+    engagementType: "subscribe" | "comment";
     creditsPerEngagement: number;
     maxEngagements: number;
     scheduledLaunchAt?: string | null;
@@ -259,14 +251,14 @@ export const api = {
   completeTask: (payload: {
     taskId: number;
     engagementType: string;
-    actionKind: "subscribe" | "like" | "comment" | "share";
+    actionKind: "subscribe" | "comment";
     proofText?: string;
   }) =>
     authRequest("/tasks/complete", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  revertEngagement: (payload: { campaignId: number; actionKind: "like" | "comment" | "share" }) =>
+  revertEngagement: (payload: { campaignId: number; actionKind: "comment" }) =>
     authRequest("/tasks/revert", {
       method: "POST",
       body: JSON.stringify(payload),
