@@ -301,7 +301,7 @@ export function SubmitPost() {
                         type="time"
                         value={scheduleTime}
                         onChange={(e) => setScheduleTime(e.target.value)}
-                        className="bg-secondary border-0"
+                        className="bg-secondary border-0 [color-scheme:dark]"
                       />
                     </div>
                     {scheduleDate ? (
