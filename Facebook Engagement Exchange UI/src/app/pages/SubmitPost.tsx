@@ -41,7 +41,7 @@ export function SubmitPost() {
   const [campaignName, setCampaignName] = useState("");
   const [selection, setSelection] = useState<Record<BaseEngagementKind, boolean>>(defaultSelection);
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
-  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [creditBudget, setCreditBudget] = useState([100]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,12 +82,13 @@ export function SubmitPost() {
   const toggleKind = (kind: BaseEngagementKind) => {
     setSelection((prev) => ({ ...prev, [kind]: !prev[kind] }));
   };
-  const [scheduleHour, scheduleMinute] = scheduleTime.split(":");
-  const updateScheduleHour = (h: string) => setScheduleTime(`${h}:${scheduleMinute ?? "00"}`);
-  const updateScheduleMinute = (m: string) => setScheduleTime(`${scheduleHour ?? "00"}:${m}`);
+  const [scheduleHour = "", scheduleMinute = ""] = scheduleTime.split(":");
+  const updateScheduleHour = (h: string) => setScheduleTime(`${h}:${scheduleMinute || "00"}`);
+  const updateScheduleMinute = (m: string) => setScheduleTime(`${scheduleHour || "00"}:${m}`);
 
   const scheduledAt = useMemo(() => {
     if (!scheduleDate) return null;
+    if (!scheduleTime) return null;
     const [hRaw, mRaw] = scheduleTime.split(":");
     const h = Number.parseInt(hRaw ?? "0", 10);
     const m = Number.parseInt(mRaw ?? "0", 10);
@@ -125,6 +126,11 @@ export function SubmitPost() {
     setIsSubmitting(true);
     try {
       let scheduledLaunchAt: string | undefined;
+      if (scheduleDate && !scheduleTime) {
+        toast.error("Pick a time for the scheduled date");
+        setIsSubmitting(false);
+        return;
+      }
       if (scheduledAt) {
         if (scheduledAt.getTime() <= Date.now()) {
           toast.error("Schedule must be in the future");
@@ -144,7 +150,7 @@ export function SubmitPost() {
       const later = Boolean(scheduledAt);
       toast.success(later ? "Campaign scheduled" : "Campaign started");
       setScheduleDate(undefined);
-      setScheduleTime("09:00");
+      setScheduleTime("");
       setCampaignName("");
       setSelection(defaultSelection);
       setCampaignMode("subscribe");
@@ -302,7 +308,7 @@ export function SubmitPost() {
                       <Label className="text-xs text-muted-foreground">Time</Label>
                       <div className="flex h-9 items-center gap-2 rounded-md bg-secondary px-3">
                         <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <Select value={scheduleHour || "09"} onValueChange={updateScheduleHour}>
+                        <Select value={scheduleHour || undefined} onValueChange={updateScheduleHour}>
                           <SelectTrigger className="h-8 w-[76px] border-0 bg-transparent px-2 shadow-none focus-visible:ring-0">
                             <SelectValue placeholder="HH" />
                           </SelectTrigger>
@@ -314,7 +320,7 @@ export function SubmitPost() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <Select value={scheduleMinute || "00"} onValueChange={updateScheduleMinute}>
+                        <Select value={scheduleMinute || undefined} onValueChange={updateScheduleMinute}>
                           <SelectTrigger className="h-8 w-[76px] border-0 bg-transparent px-2 shadow-none focus-visible:ring-0">
                             <SelectValue placeholder="MM" />
                           </SelectTrigger>
@@ -335,7 +341,7 @@ export function SubmitPost() {
                         size="sm"
                         onClick={() => {
                           setScheduleDate(undefined);
-                          setScheduleTime("09:00");
+                          setScheduleTime("");
                         }}
                       >
                         Clear
