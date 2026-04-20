@@ -334,7 +334,11 @@ export function EarnCredits() {
               </div>
 
               <div className="px-4 pb-3 pl-14">
-                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start">
+                  <TelegramMessageMedia
+                    postUrl={campaign.soundcloudPostUrl || campaign.messageUrl || ""}
+                    className="w-[170px] shrink-0 self-start"
+                  />
                   <p className="text-sm leading-relaxed text-foreground sm:flex-1">
                     <span className="font-semibold">{getEngagementLabel(et)}</span>
                     {" — "}
@@ -343,10 +347,6 @@ export function EarnCredits() {
                         ? "Open the channel, subscribe in Telegram, then tap Subscribe in-app."
                         : "Subscribe to the channel, then use the button here once you have completed the action in Telegram.")}
                   </p>
-                  <TelegramMessageMedia
-                    postUrl={campaign.soundcloudPostUrl || campaign.messageUrl || ""}
-                    className="w-[170px] shrink-0 self-start"
-                  />
                 </div>
               </div>
 
