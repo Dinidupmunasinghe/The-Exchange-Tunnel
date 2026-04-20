@@ -12,7 +12,6 @@ import { api } from "../services/api";
 import {
   bundleAllowsAction,
   getEngagementLabel,
-  getBundleActionHint,
   type BaseEngagementKind
 } from "../lib/engagement";
 
@@ -289,7 +288,6 @@ export function EarnCredits() {
         {taskGroups.map(({ campaign, tasks: campaignTasks }) => {
           if (!campaign) return null;
           const et = String(campaignTasks[0]?.engagementType ?? "");
-          const hint = getBundleActionHint(et);
           const title = campaign.name ? campaign.name : `Campaign #${campaign.id}`;
           const nextOpen = firstOpenTask(campaignTasks);
           const reward = nextOpen?.rewardCredits ?? campaignTasks[0]?.rewardCredits ?? 0;
@@ -319,16 +317,24 @@ export function EarnCredits() {
                       <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">{title}</h2>
                       <p className="text-sm text-muted-foreground">{postedAgo}</p>
                     </div>
-                    <Button variant="ghost" size="icon" className="shrink-0" asChild>
-                      <a
-                        href={campaign.soundcloudPostUrl || campaign.messageUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label="Open post"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </Button>
+                    <div className="flex items-start gap-3">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Associated tasks</p>
+                        <Badge variant="outline" className="mt-1 border-primary/30 bg-primary/10 text-primary">
+                          {isSubscribeCampaign ? "Subscribe" : getEngagementLabel(et)}
+                        </Badge>
+                      </div>
+                      <Button variant="ghost" size="icon" className="shrink-0" asChild>
+                        <a
+                          href={campaign.soundcloudPostUrl || campaign.messageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label="Open post"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -339,14 +345,6 @@ export function EarnCredits() {
                     postUrl={campaign.soundcloudPostUrl || campaign.messageUrl || ""}
                     className="w-[170px] shrink-0 self-start"
                   />
-                  <p className="text-sm leading-relaxed text-foreground sm:flex-1">
-                    <span className="font-semibold">{getEngagementLabel(et)}</span>
-                    {" — "}
-                    {hint ??
-                      (isSubscribeCampaign
-                        ? "Open the channel, subscribe in Telegram, then tap Subscribe in-app."
-                        : "Subscribe to the channel, then use the button here once you have completed the action in Telegram.")}
-                  </p>
                 </div>
               </div>
 
