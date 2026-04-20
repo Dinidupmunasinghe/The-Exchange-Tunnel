@@ -162,33 +162,35 @@ async function submitTaskCompletion(req, res) {
         throw error;
       }
       const channelId = resolved.chatId;
-      let memberCheck = await tg.getUserChatMemberStatus(String(channelId), tUid);
-      // Telegram can lag briefly right after subscribe; retry a few times for subscribe campaigns.
-      if (!memberCheck.ok && engagementType === "subscribe") {
-        for (let i = 0; i < 3; i += 1) {
-          await sleep(1500);
-          memberCheck = await tg.getUserChatMemberStatus(String(channelId), tUid);
-          if (memberCheck.ok) break;
+      if (engagementType === "subscribe") {
+        let memberCheck = await tg.getUserChatMemberStatus(String(channelId), tUid);
+        // Telegram can lag briefly right after subscribe; retry a few times for subscribe campaigns.
+        if (!memberCheck.ok) {
+          for (let i = 0; i < 3; i += 1) {
+            await sleep(1500);
+            memberCheck = await tg.getUserChatMemberStatus(String(channelId), tUid);
+            if (memberCheck.ok) break;
+          }
         }
-      }
-      if (!memberCheck.ok) {
-        const raw = String(memberCheck.error || "").toLowerCase();
-        let hint =
-          "Open the t.me/… link, subscribe in Telegram, then return here. The bot must be in the channel.";
-        if (raw.includes("bot is not a member")) {
-          hint = "The bot is not in that channel. Add the bot as an admin to the target channel, then try again.";
-        } else if (raw.includes("user not found")) {
-          hint = "This Telegram account is not visible in that channel yet. Ensure you subscribed with the same account and retry after 10 seconds.";
-        } else if (raw.includes("chat not found")) {
-          hint = "Campaign channel could not be found. Ensure the channel is public and still exists.";
-        } else if (memberCheck.status === "left" || memberCheck.status === "kicked") {
-          hint = "Telegram reports this account is not subscribed to the channel.";
+        if (!memberCheck.ok) {
+          const raw = String(memberCheck.error || "").toLowerCase();
+          let hint =
+            "Open the t.me/… link, subscribe in Telegram, then return here. The bot must be in the channel.";
+          if (raw.includes("bot is not a member")) {
+            hint = "The bot is not in that channel. Add the bot as an admin to the target channel, then try again.";
+          } else if (raw.includes("user not found")) {
+            hint = "This Telegram account is not visible in that channel yet. Ensure you subscribed with the same account and retry after 10 seconds.";
+          } else if (raw.includes("chat not found")) {
+            hint = "Campaign channel could not be found. Ensure the channel is public and still exists.";
+          } else if (memberCheck.status === "left" || memberCheck.status === "kicked") {
+            hint = "Telegram reports this account is not subscribed to the channel.";
+          }
+          const error = new Error(
+            `Could not confirm your subscription to the target channel. ${hint}`
+          );
+          error.status = 400;
+          throw error;
         }
-        const error = new Error(
-          `Could not confirm your subscription to the target channel. ${hint}`
-        );
-        error.status = 400;
-        throw error;
       }
       if (actionKind === "comment" && isSuspiciousSubmission(proofText)) {
         const error = new Error("Comment: enter at least 10 characters in your proof (what you posted)");
