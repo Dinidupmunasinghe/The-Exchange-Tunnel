@@ -31,6 +31,21 @@ function requireWorkerTelegramId(user) {
   return String(user.telegramUserId);
 }
 
+function parseTmeChannelUsername(url) {
+  try {
+    const u = new URL(String(url || "").trim());
+    const host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+    if (host !== "t.me") return null;
+    const parts = (u.pathname || "/").split("/").filter(Boolean);
+    if (!parts[0] || parts[0] === "c") return null;
+    // Channel root link: https://t.me/<username>
+    if (parts.length === 1) return parts[0].replace(/^@/, "");
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function submitTaskCompletion(req, res) {
   const { taskId, engagementType, proofText: proofRaw, actionKind } = req.body;
   const proofText = typeof proofRaw === "string" ? proofRaw : "";
@@ -108,13 +123,30 @@ async function submitTaskCompletion(req, res) {
         error.status = 400;
         throw error;
       }
-      const parsed = tg.parseTmeMessageUrl(String(msgUrl));
-      if (!parsed) {
-        const error = new Error("Invalid t.me post URL on campaign");
-        error.status = 400;
-        throw error;
+      let resolved;
+      if (engagementType === "subscribe") {
+        const username = parseTmeChannelUsername(String(msgUrl));
+        if (!username) {
+          const error = new Error("Invalid t.me channel URL on campaign");
+          error.status = 400;
+          throw error;
+        }
+        const chat = await tg.getChat(`@${username}`).catch(() => null);
+        if (!chat || chat.id == null) {
+          const error = new Error("Could not resolve campaign channel");
+          error.status = 400;
+          throw error;
+        }
+        resolved = { chatId: String(chat.id), title: chat.title || null };
+      } else {
+        const parsed = tg.parseTmeMessageUrl(String(msgUrl));
+        if (!parsed) {
+          const error = new Error("Invalid t.me post URL on campaign");
+          error.status = 400;
+          throw error;
+        }
+        resolved = await tg.resolveChannelChatIdFromTme(parsed, null);
       }
-      const resolved = await tg.resolveChannelChatIdFromTme(parsed, null);
       if (resolved == null) {
         const error = new Error("Could not resolve this Telegram post");
         error.status = 400;
