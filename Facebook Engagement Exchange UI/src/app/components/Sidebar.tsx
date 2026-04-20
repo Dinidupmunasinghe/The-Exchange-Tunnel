@@ -15,7 +15,7 @@ import { Button } from "./ui/button";
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Earn Credits", href: "/earn", icon: Sparkles },
-  { name: "Submit Post", href: "/submit", icon: Upload },
+  { name: "Launch Campaigns", href: "/submit", icon: Upload },
   { name: "My Campaigns", href: "/campaigns", icon: FolderOpen },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Wallet", href: "/wallet", icon: Wallet },

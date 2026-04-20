@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import {
   ChannelConnectPrerequisites,
   ChannelConnectVisualGuide,
-  UserGoalPicker,
 } from "../components/ChannelConnectGuide";
 
 type Profile = {
@@ -79,6 +78,7 @@ export function Settings() {
     () => pages.find((page) => page.id === profile?.telegramActingChannelId) ?? null,
     [pages, profile?.telegramActingChannelId]
   );
+  const hasConnectedChannel = Boolean(selectedPage || profile?.telegramActingChannelId);
 
   const hasPlaceholderEmail = Boolean(
     profile?.email &&
@@ -150,21 +150,9 @@ export function Settings() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
         <p className="mt-1 text-muted-foreground">
-          Choose how you use the platform, then link a channel only if you run campaigns.
+          Link Telegram and connect your campaign channel.
         </p>
       </div>
-
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-foreground">How you use Exchange Tunnel</CardTitle>
-          <CardDescription>
-            Browse-only users never need to add the bot to a channel. Promoters must add the bot as admin once per channel.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <UserGoalPicker />
-        </CardContent>
-      </Card>
 
       <Card className="border-border bg-card">
         <CardHeader>
@@ -228,8 +216,12 @@ export function Settings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <ChannelConnectPrerequisites disabled={!profile?.telegramUserId} />
-          <ChannelConnectVisualGuide />
+          {!hasConnectedChannel ? (
+            <>
+              <ChannelConnectPrerequisites disabled={!profile?.telegramUserId} />
+              <ChannelConnectVisualGuide defaultOpenAccordion />
+            </>
+          ) : null}
           <div className="space-y-2 max-w-md">
             <Label htmlFor="ch">Channel</Label>
             <div className="flex flex-col gap-2 sm:flex-row">

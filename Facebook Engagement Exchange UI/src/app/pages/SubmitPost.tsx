@@ -155,7 +155,7 @@ export function SubmitPost() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Submit post</h1>
+        <h1 className="text-3xl font-bold text-foreground">Launch Campaigns</h1>
         <p className="text-muted-foreground mt-1">
           Run either a subscriber campaign for your connected channel or a post engagement campaign.
         </p>
