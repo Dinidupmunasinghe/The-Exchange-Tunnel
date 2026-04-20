@@ -190,7 +190,7 @@ export function EarnCredits() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Earn Credits</h1>
-          <p className="mt-1 text-muted-foreground">One completion per button; join the channel, then use the app</p>
+          <p className="mt-1 text-muted-foreground">One completion per button; subscribe in Telegram, then verify in app</p>
         </div>
         <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void loadTasks()}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -201,8 +201,8 @@ export function EarnCredits() {
       <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
         <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-sm leading-relaxed text-muted-foreground">
-          <span className="font-medium text-foreground">Log in with Telegram</span> so we can verify you joined the
-          target channel. Like can be undone in-app. Comment/Share need a short proof (auto-filled) after you do the
+          <span className="font-medium text-foreground">Log in with Telegram</span> so we can verify your subscription to
+          the target channel. Like can be undone in-app. Comment/Share need a short proof (auto-filled) after you do the
           action in Telegram.
         </p>
       </div>
@@ -212,7 +212,7 @@ export function EarnCredits() {
           <Link to="/login" className="font-medium underline underline-offset-2">
             Login
           </Link>{" "}
-          first. The app checks your Telegram user id and channel membership.
+          first. The app checks your Telegram user id and channel subscription.
         </div>
       ) : null}
 
@@ -279,8 +279,8 @@ export function EarnCredits() {
                   {" — "}
                   {hint ??
                     (isSubscribeCampaign
-                      ? "Open the channel, join it in Telegram, then tap Subscribe in-app."
-                      : "Join the channel, then use the button here once you have completed the action in Telegram.")}
+                      ? "Open the channel, subscribe in Telegram, then tap Subscribe in-app."
+                      : "Subscribe to the channel, then use the button here once you have completed the action in Telegram.")}
                 </p>
               </div>
 

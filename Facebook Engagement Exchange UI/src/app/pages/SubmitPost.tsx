@@ -171,7 +171,7 @@ export function SubmitPost() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Launch Campaigns</h1>
         <p className="text-muted-foreground mt-1">
-          Run either a subscriber campaign for your connected channel or a post engagement campaign.
+          Run either a channel subscribe campaign or a post engagement campaign.
         </p>
       </div>
       {!channelTitle ? (
@@ -208,7 +208,7 @@ export function SubmitPost() {
                       )}
                     >
                       <p className="font-medium text-foreground">Get subscribers</p>
-                      <p className="text-xs text-muted-foreground">Workers join your connected channel.</p>
+                      <p className="text-xs text-muted-foreground">Workers subscribe to your connected channel.</p>
                     </button>
                     <button
                       type="button"
@@ -244,7 +244,7 @@ export function SubmitPost() {
                           {channelTitle || "No channel connected"}
                         </span>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Subscriber campaigns automatically use your connected channel from Settings.
+                          Subscribe campaigns automatically use your connected channel from Settings.
                         </p>
                       </div>
                     </>
@@ -384,7 +384,7 @@ export function SubmitPost() {
                   </div>
                 ) : (
                   <div className="rounded-lg border border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
-                    Subscriber campaign selected. Workers will join your connected channel and tap{" "}
+                    Subscribe campaign selected. Workers will subscribe to your connected channel and tap{" "}
                     <strong className="text-foreground">Subscribe</strong> in the earn feed.
                   </div>
                 )}
@@ -464,8 +464,8 @@ export function SubmitPost() {
             <CardContent className="p-4 flex gap-2">
               <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />
               <p className="text-xs text-muted-foreground">
-                Earners must join the channel; the app checks membership with your bot. For post campaigns, they also perform
-                the selected actions.
+                Earners must subscribe to the channel; the app confirms subscription with your bot. For post campaigns, they
+                also perform the selected actions.
               </p>
             </CardContent>
           </Card>

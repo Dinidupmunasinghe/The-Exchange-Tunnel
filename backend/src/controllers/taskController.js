@@ -161,8 +161,8 @@ async function submitTaskCompletion(req, res) {
       const isMember = await tg.isUserMemberOrAdminOfChat(String(channelId), tUid);
       if (!isMember) {
         const error = new Error(
-          "Could not confirm you are a member of the target channel. " +
-            "Open the t.me/… link, join the channel, then return here. The bot must be in the channel."
+          "Could not confirm your subscription to the target channel. " +
+            "Open the t.me/… link, subscribe in Telegram, then return here. The bot must be in the channel."
         );
         error.status = 400;
         throw error;
