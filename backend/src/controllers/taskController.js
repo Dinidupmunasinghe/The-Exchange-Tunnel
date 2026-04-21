@@ -230,7 +230,7 @@ async function submitTaskCompletion(req, res) {
           verificationDetails:
             actionKind === "subscribe"
               ? "Telegram: channel membership verified for subscribe campaign"
-              : "Telegram: trust-mode comment completion"
+              : "Telegram: bot-detected discussion comment"
         },
         { transaction }
       );
