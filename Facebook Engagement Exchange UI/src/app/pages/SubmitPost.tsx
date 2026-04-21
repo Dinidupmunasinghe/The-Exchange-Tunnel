@@ -43,18 +43,44 @@ export function SubmitPost() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [creditBudget, setCreditBudget] = useState([100]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRecheckingSetup, setIsRecheckingSetup] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [channelTitle, setChannelTitle] = useState<string | null>(null);
+  const [connectedChannelId, setConnectedChannelId] = useState<string | null>(null);
+  const [hasTelegramLogin, setHasTelegramLogin] = useState<boolean>(false);
+  const [setupCheckMessage, setSetupCheckMessage] = useState<string | null>(null);
   const [messageUrl, setMessageUrl] = useState("");
 
+  const refreshSetupState = async () => {
+    const res = await api.getProfile();
+    const nextBalance = res.user?.credits ?? 0;
+    const nextTitle = res.user?.telegramActingChannelTitle ?? res.user?.telegramActingAccountName ?? null;
+    const nextChannelId = res.user?.telegramActingChannelId ? String(res.user.telegramActingChannelId) : null;
+    const nextHasLogin = Boolean(res.user?.telegramUserId);
+    setBalance(nextBalance);
+    setChannelTitle(nextTitle);
+    setConnectedChannelId(nextChannelId);
+    setHasTelegramLogin(nextHasLogin);
+    return { hasLogin: nextHasLogin, channelId: nextChannelId };
+  };
+
   useEffect(() => {
-    api
-      .getProfile()
-      .then((res) => {
-        setBalance(res.user?.credits ?? 0);
-        setChannelTitle(res.user?.telegramActingChannelTitle ?? res.user?.telegramActingAccountName ?? null);
-      })
-      .catch(() => setBalance(null));
+    void refreshSetupState().catch(() => setBalance(null));
+  }, []);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refreshSetupState();
+      }
+    };
+    const onFocus = () => void refreshSetupState();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   const derivedType = selectionToEngagementType(selection);
@@ -164,6 +190,36 @@ export function SubmitPost() {
     }
   };
 
+  const botUsername = BOT_DISPLAY.replace(/^@/, "");
+  const fixBotAdminUrl = `https://t.me/${botUsername}?startchannel=true`;
+  const fixBotFatherUrl = "https://t.me/BotFather";
+
+  const handleRecheckSetup = async () => {
+    setIsRecheckingSetup(true);
+    setSetupCheckMessage(null);
+    try {
+      const snapshot = await refreshSetupState();
+      if (!snapshot.hasLogin) {
+        setSetupCheckMessage("Log in with Telegram first.");
+        return;
+      }
+      if (!snapshot.channelId) {
+        setSetupCheckMessage("No channel connected yet. Connect it in Settings.");
+        return;
+      }
+      await api.connectTelegramChannel(snapshot.channelId);
+      await refreshSetupState();
+      setSetupCheckMessage("Setup looks good. You can launch campaigns now.");
+      toast.success("Telegram setup verified");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Could not verify";
+      setSetupCheckMessage(msg);
+      toast.error("Setup check failed", { description: msg });
+    } finally {
+      setIsRecheckingSetup(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -184,6 +240,27 @@ export function SubmitPost() {
             <code className="rounded bg-black/20 px-1 font-mono text-xs">@yourchannel</code>. See the step-by-step guide
             there. Only browsing/earning? Pick &quot;Earn &amp; browse&quot; on Settings — no bot admin needed.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {!hasTelegramLogin ? (
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/login">Fix in Telegram: Login</Link>
+              </Button>
+            ) : null}
+            <Button size="sm" variant="outline" asChild>
+              <a href={fixBotAdminUrl} target="_blank" rel="noreferrer">
+                Fix in Telegram: Add bot to channel
+              </a>
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <a href={fixBotFatherUrl} target="_blank" rel="noreferrer">
+                Fix in Telegram: BotFather privacy
+              </a>
+            </Button>
+            <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={isRecheckingSetup}>
+              {isRecheckingSetup ? "Rechecking..." : "I fixed it, recheck now"}
+            </Button>
+          </div>
+          {setupCheckMessage ? <p className="mt-2 text-xs text-amber-50/90">{setupCheckMessage}</p> : null}
         </div>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-3">
