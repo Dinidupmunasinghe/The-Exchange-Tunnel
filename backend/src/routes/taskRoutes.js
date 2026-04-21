@@ -3,8 +3,11 @@ const { body } = require("express-validator");
 const {
   getAvailableTasks,
   submitTaskCompletion,
-  revertEngagement
+  revertEngagement,
+  startCommentDetection,
+  pollCommentDetection
 } = require("../controllers/taskController");
+const requireAuth = require("../middleware/requireAuth");
 const validateRequest = require("../middleware/validateRequest");
 const { taskSubmitLimiter } = require("../middleware/rateLimiters");
 const { ENGAGEMENT_TYPES, ACTION_KINDS } = require("../constants/engagement");
@@ -19,12 +22,24 @@ router.post(
     body("taskId").isInt({ min: 1 }),
     body("engagementType").isIn(ENGAGEMENT_TYPES),
     body("actionKind").isIn(ACTION_KINDS),
+    body("commentVerifyToken").optional().isString().isLength({ min: 10, max: 120 }),
     body("proofText").optional().isString().isLength({ max: 500 }),
     body("proofText").custom(() => true)
   ],
   validateRequest,
   submitTaskCompletion
 );
+
+router.post(
+  "/comment-detect/start",
+  requireAuth,
+  taskSubmitLimiter,
+  [body("taskId").isInt({ min: 1 })],
+  validateRequest,
+  startCommentDetection
+);
+
+router.get("/comment-detect/poll", requireAuth, pollCommentDetection);
 
 router.post(
   "/revert",

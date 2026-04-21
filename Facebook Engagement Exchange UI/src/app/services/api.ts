@@ -252,6 +252,7 @@ export const api = {
     taskId: number;
     engagementType: string;
     actionKind: "subscribe" | "comment";
+    commentVerifyToken?: string;
     proofText?: string;
   }) =>
     authRequest("/tasks/complete", {
@@ -263,6 +264,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  startCommentDetect: (payload: { taskId: number }) =>
+    authRequest("/tasks/comment-detect/start", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as Promise<{ token: string; expiresInMs: number }>,
+  pollCommentDetect: (token: string) =>
+    authRequest(`/tasks/comment-detect/poll?token=${encodeURIComponent(token)}`) as Promise<{
+      status: "pending" | "detected" | "expired";
+    }>,
   getTransactions: () => authRequest("/transactions") as Promise<{ transactions: any[] }>,
   getTelegramMessagePreview: (url: string) =>
     authRequest(`/telegram/post-preview?${new URLSearchParams({ url }).toString()}`) as Promise<{

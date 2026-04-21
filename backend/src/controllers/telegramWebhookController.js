@@ -1,5 +1,6 @@
 const env = require("../config/env");
 const deeplinkStore = require("../services/telegramDeeplinkStore");
+const commentDetectionStore = require("../services/commentDetectionStore");
 
 /**
  * Telegram Bot API push updates — used to complete "open t.me/bot?start=login_*" login.
@@ -25,7 +26,20 @@ async function handleTelegramWebhook(req, res) {
   }
 
   const msg = body.message;
-  if (!msg || typeof msg.text !== "string") {
+  if (!msg || typeof msg !== "object") {
+    return res.status(200).json({ ok: true });
+  }
+
+  // Comment auto-detection path (discussion group messages)
+  if (msg.chat && msg.from && !msg.from.is_bot && msg.chat.id != null && msg.from.id != null) {
+    try {
+      commentDetectionStore.resolveByTelegramMessage(String(msg.chat.id), String(msg.from.id));
+    } catch {
+      // keep webhook resilient
+    }
+  }
+
+  if (typeof msg.text !== "string") {
     return res.status(200).json({ ok: true });
   }
 

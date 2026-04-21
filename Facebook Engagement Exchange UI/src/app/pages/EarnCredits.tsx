@@ -213,19 +213,38 @@ export function EarnCredits() {
         const key = `${campaignId}-comment`;
         setBusy(key);
         const campaignLink = task.campaign?.messageUrl || task.campaign?.soundcloudPostUrl || "";
+        const started = await api.startCommentDetect({ taskId: task.id });
         if (campaignLink) {
           const opened = window.open(campaignLink, "_blank", "noopener,noreferrer");
           if (!opened) {
             window.location.href = campaignLink;
           }
           toast.info("Opened Telegram post", {
-            description: "Post your comment there. The app will mark this action now.",
+            description: "Post your comment there. We are checking in real time for up to 60s.",
           });
+        }
+        let detected = false;
+        for (let i = 0; i < 20; i += 1) {
+          await sleep(3000);
+          const polled = await api.pollCommentDetect(started.token);
+          if (polled.status === "detected") {
+            detected = true;
+            break;
+          }
+          if (polled.status === "expired") break;
+        }
+        if (!detected) {
+          toast.error("Comment not detected yet", {
+            description: "Comment on Telegram discussion, then tap Comment again.",
+          });
+          setBusy(null);
+          return;
         }
         await api.completeTask({
           taskId: task.id,
           engagementType,
           actionKind: "comment",
+          commentVerifyToken: started.token,
         });
         toast.success(`Earned ${task.rewardCredits} credits`, {
           description: `Recorded · comment · task #${task.id}`,

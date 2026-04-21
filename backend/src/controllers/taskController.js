@@ -5,6 +5,8 @@ const tg = require("../services/telegramService");
 const { verifyEngagement } = require("../services/engagementVerification");
 const { earnCredits, refundCredits, reverseEarnCredits } = require("../services/creditService");
 const { ENGAGEMENT_TYPES, ACTION_KINDS, bundleAllowsAction } = require("../constants/engagement");
+const commentDetectionStore = require("../services/commentDetectionStore");
+const crypto = require("crypto");
 
 function runnableCampaignWhere() {
   return {
@@ -44,7 +46,7 @@ function sleep(ms) {
 }
 
 async function submitTaskCompletion(req, res) {
-  const { taskId, engagementType, proofText: proofRaw, actionKind } = req.body;
+  const { taskId, engagementType, proofText: proofRaw, actionKind, commentVerifyToken } = req.body;
   const proofText = typeof proofRaw === "string" ? proofRaw : "";
 
   if (!ACTION_KINDS.includes(actionKind)) {
@@ -185,6 +187,16 @@ async function submitTaskCompletion(req, res) {
           throw error;
         }
       }
+      if (actionKind === "comment") {
+        const consumed = commentDetectionStore.consumeResolved(String(commentVerifyToken || ""), req.user.id, task.id);
+        if (!consumed.ok) {
+          const error = new Error(
+            "Comment was not detected by bot yet. Open Telegram post, comment there, then retry."
+          );
+          error.status = 400;
+          throw error;
+        }
+      }
       const verifiedViaProvider = true;
       const verification = await verifyEngagement({
         campaign: task.campaign,
@@ -317,6 +329,69 @@ async function getAvailableTasks(req, res) {
   return res.json({ tasks: serialized, myEngagements });
 }
 
+async function startCommentDetection(req, res) {
+  const taskId = Number(req.body.taskId);
+  if (!Number.isInteger(taskId) || taskId < 1) {
+    return res.status(400).json({ message: "Invalid task id" });
+  }
+  try {
+    const task = await db.Task.findByPk(taskId, {
+      include: [{ model: db.Campaign, as: "campaign" }]
+    });
+    if (!task || !task.campaign) return res.status(404).json({ message: "Task not found" });
+    if (task.status !== "open" && !(task.status === "assigned" && task.assignedUserId === req.user.id)) {
+      return res.status(400).json({ message: "Task is not open for comment detection" });
+    }
+    if (task.campaign.engagementType !== "comment") {
+      return res.status(400).json({ message: "Comment detection only applies to comment campaigns" });
+    }
+    if (task.campaign.userId === req.user.id) {
+      return res.status(400).json({ message: "Cannot complete your own campaign task" });
+    }
+    const worker = await db.User.findByPk(req.user.id);
+    const telegramUserId = requireWorkerTelegramId(worker);
+    const msgUrl = task.campaign.messageUrl || task.campaign.soundcloudPostUrl;
+    const parsed = tg.parseTmeMessageUrl(String(msgUrl || ""));
+    if (!parsed) return res.status(400).json({ message: "Invalid t.me post URL on campaign" });
+    const resolved = await tg.resolveChannelChatIdFromTme(parsed, null);
+    if (!resolved || resolved.error || !resolved.chatId) {
+      return res.status(400).json({ message: resolved?.error || "Could not resolve campaign channel" });
+    }
+    const chatInfo = await tg.getChat(String(resolved.chatId)).catch(() => null);
+    const discussionChatId = chatInfo?.linked_chat_id ? String(chatInfo.linked_chat_id) : null;
+    if (!discussionChatId) {
+      return res.status(400).json({
+        message:
+          "Comments are not enabled for this channel post. Link a discussion group to the channel and add the bot there."
+      });
+    }
+
+    const token = crypto.randomBytes(16).toString("hex");
+    commentDetectionStore.create({
+      token,
+      userId: req.user.id,
+      telegramUserId: String(telegramUserId),
+      taskId: task.id,
+      campaignId: task.campaignId,
+      discussionChatId,
+      expires: Date.now() + commentDetectionStore.TTL_MS
+    });
+    return res.json({ token, expiresInMs: commentDetectionStore.TTL_MS });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || "Could not start comment detection" });
+  }
+}
+
+async function pollCommentDetection(req, res) {
+  const token = String(req.query.token || "");
+  if (!token) return res.status(400).json({ message: "token is required" });
+  const row = commentDetectionStore.peek(token);
+  if (!row) return res.json({ status: "expired" });
+  if (row.userId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+  if (row.resolvedAt) return res.json({ status: "detected" });
+  return res.json({ status: "pending" });
+}
+
 async function revertEngagement(req, res) {
   const { campaignId, actionKind } = req.body;
   if (!["comment"].includes(actionKind)) {
@@ -389,4 +464,10 @@ async function revertEngagement(req, res) {
   }
 }
 
-module.exports = { getAvailableTasks, submitTaskCompletion, revertEngagement };
+module.exports = {
+  getAvailableTasks,
+  submitTaskCompletion,
+  revertEngagement,
+  startCommentDetection,
+  pollCommentDetection
+};
