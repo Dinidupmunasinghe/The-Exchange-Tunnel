@@ -7,7 +7,6 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { Textarea } from "../components/ui/textarea";
 import { toast } from "sonner";
 import { api } from "../services/api";
 import {
@@ -34,13 +33,6 @@ type TaskRow = {
 };
 
 type MyEngagementRow = { id: number; campaignId: number; taskId: number; actionKind: string };
-type PendingComment = {
-  campaignId: number;
-  taskId: number;
-  engagementType: string;
-  rewardCredits: number;
-};
-
 function campaignInitials(title: string): string {
   const t = title.trim();
   if (/^campaign\s*#\d+$/i.test(t)) return "CP";
@@ -82,9 +74,6 @@ export function EarnCredits() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
-  const [commentProof, setCommentProof] = useState("");
-  const [pendingComment, setPendingComment] = useState<PendingComment | null>(null);
-  const [submittingComment, setSubmittingComment] = useState(false);
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -149,39 +138,6 @@ export function EarnCredits() {
         return topB - topA;
       });
   }, [tasks]);
-
-  const handleCommentSubmit = async () => {
-    if (!pendingComment) return;
-    const proofText = commentProof.trim();
-    if (proofText.length < 10) {
-      toast.error("Comment proof is required (at least 10 characters).");
-      return;
-    }
-    const key = `${pendingComment.campaignId}-comment`;
-    setSubmittingComment(true);
-    setBusy(key);
-    try {
-      await api.completeTask({
-        taskId: pendingComment.taskId,
-        engagementType: pendingComment.engagementType,
-        actionKind: "comment",
-        proofText,
-      });
-      toast.success(`Earned ${pendingComment.rewardCredits} credits`, {
-        description: `Recorded · comment · task #${pendingComment.taskId}`,
-      });
-      setCommentProof("");
-      setPendingComment(null);
-      const refreshed = await api.getTasks();
-      setTasks(refreshed.tasks as TaskRow[]);
-      setMyEngagements(refreshed.myEngagements ?? []);
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Could not update engagement");
-    } finally {
-      setSubmittingComment(false);
-      setBusy(null);
-    }
-  };
 
   const handleAction = async (
     campaignId: number,
@@ -254,6 +210,8 @@ export function EarnCredits() {
       }
 
       if (action === "comment") {
+        const key = `${campaignId}-comment`;
+        setBusy(key);
         const campaignLink = task.campaign?.messageUrl || task.campaign?.soundcloudPostUrl || "";
         if (campaignLink) {
           const opened = window.open(campaignLink, "_blank", "noopener,noreferrer");
@@ -261,16 +219,21 @@ export function EarnCredits() {
             window.location.href = campaignLink;
           }
           toast.info("Opened Telegram post", {
-            description: "Post your comment there, then return here and submit proof.",
+            description: "Post your comment there. The app will mark this action now.",
           });
         }
-        setPendingComment({
-          campaignId,
+        await api.completeTask({
           taskId: task.id,
           engagementType,
-          rewardCredits: task.rewardCredits,
+          actionKind: "comment",
         });
-        setCommentProof("");
+        toast.success(`Earned ${task.rewardCredits} credits`, {
+          description: `Recorded · comment · task #${task.id}`,
+        });
+        const refreshed = await api.getTasks();
+        setTasks(refreshed.tasks as TaskRow[]);
+        setMyEngagements(refreshed.myEngagements ?? []);
+        setBusy(null);
         return;
       }
     } catch (error: unknown) {
@@ -296,7 +259,7 @@ export function EarnCredits() {
         <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-sm leading-relaxed text-muted-foreground">
           <span className="font-medium text-foreground">Log in with Telegram</span> so we can verify your subscription to
-          the target channel. Comments require proof text so the action can be reviewed.
+          the target channel. Comment campaigns use one-tap trust mode completion.
         </p>
       </div>
       {hasTelegram === false ? (
@@ -418,46 +381,6 @@ export function EarnCredits() {
                 </Button>
                 ) : null}
               </div>
-              {!isSubscribeCampaign && pendingComment?.campaignId === cid ? (
-                <div className="border-t border-border bg-secondary/5 px-4 py-3 pl-14">
-                  <p className="mb-2 text-sm font-medium text-foreground">Paste your Telegram comment proof</p>
-                  <div className="space-y-2">
-                    <Textarea
-                      value={commentProof}
-                      onChange={(e) => setCommentProof(e.target.value)}
-                      placeholder="Paste the exact comment text you posted on Telegram (min 10 chars)"
-                      maxLength={500}
-                      className="min-h-24"
-                      disabled={submittingComment}
-                    />
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">{commentProof.trim().length}/500</p>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setCommentProof("");
-                            setPendingComment(null);
-                          }}
-                          disabled={submittingComment}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => void handleCommentSubmit()}
-                          disabled={submittingComment}
-                        >
-                          {submittingComment ? "Submitting..." : "Submit proof"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </Card>
           );
         })}

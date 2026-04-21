@@ -6,13 +6,6 @@ const { verifyEngagement } = require("../services/engagementVerification");
 const { earnCredits, refundCredits, reverseEarnCredits } = require("../services/creditService");
 const { ENGAGEMENT_TYPES, ACTION_KINDS, bundleAllowsAction } = require("../constants/engagement");
 
-function isSuspiciousSubmission(proofText) {
-  if (!proofText) return true;
-  const repeatedChars = /(.)\1{8,}/.test(proofText);
-  const tooShort = proofText.trim().length < 10;
-  return repeatedChars || tooShort;
-}
-
 function runnableCampaignWhere() {
   return {
     [Op.or]: [
@@ -192,12 +185,6 @@ async function submitTaskCompletion(req, res) {
           throw error;
         }
       }
-      if (actionKind === "comment" && isSuspiciousSubmission(proofText)) {
-        const error = new Error("Comment: enter at least 10 characters in your proof (what you posted)");
-        error.status = 400;
-        throw error;
-      }
-
       const verifiedViaProvider = true;
       const verification = await verifyEngagement({
         campaign: task.campaign,
@@ -231,7 +218,7 @@ async function submitTaskCompletion(req, res) {
           verificationDetails:
             actionKind === "subscribe"
               ? "Telegram: channel membership verified for subscribe campaign"
-              : "Telegram: channel membership + proof rules"
+              : "Telegram: trust-mode comment completion"
         },
         { transaction }
       );
