@@ -240,7 +240,13 @@ export function SubmitPost() {
                   Complete these 3 steps. We auto-check when you return from Telegram.
                 </p>
               </div>
-              <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "border-primary/40 bg-primary/10 text-primary transition-all duration-300",
+                  setupReady ? "scale-105 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]" : ""
+                )}
+              >
                 {completedSteps}/3 complete
               </Badge>
             </div>
@@ -248,7 +254,7 @@ export function SubmitPost() {
             <div className="grid gap-3 sm:grid-cols-3">
               <div
                 className={cn(
-                  "rounded-lg border p-3",
+                  "rounded-lg border p-3 transition-all duration-300",
                   hasTelegramLogin ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
                 )}
               >
@@ -258,7 +264,10 @@ export function SubmitPost() {
                     <p className="font-medium text-foreground">Login with Telegram</p>
                   </div>
                   <UserRoundCheck
-                    className={cn("h-4 w-4", hasTelegramLogin ? "text-emerald-400" : "text-muted-foreground")}
+                    className={cn(
+                      "h-4 w-4 transition-all duration-300",
+                      hasTelegramLogin ? "text-emerald-400 scale-110" : "text-muted-foreground"
+                    )}
                   />
                 </div>
                 {!hasTelegramLogin ? (
@@ -272,7 +281,7 @@ export function SubmitPost() {
 
               <div
                 className={cn(
-                  "rounded-lg border p-3",
+                  "rounded-lg border p-3 transition-all duration-300",
                   channelTitle ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
                 )}
               >
@@ -282,7 +291,10 @@ export function SubmitPost() {
                     <p className="font-medium text-foreground">Connect channel</p>
                   </div>
                   <CheckCircle
-                    className={cn("h-4 w-4", channelTitle ? "text-emerald-400" : "text-muted-foreground")}
+                    className={cn(
+                      "h-4 w-4 transition-all duration-300",
+                      channelTitle ? "text-emerald-400 scale-110" : "text-muted-foreground"
+                    )}
                   />
                 </div>
                 {channelTitle ? (
@@ -294,7 +306,7 @@ export function SubmitPost() {
                 )}
               </div>
 
-              <div className="rounded-lg border border-border bg-card/60 p-3">
+              <div className="rounded-lg border border-border bg-card/60 p-3 transition-all duration-300">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Step 3</p>
@@ -321,7 +333,9 @@ export function SubmitPost() {
               <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={isRecheckingSetup}>
                 {isRecheckingSetup ? "Rechecking..." : "I fixed it, recheck now"}
               </Button>
-              {setupCheckMessage ? <p className="text-xs text-muted-foreground">{setupCheckMessage}</p> : null}
+              {setupCheckMessage ? (
+                <p className="text-xs text-muted-foreground animate-in fade-in-0 duration-300">{setupCheckMessage}</p>
+              ) : null}
             </div>
           </CardContent>
         </Card>
