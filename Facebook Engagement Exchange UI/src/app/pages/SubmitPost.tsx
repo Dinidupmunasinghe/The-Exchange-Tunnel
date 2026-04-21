@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Coins, Info, CheckCircle, CalendarDays, Clock3 } from "lucide-react";
+import { Coins, Info, CheckCircle, CalendarDays, Clock3, ArrowUpRight, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -193,6 +193,8 @@ export function SubmitPost() {
   const botUsername = BOT_DISPLAY.replace(/^@/, "");
   const fixBotAdminUrl = `https://t.me/${botUsername}?startchannel=true`;
   const fixBotFatherUrl = "https://t.me/BotFather";
+  const setupReady = hasTelegramLogin && Boolean(channelTitle);
+  const completedSteps = Number(hasTelegramLogin) + Number(Boolean(channelTitle)) + Number(setupReady);
 
   const handleRecheckSetup = async () => {
     setIsRecheckingSetup(true);
@@ -229,39 +231,100 @@ export function SubmitPost() {
         </p>
       </div>
       {!channelTitle ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          <p className="font-medium text-amber-50">Campaigns need a linked channel</p>
-          <p className="mt-1 text-amber-100/90">
-            In{" "}
-            <Link to="/settings" className="font-medium underline underline-offset-2">
-              Settings
-            </Link>
-            , add <strong>{BOT_DISPLAY}</strong> as an admin on your channel first, then connect{" "}
-            <code className="rounded bg-black/20 px-1 font-mono text-xs">@yourchannel</code>. See the step-by-step guide
-            there. Only browsing/earning? Pick &quot;Earn &amp; browse&quot; on Settings — no bot admin needed.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {!hasTelegramLogin ? (
-              <Button size="sm" variant="outline" asChild>
-                <Link to="/login">Fix in Telegram: Login</Link>
+        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/20">
+          <CardContent className="space-y-4 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-base font-semibold text-foreground">Quick setup before launch</p>
+                <p className="text-sm text-muted-foreground">
+                  Complete these 3 steps. We auto-check when you return from Telegram.
+                </p>
+              </div>
+              <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
+                {completedSteps}/3 complete
+              </Badge>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div
+                className={cn(
+                  "rounded-lg border p-3",
+                  hasTelegramLogin ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Step 1</p>
+                    <p className="font-medium text-foreground">Login with Telegram</p>
+                  </div>
+                  <UserRoundCheck
+                    className={cn("h-4 w-4", hasTelegramLogin ? "text-emerald-400" : "text-muted-foreground")}
+                  />
+                </div>
+                {!hasTelegramLogin ? (
+                  <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
+                    <Link to="/login">Open login</Link>
+                  </Button>
+                ) : (
+                  <p className="mt-3 text-xs text-emerald-300">Done</p>
+                )}
+              </div>
+
+              <div
+                className={cn(
+                  "rounded-lg border p-3",
+                  channelTitle ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Step 2</p>
+                    <p className="font-medium text-foreground">Connect channel</p>
+                  </div>
+                  <CheckCircle
+                    className={cn("h-4 w-4", channelTitle ? "text-emerald-400" : "text-muted-foreground")}
+                  />
+                </div>
+                {channelTitle ? (
+                  <p className="mt-3 truncate text-xs text-emerald-300">{channelTitle}</p>
+                ) : (
+                  <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
+                    <Link to="/settings">Open settings</Link>
+                  </Button>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border bg-card/60 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Step 3</p>
+                    <p className="font-medium text-foreground">Telegram permissions</p>
+                  </div>
+                  <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="mt-3 space-y-2">
+                  <Button size="sm" variant="outline" className="w-full justify-between" asChild>
+                    <a href={fixBotAdminUrl} target="_blank" rel="noreferrer">
+                      Add bot to channel <ArrowUpRight className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                  <Button size="sm" variant="outline" className="w-full justify-between" asChild>
+                    <a href={fixBotFatherUrl} target="_blank" rel="noreferrer">
+                      Open BotFather <ArrowUpRight className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={isRecheckingSetup}>
+                {isRecheckingSetup ? "Rechecking..." : "I fixed it, recheck now"}
               </Button>
-            ) : null}
-            <Button size="sm" variant="outline" asChild>
-              <a href={fixBotAdminUrl} target="_blank" rel="noreferrer">
-                Fix in Telegram: Add bot to channel
-              </a>
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <a href={fixBotFatherUrl} target="_blank" rel="noreferrer">
-                Fix in Telegram: BotFather privacy
-              </a>
-            </Button>
-            <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={isRecheckingSetup}>
-              {isRecheckingSetup ? "Rechecking..." : "I fixed it, recheck now"}
-            </Button>
-          </div>
-          {setupCheckMessage ? <p className="mt-2 text-xs text-amber-50/90">{setupCheckMessage}</p> : null}
-        </div>
+              {setupCheckMessage ? <p className="text-xs text-muted-foreground">{setupCheckMessage}</p> : null}
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
