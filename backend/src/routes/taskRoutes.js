@@ -7,7 +7,6 @@ const {
   startCommentDetection,
   pollCommentDetection
 } = require("../controllers/taskController");
-const requireAuth = require("../middleware/requireAuth");
 const validateRequest = require("../middleware/validateRequest");
 const { taskSubmitLimiter } = require("../middleware/rateLimiters");
 const { ENGAGEMENT_TYPES, ACTION_KINDS } = require("../constants/engagement");
@@ -32,14 +31,13 @@ router.post(
 
 router.post(
   "/comment-detect/start",
-  requireAuth,
   taskSubmitLimiter,
   [body("taskId").isInt({ min: 1 })],
   validateRequest,
   startCommentDetection
 );
 
-router.get("/comment-detect/poll", requireAuth, pollCommentDetection);
+router.get("/comment-detect/poll", pollCommentDetection);
 
 router.post(
   "/revert",
