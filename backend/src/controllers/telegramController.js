@@ -5,6 +5,30 @@ const {
   isUserChannelAdminOrCreator,
   fetchTmePagePreview
 } = require("../services/telegramService");
+const { runBridge } = require("../services/telegramMtprotoService");
+const { encrypt, decrypt } = require("../utils/crypto");
+
+function parseStoredMtprotoCredentials(user) {
+  if (!user.userOAuthTokenEncrypted) return null;
+  try {
+    const raw = decrypt(user.userOAuthTokenEncrypted);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.apiId || !parsed.apiHash) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function parseStoredSessionString(user) {
+  if (!user.userActingTokenEncrypted) return null;
+  try {
+    return decrypt(user.userActingTokenEncrypted);
+  } catch {
+    return null;
+  }
+}
 
 async function connectChannelToUser(req, res) {
   const raw = req.body && typeof req.body.channel === "string" ? req.body.channel.trim() : "";
@@ -132,11 +156,171 @@ async function clearSelectedAccount(req, res) {
   return res.json({ message: "Selected channel removed" });
 }
 
+async function sendMtprotoCode(req, res) {
+  const { apiId, apiHash, phone, proxy } = req.body || {};
+  if (!apiId || !apiHash || !phone) {
+    return res.status(400).json({ message: "apiId, apiHash, and phone are required" });
+  }
+  try {
+    const result = await runBridge("send_code", { apiId, apiHash, phone, proxy });
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Failed to send Telegram code" });
+  }
+}
+
+async function mtprotoSignIn(req, res) {
+  const { apiId, apiHash, phone, phoneCode, phoneCodeHash, proxy } = req.body || {};
+  if (!apiId || !apiHash || !phone || !phoneCode) {
+    return res.status(400).json({ message: "apiId, apiHash, phone, and phoneCode are required" });
+  }
+  try {
+    const result = await runBridge("sign_in", {
+      apiId,
+      apiHash,
+      phone,
+      phoneCode,
+      phoneCodeHash,
+      proxy
+    });
+    if (result.requires2fa) {
+      req.user.userOAuthTokenEncrypted = encrypt(JSON.stringify({ apiId, apiHash, proxy: proxy || null }));
+      if (result.sessionString) {
+        req.user.userActingTokenEncrypted = encrypt(result.sessionString);
+      }
+      await req.user.save();
+      return res.status(200).json({ ...result, sessionSaved: true });
+    }
+    req.user.userOAuthTokenEncrypted = encrypt(JSON.stringify({ apiId, apiHash, proxy: proxy || null }));
+    req.user.userActingTokenEncrypted = encrypt(result.sessionString);
+    await req.user.save();
+    return res.json({
+      ...result,
+      sessionSaved: true
+    });
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Failed to sign in to Telegram" });
+  }
+}
+
+async function mtprotoSignInPassword(req, res) {
+  const { password } = req.body || {};
+  if (!password) {
+    return res.status(400).json({ message: "password is required" });
+  }
+
+  const creds = parseStoredMtprotoCredentials(req.user);
+  const sessionString = parseStoredSessionString(req.user);
+  if (!creds) {
+    return res.status(400).json({ message: "No MTProto credentials found. Start login again." });
+  }
+
+  try {
+    const result = await runBridge("sign_in_password", {
+      apiId: creds.apiId,
+      apiHash: creds.apiHash,
+      proxy: creds.proxy || null,
+      sessionString,
+      password
+    });
+    req.user.userActingTokenEncrypted = encrypt(result.sessionString);
+    await req.user.save();
+    return res.json({
+      ...result,
+      sessionSaved: true
+    });
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "2FA sign-in failed" });
+  }
+}
+
+async function mtprotoJoinChannel(req, res) {
+  const { channel } = req.body || {};
+  if (!channel) {
+    return res.status(400).json({ message: "channel is required" });
+  }
+  const creds = parseStoredMtprotoCredentials(req.user);
+  const sessionString = parseStoredSessionString(req.user);
+  if (!creds || !sessionString) {
+    return res.status(400).json({ message: "No authorized Telegram user session found." });
+  }
+  try {
+    const result = await runBridge("join_channel", {
+      apiId: creds.apiId,
+      apiHash: creds.apiHash,
+      proxy: creds.proxy || null,
+      sessionString,
+      channel
+    });
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Failed to join channel" });
+  }
+}
+
+async function mtprotoReact(req, res) {
+  const { chat, msgId, reaction } = req.body || {};
+  if (!chat || !msgId || !reaction) {
+    return res.status(400).json({ message: "chat, msgId and reaction are required" });
+  }
+  const creds = parseStoredMtprotoCredentials(req.user);
+  const sessionString = parseStoredSessionString(req.user);
+  if (!creds || !sessionString) {
+    return res.status(400).json({ message: "No authorized Telegram user session found." });
+  }
+  try {
+    const result = await runBridge("react", {
+      apiId: creds.apiId,
+      apiHash: creds.apiHash,
+      proxy: creds.proxy || null,
+      sessionString,
+      chat,
+      msgId,
+      reaction
+    });
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Failed to react to message" });
+  }
+}
+
+async function mtprotoReply(req, res) {
+  const { chat, msgId, text } = req.body || {};
+  if (!chat || !msgId || !text) {
+    return res.status(400).json({ message: "chat, msgId and text are required" });
+  }
+  const creds = parseStoredMtprotoCredentials(req.user);
+  const sessionString = parseStoredSessionString(req.user);
+  if (!creds || !sessionString) {
+    return res.status(400).json({ message: "No authorized Telegram user session found." });
+  }
+  try {
+    const result = await runBridge("reply", {
+      apiId: creds.apiId,
+      apiHash: creds.apiHash,
+      proxy: creds.proxy || null,
+      sessionString,
+      chat,
+      msgId,
+      text
+    });
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Failed to post reply" });
+  }
+}
+
 module.exports = {
   connectChannelToUser,
   getMyPosts,
   getPostPreview,
   getManagedAccounts,
   selectManagedAccount,
-  clearSelectedAccount
+  clearSelectedAccount,
+  sendMtprotoCode,
+  mtprotoSignIn,
+  mtprotoSignInPassword,
+  mtprotoJoinChannel,
+  mtprotoReact,
+  mtprotoReply
 };

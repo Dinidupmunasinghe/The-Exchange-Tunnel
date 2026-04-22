@@ -25,7 +25,10 @@ const env = {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     botName: process.env.TELEGRAM_BOT_NAME || "",
-    webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || ""
+    webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
+    mtproto: {
+      pythonBinary: process.env.TELEGRAM_MTPROTO_PYTHON || "python"
+    }
   },
   limits: {
     dailyEarnLimit: Number(process.env.DAILY_EARN_LIMIT || 500),

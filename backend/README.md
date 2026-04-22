@@ -38,6 +38,23 @@ npm run dev
 
 Server starts at `http://localhost:5000`.
 
+## MTProto User Sync (Telethon)
+
+This backend now includes a Python bridge for user-authorized Telegram MTProto actions.
+
+- Python deps required: `telethon`, `pysocks`
+- Bridge entrypoint: `src/scripts/telegram_mtproto_bridge.py`
+- Configure Python binary via `TELEGRAM_MTPROTO_PYTHON` in `.env`
+
+Protected MTProto routes under `/api/telegram`:
+
+- `POST /user-auth/send-code`
+- `POST /user-auth/sign-in`
+- `POST /user-auth/sign-in-2fa`
+- `POST /actions/join-channel`
+- `POST /actions/react`
+- `POST /actions/reply`
+
 ## API Base
 
 All routes are prefixed with `/api`.

@@ -6,7 +6,13 @@ const {
   getPostPreview,
   getManagedAccounts,
   selectManagedAccount,
-  clearSelectedAccount
+  clearSelectedAccount,
+  sendMtprotoCode,
+  mtprotoSignIn,
+  mtprotoSignInPassword,
+  mtprotoJoinChannel,
+  mtprotoReact,
+  mtprotoReply
 } = require("../controllers/telegramController");
 const { isLikelyTelegramMessageUrl } = require("../services/telegramService");
 const validateRequest = require("../middleware/validateRequest");
@@ -45,5 +51,47 @@ router.post(
 );
 router.delete("/pages/select", clearSelectedAccount);
 router.get("/posts", getMyPosts);
+router.post(
+  "/user-auth/send-code",
+  [body("apiId").notEmpty(), body("apiHash").isString().isLength({ min: 8 }), body("phone").isString()],
+  validateRequest,
+  sendMtprotoCode
+);
+router.post(
+  "/user-auth/sign-in",
+  [
+    body("apiId").notEmpty(),
+    body("apiHash").isString().isLength({ min: 8 }),
+    body("phone").isString(),
+    body("phoneCode").isString(),
+    body("phoneCodeHash").optional().isString()
+  ],
+  validateRequest,
+  mtprotoSignIn
+);
+router.post(
+  "/user-auth/sign-in-2fa",
+  [body("password").isString().isLength({ min: 1 })],
+  validateRequest,
+  mtprotoSignInPassword
+);
+router.post(
+  "/actions/join-channel",
+  [body("channel").isString().isLength({ min: 1, max: 512 })],
+  validateRequest,
+  mtprotoJoinChannel
+);
+router.post(
+  "/actions/react",
+  [body("chat").notEmpty(), body("msgId").isInt({ min: 1 }), body("reaction").isString().isLength({ min: 1, max: 32 })],
+  validateRequest,
+  mtprotoReact
+);
+router.post(
+  "/actions/reply",
+  [body("chat").notEmpty(), body("msgId").isInt({ min: 1 }), body("text").isString().isLength({ min: 1, max: 4096 })],
+  validateRequest,
+  mtprotoReply
+);
 
 module.exports = router;
