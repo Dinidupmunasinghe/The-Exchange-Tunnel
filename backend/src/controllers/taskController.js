@@ -70,7 +70,7 @@ function parseStoredSessionString(user) {
 }
 
 async function submitTaskCompletion(req, res) {
-  const { taskId, engagementType, proofText: proofRaw, actionKind, commentVerifyToken } = req.body;
+  const { taskId, engagementType, proofText: proofRaw, actionKind, commentVerifyToken, reaction } = req.body;
   const proofText = typeof proofRaw === "string" ? proofRaw : "";
 
   if (!ACTION_KINDS.includes(actionKind)) {
@@ -237,6 +237,7 @@ async function submitTaskCompletion(req, res) {
           error.status = 400;
           throw error;
         }
+        const chosenReaction = typeof reaction === "string" && reaction.trim() ? reaction.trim() : "👍";
         try {
           const chatCandidates = [];
           if (parsedMessage.kind === "public" && parsedMessage.username) {
@@ -254,7 +255,7 @@ async function submitTaskCompletion(req, res) {
                 sessionString,
                 chat: chatRef,
                 msgId: Number(parsedMessage.messageId),
-                reaction: "👍"
+                reaction: chosenReaction
               });
               reacted = true;
               break;
@@ -304,7 +305,9 @@ async function submitTaskCompletion(req, res) {
         actionKind === "subscribe"
           ? `tg-sub-${tUid}-${channelId}`
           : actionKind === "like" && parsedMessage?.messageId
-            ? `tg-like-${tUid}-${channelId}-${Number(parsedMessage.messageId)}`
+            ? `tg-like-${tUid}-${channelId}-${Number(parsedMessage.messageId)}--${encodeURIComponent(
+              typeof reaction === "string" && reaction.trim() ? reaction.trim() : "👍"
+            )}`
             : `tg-mem-${tUid}-${channelId}`;
 
       await db.Engagement.create(
@@ -485,7 +488,7 @@ async function pollCommentDetection(req, res) {
 
 async function revertEngagement(req, res) {
   const { campaignId, actionKind } = req.body;
-  if (!["comment"].includes(actionKind)) {
+  if (!["comment", "like"].includes(actionKind)) {
     return res.status(400).json({ message: "Invalid action kind" });
   }
   try {

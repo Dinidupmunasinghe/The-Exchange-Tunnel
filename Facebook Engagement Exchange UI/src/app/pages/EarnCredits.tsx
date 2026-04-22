@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus } from "lucide-react";
+import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus, Loader2 } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
 import { api } from "../services/api";
 import {
@@ -33,6 +34,7 @@ type TaskRow = {
 };
 
 type MyEngagementRow = { id: number; campaignId: number; taskId: number; actionKind: string };
+const REACTION_CHOICES = ["👍", "🔥", "❤️", "👏", "🤩", "🎉"];
 function campaignInitials(title: string): string {
   const t = title.trim();
   if (/^campaign\s*#\d+$/i.test(t)) return "CP";
@@ -75,6 +77,7 @@ export function EarnCredits() {
   const [busy, setBusy] = useState<string | null>(null);
   const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
   const [hasMtprotoSession, setHasMtprotoSession] = useState<boolean | null>(null);
+  const [selectedReactionByCampaign, setSelectedReactionByCampaign] = useState<Record<number, string>>({});
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -202,7 +205,7 @@ export function EarnCredits() {
         return;
       }
 
-      if (action !== "subscribe" && hasEngagement(myEngagements, campaignId, action)) {
+      if (action !== "subscribe" && action !== "like" && hasEngagement(myEngagements, campaignId, action)) {
         toast.info("You already recorded this action.");
         return;
       }
@@ -260,6 +263,21 @@ export function EarnCredits() {
         return;
       }
       if (action === "like") {
+        const likedAlready = hasEngagement(myEngagements, campaignId, "like");
+        if (likedAlready) {
+          const key = `${campaignId}-unlike`;
+          setBusy(key);
+          await api.revertEngagement({
+            campaignId,
+            actionKind: "like",
+          });
+          toast.success("Like removed and credits refunded.");
+          const refreshed = await api.getTasks();
+          setTasks(refreshed.tasks as TaskRow[]);
+          setMyEngagements(refreshed.myEngagements ?? []);
+          setBusy(null);
+          return;
+        }
         const key = `${campaignId}-like`;
         setBusy(key);
         if (hasMtprotoSession !== true) {
@@ -270,13 +288,15 @@ export function EarnCredits() {
           window.location.href = "/settings#user-session";
           return;
         }
+        const selectedReaction = selectedReactionByCampaign[campaignId] || "👍";
         await api.completeTask({
           taskId: task.id,
           engagementType,
           actionKind: "like",
+          reaction: selectedReaction,
         });
         toast.success(`Earned ${task.rewardCredits} credits`, {
-          description: `Recorded · like · task #${task.id}`,
+          description: `Recorded · reaction ${selectedReaction} · task #${task.id}`,
         });
         const refreshed = await api.getTasks();
         setTasks(refreshed.tasks as TaskRow[]);
@@ -424,6 +444,29 @@ export function EarnCredits() {
                   </Button>
                 ) : null}
                 {!isSubscribeCampaign ? (
+                <div className="inline-flex items-center gap-2">
+                {!liked ? (
+                  <Select
+                    value={selectedReactionByCampaign[cid] || "👍"}
+                    onValueChange={(value) =>
+                      setSelectedReactionByCampaign((prev) => ({
+                        ...prev,
+                        [cid]: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-9 w-[88px] rounded-full border-amber-500/25 bg-background/80 px-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REACTION_CHOICES.map((emoji) => (
+                        <SelectItem key={emoji} value={emoji}>
+                          {emoji}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
                 <Button
                   type="button"
                   variant={liked ? "default" : "outline"}
@@ -436,18 +479,28 @@ export function EarnCredits() {
                   onClick={() => void handleAction(cid, campaignTasks, et, "like")}
                   disabled={
                     !bundleAllowsAction(et, "like") ||
-                    liked ||
                     busy !== null ||
                     hasTelegram === false ||
                     hasMtprotoSession !== true
                   }
                 >
-                  <ThumbsUp className="mr-2 h-4 w-4" />
-                  {liked ? "Liked" : "Like"}
+                  {busy === `${cid}-like` || busy === `${cid}-unlike` ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ThumbsUp className="mr-2 h-4 w-4" />
+                  )}
+                  {busy === `${cid}-like`
+                    ? "Liking..."
+                    : busy === `${cid}-unlike`
+                      ? "Removing..."
+                      : liked
+                        ? "Unlike"
+                        : "Like"}
                   <Badge className="ml-2 rounded-full bg-amber-500/15 px-2 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15">
                     +{reward}
                   </Badge>
                 </Button>
+                </div>
                 ) : null}
                 {!isSubscribeCampaign ? (
                 <Button

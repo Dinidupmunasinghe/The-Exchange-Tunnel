@@ -21,6 +21,7 @@ router.post(
     body("taskId").isInt({ min: 1 }),
     body("engagementType").isIn(ENGAGEMENT_TYPES),
     body("actionKind").isIn(ACTION_KINDS),
+    body("reaction").optional().isString().isLength({ min: 1, max: 8 }),
     body("commentVerifyToken").optional().isString().isLength({ min: 10, max: 120 }),
     body("proofText").optional().isString().isLength({ max: 500 }),
     body("proofText").custom(() => true)
@@ -44,7 +45,7 @@ router.post(
   taskSubmitLimiter,
   [
     body("campaignId").isInt({ min: 1 }),
-    body("actionKind").isIn(["comment"])
+    body("actionKind").isIn(["comment", "like"])
   ],
   validateRequest,
   revertEngagement

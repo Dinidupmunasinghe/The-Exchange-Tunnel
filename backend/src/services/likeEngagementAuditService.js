@@ -7,9 +7,17 @@ const { reverseEarnCredits, refundCredits } = require("./creditService");
 
 function parseLikeMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
-  const m = /^tg-like-\d+-(-?\d+)-(\d+)$/.exec(raw);
+  const m = /^tg-like-\d+-(-?\d+)-(\d+)(?:--(.+))?$/.exec(raw);
   if (!m) return null;
-  return { channelId: String(m[1]), messageId: Number(m[2]) };
+  const reaction = (() => {
+    if (!m[3]) return "👍";
+    try {
+      return decodeURIComponent(m[3]);
+    } catch {
+      return "👍";
+    }
+  })();
+  return { channelId: String(m[1]), messageId: Number(m[2]), reaction };
 }
 
 function parseStoredMtprotoCredentials(user) {
@@ -92,7 +100,7 @@ async function auditLikeEngagements() {
         sessionString,
         chat: parsed.channelId,
         msgId: parsed.messageId,
-        reaction: "👍"
+        reaction: parsed.reaction || "👍"
       });
       stillChosen = Boolean(out?.chosen);
     } catch {
