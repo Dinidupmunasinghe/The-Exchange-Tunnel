@@ -4,6 +4,7 @@ const sequelize = require("../config/database");
 const { runBridge } = require("./telegramMtprotoService");
 const { decrypt } = require("../utils/crypto");
 const { reverseEarnCredits, refundCredits } = require("./creditService");
+const tg = require("./telegramService");
 
 function parseLikeMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
@@ -93,16 +94,33 @@ async function auditLikeEngagements() {
 
     let stillChosen = false;
     try {
-      const out = await runBridge("verify_reaction", {
-        apiId: creds.apiId,
-        apiHash: creds.apiHash,
-        proxy: creds.proxy || null,
-        sessionString,
-        chat: parsed.channelId,
-        msgId: parsed.messageId,
-        reaction: parsed.reaction || "👍"
-      });
-      stillChosen = Boolean(out?.chosen);
+      const msgUrl = e.campaign?.messageUrl || e.campaign?.soundcloudPostUrl || "";
+      const parsedMessage = tg.parseTmeMessageUrl(String(msgUrl || ""));
+      const chatCandidates = [];
+      if (parsedMessage?.kind === "public" && parsedMessage?.username) {
+        chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
+      }
+      chatCandidates.push(String(parsed.channelId));
+      let lastErr = null;
+      for (const chatRef of chatCandidates) {
+        try {
+          const out = await runBridge("verify_reaction", {
+            apiId: creds.apiId,
+            apiHash: creds.apiHash,
+            proxy: creds.proxy || null,
+            sessionString,
+            chat: chatRef,
+            msgId: parsed.messageId,
+            reaction: parsed.reaction || "👍"
+          });
+          stillChosen = Boolean(out?.chosen);
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      if (lastErr) throw lastErr;
     } catch {
       // Skip this row when Telegram/bridge errors occur.
       continue;
