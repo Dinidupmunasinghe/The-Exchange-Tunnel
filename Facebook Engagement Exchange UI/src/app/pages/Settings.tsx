@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CheckCircle2, Send, Loader2 } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Loader2, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
+import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
 import { toast } from "sonner";
 import {
@@ -40,6 +41,7 @@ export function Settings() {
   const [channelInput, setChannelInput] = useState("");
   const [selectingPageId, setSelectingPageId] = useState<string | null>(null);
   const [clearingSelection, setClearingSelection] = useState(false);
+  const [rechecking, setRechecking] = useState(false);
 
   const refreshProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -74,11 +76,37 @@ export function Settings() {
     if (profile?.telegramUserId) void refreshPages();
   }, [profile?.telegramUserId, refreshPages]);
 
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refreshProfile();
+        if (profile?.telegramUserId) void refreshPages();
+      }
+    };
+    const onFocus = () => {
+      void refreshProfile();
+      if (profile?.telegramUserId) void refreshPages();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [profile?.telegramUserId, refreshPages, refreshProfile]);
+
   const selectedPage = useMemo(
     () => pages.find((page) => page.id === profile?.telegramActingChannelId) ?? null,
     [pages, profile?.telegramActingChannelId]
   );
   const hasConnectedChannel = Boolean(selectedPage || profile?.telegramActingChannelId);
+  const hasTelegramLogin = Boolean(profile?.telegramUserId);
+  const setupReady = hasTelegramLogin && hasConnectedChannel;
+  const completedSteps = Number(hasTelegramLogin) + Number(hasConnectedChannel) + Number(setupReady);
+  const botAt = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "ExchangeTunnelApp_bot").trim();
+  const botUsername = botAt.startsWith("@") ? botAt.slice(1) : botAt;
+  const fixBotAdminUrl = `https://t.me/${botUsername}?startchannel=true`;
+  const fixBotFatherUrl = "https://t.me/BotFather";
 
   const hasPlaceholderEmail = Boolean(
     profile?.email &&
@@ -145,6 +173,19 @@ export function Settings() {
     }
   }
 
+  async function handleRecheckSetup() {
+    setRechecking(true);
+    try {
+      await refreshProfile();
+      if (profile?.telegramUserId) await refreshPages();
+      toast.success("Setup rechecked");
+    } catch {
+      toast.error("Could not recheck setup");
+    } finally {
+      setRechecking(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -153,6 +194,111 @@ export function Settings() {
           Link Telegram and connect your campaign channel.
         </p>
       </div>
+
+      <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/20">
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-base font-semibold text-foreground">Creator setup checklist</p>
+              <p className="text-sm text-muted-foreground">Complete these steps once to launch campaigns smoothly.</p>
+            </div>
+            <Badge
+              variant="outline"
+              className={cn(
+                "border-primary/40 bg-primary/10 text-primary transition-all duration-300",
+                setupReady ? "scale-105 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]" : ""
+              )}
+            >
+              {completedSteps}/3 complete
+            </Badge>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div
+              className={cn(
+                "rounded-lg border p-3 transition-all duration-300",
+                hasTelegramLogin ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Step 1</p>
+                  <p className="font-medium text-foreground">Login with Telegram</p>
+                </div>
+                <UserRoundCheck
+                  className={cn(
+                    "h-4 w-4 transition-all duration-300",
+                    hasTelegramLogin ? "scale-110 text-emerald-400" : "text-muted-foreground"
+                  )}
+                />
+              </div>
+              {!hasTelegramLogin ? (
+                <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
+                  <Link to="/login">Open login</Link>
+                </Button>
+              ) : (
+                <p className="mt-3 text-xs text-emerald-300">Done</p>
+              )}
+            </div>
+
+            <div
+              className={cn(
+                "rounded-lg border p-3 transition-all duration-300",
+                hasConnectedChannel ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Step 2</p>
+                  <p className="font-medium text-foreground">Connect channel</p>
+                </div>
+                <CheckCircle2
+                  className={cn(
+                    "h-4 w-4 transition-all duration-300",
+                    hasConnectedChannel ? "scale-110 text-emerald-400" : "text-muted-foreground"
+                  )}
+                />
+              </div>
+              {hasConnectedChannel ? (
+                <p className="mt-3 truncate text-xs text-emerald-300">
+                  {selectedPage?.name || profile?.telegramActingChannelTitle || "Connected"}
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-muted-foreground">Use the channel connect form below.</p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card/60 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Step 3</p>
+                  <p className="font-medium text-foreground">Telegram permissions</p>
+                </div>
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="mt-3 space-y-2">
+                <Button size="sm" variant="outline" className="w-full justify-between" asChild>
+                  <a href={fixBotAdminUrl} target="_blank" rel="noreferrer">
+                    Add bot to channel <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+                <Button size="sm" variant="outline" className="w-full justify-between" asChild>
+                  <a href={fixBotFatherUrl} target="_blank" rel="noreferrer">
+                    Open BotFather <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={rechecking}>
+              {rechecking ? "Rechecking..." : "I fixed it, recheck now"}
+            </Button>
+            <p className="text-xs text-muted-foreground">Returns from Telegram auto-refresh this page too.</p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-border bg-card">
         <CardHeader>
