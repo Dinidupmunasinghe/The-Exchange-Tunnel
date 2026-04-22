@@ -347,13 +347,30 @@ class TelegramClientManager:
         await self.connect()
         await self._enforce_write_delay()
         try:
-            message = await self._client.send_message(entity=chat, message=text, reply_to=msg_id)
+            # For channel post comments, Telegram expects `comment_to` (discussion flow).
+            # Using only `reply_to` can fail with admin-required errors on channels.
+            message = await self._client.send_message(entity=chat, message=text, comment_to=msg_id)
+        except RPCError as exc:
+            raw = str(exc).lower()
+            can_retry_as_reply = (
+                "comment_to" in raw
+                or "reply message not found" in raw
+                or "invalid" in raw
+            )
+            if not can_retry_as_reply:
+                raise TelegramClientManagerError(f"post_reply failed: {exc}") from exc
+            try:
+                message = await self._client.send_message(entity=chat, message=text, reply_to=msg_id)
+            except FloodWaitError as exc2:
+                raise TelegramClientManagerError(
+                    f"FLOOD_WAIT:{exc2.seconds}:Too many requests. Retry after {exc2.seconds} seconds."
+                ) from exc2
+            except RPCError as exc2:
+                raise TelegramClientManagerError(f"post_reply failed: {exc2}") from exc2
         except FloodWaitError as exc:
             raise TelegramClientManagerError(
                 f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
             ) from exc
-        except RPCError as exc:
-            raise TelegramClientManagerError(f"post_reply failed: {exc}") from exc
         if not isinstance(message, types.Message):
             raise TelegramClientManagerError("Unexpected send_message response type.")
         return message
