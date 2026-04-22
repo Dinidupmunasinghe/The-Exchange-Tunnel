@@ -2,18 +2,21 @@ const TTL_MS = 10 * 60 * 1000;
 const store = new Map();
 
 function key(userId, phone) {
-  return `${String(userId)}::${String(phone).trim()}`;
+  const p = String(phone || "").trim();
+  const normalized = p.startsWith("+") ? `+${p.replace(/[^\d]/g, "")}` : `+${p.replace(/[^\d]/g, "")}`;
+  return `${String(userId)}::${normalized}`;
 }
 
-function setPhoneCodeHash(userId, phone, phoneCodeHash) {
+function setAuthState(userId, phone, phoneCodeHash, sessionString) {
   const k = key(userId, phone);
   store.set(k, {
     phoneCodeHash: String(phoneCodeHash || ""),
+    sessionString: sessionString ? String(sessionString) : null,
     expiresAt: Date.now() + TTL_MS
   });
 }
 
-function getPhoneCodeHash(userId, phone) {
+function getAuthState(userId, phone) {
   const k = key(userId, phone);
   const row = store.get(k);
   if (!row) return null;
@@ -21,7 +24,10 @@ function getPhoneCodeHash(userId, phone) {
     store.delete(k);
     return null;
   }
-  return row.phoneCodeHash || null;
+  return {
+    phoneCodeHash: row.phoneCodeHash || null,
+    sessionString: row.sessionString || null
+  };
 }
 
 function clearPhoneCodeHash(userId, phone) {
@@ -29,7 +35,7 @@ function clearPhoneCodeHash(userId, phone) {
 }
 
 module.exports = {
-  setPhoneCodeHash,
-  getPhoneCodeHash,
+  setAuthState,
+  getAuthState,
   clearPhoneCodeHash
 };

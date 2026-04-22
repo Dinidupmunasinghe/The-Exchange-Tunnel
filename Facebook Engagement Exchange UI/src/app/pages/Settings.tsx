@@ -245,11 +245,12 @@ export function Settings() {
     const normalizedPhone = raw.startsWith("+")
       ? raw
       : `${mtprotoCountryCode}${raw.replace(/^0+/, "")}`;
+    const normalizedCode = mtprotoCode.replace(/[^\d]/g, "");
     setSigningIn(true);
     try {
       const res = await api.mtprotoSignIn({
         phone: normalizedPhone,
-        phoneCode: mtprotoCode.trim(),
+        phoneCode: normalizedCode,
         phoneCodeHash: mtprotoCodeHash || undefined,
       });
       if (res.requires2fa) {

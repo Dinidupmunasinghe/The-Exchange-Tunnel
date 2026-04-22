@@ -45,7 +45,7 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
     async with manager:
         if operation == "send_code":
             phone_code_hash = await manager.send_code_request(phone=str(payload["phone"]))
-            return {"ok": True, "phoneCodeHash": phone_code_hash}
+            return {"ok": True, "phoneCodeHash": phone_code_hash, "sessionString": manager.session_string}
 
         if operation == "sign_in":
             try:

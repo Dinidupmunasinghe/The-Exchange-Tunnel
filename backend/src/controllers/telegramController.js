@@ -41,6 +41,13 @@ function resolveMtprotoCredentials(body) {
   return { apiId, apiHash };
 }
 
+function normalizePhone(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return "";
+  const digits = text.replace(/[^\d]/g, "");
+  return digits ? `+${digits}` : "";
+}
+
 function handleMtprotoError(res, error, fallbackMessage) {
   const code = error?.code;
   if (code === "FLOOD_WAIT") {
@@ -187,14 +194,25 @@ async function clearSelectedAccount(req, res) {
 
 async function sendMtprotoCode(req, res) {
   const { phone, proxy } = req.body || {};
+  const normalizedPhone = normalizePhone(phone);
   const creds = resolveMtprotoCredentials(req.body || {});
-  if (!creds || !phone) {
+  if (!creds || !normalizedPhone) {
     return res.status(400).json({ message: "phone is required, and MTProto credentials must be configured" });
   }
   try {
-    const result = await runBridge("send_code", { apiId: creds.apiId, apiHash: creds.apiHash, phone, proxy });
+    const result = await runBridge("send_code", {
+      apiId: creds.apiId,
+      apiHash: creds.apiHash,
+      phone: normalizedPhone,
+      proxy
+    });
     if (result?.phoneCodeHash) {
-      mtprotoAuthStore.setPhoneCodeHash(req.user.id, String(phone), String(result.phoneCodeHash));
+      mtprotoAuthStore.setAuthState(
+        req.user.id,
+        normalizedPhone,
+        String(result.phoneCodeHash),
+        result?.sessionString ? String(result.sessionString) : null
+      );
     }
     return res.json(result);
   } catch (error) {
@@ -204,18 +222,21 @@ async function sendMtprotoCode(req, res) {
 
 async function mtprotoSignIn(req, res) {
   const { phone, phoneCode, phoneCodeHash, proxy } = req.body || {};
+  const normalizedPhone = normalizePhone(phone);
+  const normalizedCode = String(phoneCode || "").replace(/[^\d]/g, "");
   const creds = resolveMtprotoCredentials(req.body || {});
-  if (!creds || !phone || !phoneCode) {
+  if (!creds || !normalizedPhone || !normalizedCode) {
     return res.status(400).json({ message: "phone and phoneCode are required, and MTProto credentials must be configured" });
   }
   try {
-    const fallbackPhoneCodeHash = mtprotoAuthStore.getPhoneCodeHash(req.user.id, String(phone));
+    const state = mtprotoAuthStore.getAuthState(req.user.id, normalizedPhone);
     const result = await runBridge("sign_in", {
       apiId: creds.apiId,
       apiHash: creds.apiHash,
-      phone,
-      phoneCode,
-      phoneCodeHash: phoneCodeHash || fallbackPhoneCodeHash || undefined,
+      phone: normalizedPhone,
+      phoneCode: normalizedCode,
+      phoneCodeHash: phoneCodeHash || state?.phoneCodeHash || undefined,
+      sessionString: state?.sessionString || undefined,
       proxy
     });
     if (result.requires2fa) {
@@ -225,7 +246,7 @@ async function mtprotoSignIn(req, res) {
       if (result.sessionString) {
         req.user.userActingTokenEncrypted = encrypt(result.sessionString);
       }
-      mtprotoAuthStore.clearPhoneCodeHash(req.user.id, String(phone));
+      mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
       await req.user.save();
       return res.status(200).json({ ...result, sessionSaved: true });
     }
@@ -233,7 +254,7 @@ async function mtprotoSignIn(req, res) {
       JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: proxy || null })
     );
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
-    mtprotoAuthStore.clearPhoneCodeHash(req.user.id, String(phone));
+    mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
     await req.user.save();
     return res.json({
       ...result,
@@ -243,22 +264,9 @@ async function mtprotoSignIn(req, res) {
     const msg = String(error?.message || "").toLowerCase();
     const isExpired = msg.includes("code has expired") || msg.includes("phone_code_expired");
     if (isExpired) {
-      try {
-        const resent = await runBridge("send_code", {
-          apiId: creds.apiId,
-          apiHash: creds.apiHash,
-          phone,
-          proxy
-        });
-        if (resent?.phoneCodeHash) {
-          mtprotoAuthStore.setPhoneCodeHash(req.user.id, String(phone), String(resent.phoneCodeHash));
-        }
-      } catch {
-        // ignore resend failure; still return an actionable error
-      }
       return res.status(400).json({
         code: "PHONE_CODE_EXPIRED",
-        message: "That OTP expired. A new code has been sent to Telegram. Enter the latest code and try again."
+        message: "That OTP expired. Tap Send code to get a fresh OTP, then enter the latest code."
       });
     }
     return handleMtprotoError(res, error, "Failed to sign in to Telegram");
