@@ -357,3 +357,35 @@ class TelegramClientManager:
         if not isinstance(message, types.Message):
             raise TelegramClientManagerError("Unexpected send_message response type.")
         return message
+
+    async def delete_message(
+        self,
+        chat: str | int | types.TypeInputPeer,
+        msg_id: int,
+    ) -> bool:
+        await self.connect()
+        await self._enforce_write_delay()
+        try:
+            deleted = await self._client.delete_messages(entity=chat, message_ids=[msg_id], revoke=True)
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"delete_message failed: {exc}") from exc
+        return bool(deleted)
+
+    async def message_exists(
+        self,
+        chat: str | int | types.TypeInputPeer,
+        msg_id: int,
+    ) -> bool:
+        await self.connect()
+        try:
+            message = await self._client.get_messages(chat, ids=msg_id)
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"message_exists failed: {exc}") from exc
+        if message is None:
+            return False
+        mid = getattr(message, "id", None)
+        return bool(mid and int(mid) == int(msg_id))

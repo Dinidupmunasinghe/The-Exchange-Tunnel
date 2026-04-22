@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus, Loader2 } from "lucide-react";
+import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus, Loader2, SendHorizontal, Trash2 } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
 import { api } from "../services/api";
@@ -33,7 +34,14 @@ type TaskRow = {
   campaignId?: number;
 };
 
-type MyEngagementRow = { id: number; campaignId: number; taskId: number; actionKind: string };
+type MyEngagementRow = {
+  id: number;
+  campaignId: number;
+  taskId: number;
+  actionKind: string;
+  verificationDetails?: string | null;
+  metaEngagementId?: string | null;
+};
 const REACTION_CHOICES = ["👍", "🔥", "❤️", "👏", "🤩", "🎉"];
 function campaignInitials(title: string): string {
   const t = title.trim();
@@ -57,6 +65,14 @@ function hasEngagement(rows: MyEngagementRow[], campaignId: number, kind: BaseEn
   return rows.some((e) => e.campaignId === campaignId && e.actionKind === kind);
 }
 
+function getCommentText(rows: MyEngagementRow[], campaignId: number): string {
+  const row = rows.find((e) => e.campaignId === campaignId && e.actionKind === "comment");
+  const details = String(row?.verificationDetails || "");
+  const marker = "Telegram: mtproto comment sent :: ";
+  if (details.startsWith(marker)) return details.slice(marker.length).trim();
+  return "";
+}
+
 function firstOpenTask(tasks: TaskRow[]): TaskRow | undefined {
   const sorted = [...tasks].sort((a, b) => a.id - b.id);
   return sorted.find((t) => t.status === "open" || t.status === "assigned");
@@ -78,6 +94,8 @@ export function EarnCredits() {
   const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
   const [hasMtprotoSession, setHasMtprotoSession] = useState<boolean | null>(null);
   const [selectedReactionByCampaign, setSelectedReactionByCampaign] = useState<Record<number, string>>({});
+  const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
+  const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -217,41 +235,18 @@ export function EarnCredits() {
       }
 
       if (action === "comment") {
-        const key = `${campaignId}-comment`;
-        setBusy(key);
-        const campaignLink = task.campaign?.messageUrl || task.campaign?.soundcloudPostUrl || "";
-        const started = await api.startCommentDetect({ taskId: task.id });
-        if (campaignLink) {
-          const opened = window.open(campaignLink, "_blank", "noopener,noreferrer");
-          if (!opened) {
-            window.location.href = campaignLink;
-          }
-          toast.info("Opened Telegram post", {
-            description: "Post your comment there. We are checking in real time for up to 60s.",
-          });
-        }
-        let detected = false;
-        for (let i = 0; i < 20; i += 1) {
-          await sleep(3000);
-          const polled = await api.pollCommentDetect(started.token);
-          if (polled.status === "detected") {
-            detected = true;
-            break;
-          }
-          if (polled.status === "expired") break;
-        }
-        if (!detected) {
-          toast.error("Comment not detected yet", {
-            description: "Comment on Telegram discussion, then tap Comment again.",
-          });
-          setBusy(null);
+        const commentText = String(commentDraftByCampaign[campaignId] || "").trim();
+        if (!commentText) {
+          toast.error("Type your comment first.");
           return;
         }
+        const key = `${campaignId}-comment-submit`;
+        setBusy(key);
         await api.completeTask({
           taskId: task.id,
           engagementType,
           actionKind: "comment",
-          commentVerifyToken: started.token,
+          proofText: commentText,
         });
         toast.success(`Earned ${task.rewardCredits} credits`, {
           description: `Recorded · comment · task #${task.id}`,
@@ -259,6 +254,8 @@ export function EarnCredits() {
         const refreshed = await api.getTasks();
         setTasks(refreshed.tasks as TaskRow[]);
         setMyEngagements(refreshed.myEngagements ?? []);
+        setCommentDraftByCampaign((prev) => ({ ...prev, [campaignId]: "" }));
+        setActiveCommentCampaignId(null);
         setBusy(null);
         return;
       }
@@ -311,6 +308,22 @@ export function EarnCredits() {
         toast.info("Open Settings to connect Telegram User Session for Like.");
         window.location.href = "/settings#user-session";
       }
+      setBusy(null);
+    }
+  };
+
+  const handleDeleteComment = async (campaignId: number) => {
+    try {
+      const key = `${campaignId}-comment-delete`;
+      setBusy(key);
+      await api.revertEngagement({ campaignId, actionKind: "comment" });
+      toast.success("Comment removed and credits refunded.");
+      const refreshed = await api.getTasks();
+      setTasks(refreshed.tasks as TaskRow[]);
+      setMyEngagements(refreshed.myEngagements ?? []);
+      setBusy(null);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not delete comment");
       setBusy(null);
     }
   };
@@ -502,25 +515,74 @@ export function EarnCredits() {
                 </Button>
                 </div>
                 ) : null}
-                {!isSubscribeCampaign ? (
-                <Button
-                  type="button"
-                  variant={commented ? "default" : "outline"}
-                  size="sm"
-                  className={
-                    commented
-                      ? "rounded-full pr-3"
-                      : "rounded-full border-blue-500/25 bg-background/80 pr-3 hover:bg-blue-500/10"
-                  }
-                  onClick={() => void handleAction(cid, campaignTasks, et, "comment")}
-                  disabled={!bundleAllowsAction(et, "comment") || commented || busy !== null || hasTelegram === false}
-                >
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  Comment
-                  <Badge className="ml-2 rounded-full bg-blue-500/15 px-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/15">
-                    +{reward}
-                  </Badge>
-                </Button>
+                {!isSubscribeCampaign && bundleAllowsAction(et, "comment") ? (
+                  commented ? (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/25 bg-background/80 px-3 py-1.5">
+                      <MessageCircle className="h-4 w-4 text-blue-500" />
+                      <span className="max-w-[220px] truncate text-sm text-foreground">
+                        {getCommentText(myEngagements, cid) || "Comment sent"}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full"
+                        onClick={() => void handleDeleteComment(cid)}
+                        disabled={busy !== null}
+                      >
+                        {busy === `${cid}-comment-delete` ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  ) : activeCommentCampaignId === cid ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={commentDraftByCampaign[cid] || ""}
+                        onChange={(e) =>
+                          setCommentDraftByCampaign((prev) => ({ ...prev, [cid]: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleAction(cid, campaignTasks, et, "comment");
+                          }
+                        }}
+                        placeholder="Write comment…"
+                        className="h-9 w-[220px] rounded-full border-blue-500/25 bg-background/80"
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        className="h-9 w-9 rounded-full"
+                        onClick={() => void handleAction(cid, campaignTasks, et, "comment")}
+                        disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                      >
+                        {busy === `${cid}-comment-submit` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <SendHorizontal className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full border-blue-500/25 bg-background/80 pr-3 hover:bg-blue-500/10"
+                      onClick={() => setActiveCommentCampaignId(cid)}
+                      disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Comment
+                      <Badge className="ml-2 rounded-full bg-blue-500/15 px-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/15">
+                        +{reward}
+                      </Badge>
+                    </Button>
+                  )
                 ) : null}
               </div>
             </Card>

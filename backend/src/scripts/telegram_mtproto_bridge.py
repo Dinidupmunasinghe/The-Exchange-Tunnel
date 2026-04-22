@@ -110,6 +110,20 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
             )
             return {"ok": True, "messageId": message.id}
 
+        if operation == "delete_message":
+            deleted = await manager.delete_message(
+                chat=payload["chat"],
+                msg_id=int(payload["msgId"]),
+            )
+            return {"ok": True, "deleted": bool(deleted)}
+
+        if operation == "message_exists":
+            exists = await manager.message_exists(
+                chat=payload["chat"],
+                msg_id=int(payload["msgId"]),
+            )
+            return {"ok": True, "exists": bool(exists)}
+
         raise TelegramClientManagerError(f"Unsupported operation: {operation}")
 
 

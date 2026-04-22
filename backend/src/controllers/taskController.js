@@ -76,6 +76,13 @@ function parseLikeMeta(metaEngagementId) {
   return { channelId: String(m[1]), messageId: Number(m[2]) };
 }
 
+function parseCommentMeta(metaEngagementId) {
+  const raw = String(metaEngagementId || "");
+  const m = /^tg-com-\d+-(-?\d+)-(\d+)-(\d+)$/.exec(raw);
+  if (!m) return null;
+  return { channelId: String(m[1]), postMessageId: Number(m[2]), commentMessageId: Number(m[3]) };
+}
+
 async function submitTaskCompletion(req, res) {
   const { taskId, engagementType, proofText: proofRaw, actionKind, commentVerifyToken, reaction } = req.body;
   const proofText = typeof proofRaw === "string" ? proofRaw : "";
@@ -220,14 +227,67 @@ async function submitTaskCompletion(req, res) {
         }
       }
       if (actionKind === "comment") {
-        const consumed = commentDetectionStore.consumeResolved(String(commentVerifyToken || ""), req.user.id, task.id);
-        if (!consumed.ok) {
+        const commentText = String(proofText || "").trim();
+        if (!commentText) {
           const error = new Error(
-            "Comment was not detected by bot yet. Open Telegram post, comment there, then retry."
+            "Comment text is required"
           );
           error.status = 400;
           throw error;
         }
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error(
+            "Comment requires Telegram user session auth first. Open Settings and complete Telegram user auth."
+          );
+          error.status = 400;
+          throw error;
+        }
+        if (!parsedMessage || !parsedMessage.messageId) {
+          const error = new Error("Could not resolve Telegram message id for comment action");
+          error.status = 400;
+          throw error;
+        }
+        const chatCandidates = [];
+        if (parsedMessage.kind === "public" && parsedMessage.username) {
+          chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
+        }
+        chatCandidates.push(String(channelId));
+        let replied = false;
+        let replyMessageId = null;
+        let lastEntityError = null;
+        for (const chatRef of chatCandidates) {
+          try {
+            const out = await runBridge("reply", {
+              apiId: creds.apiId,
+              apiHash: creds.apiHash,
+              proxy: creds.proxy || null,
+              sessionString,
+              chat: chatRef,
+              msgId: Number(parsedMessage.messageId),
+              text: commentText
+            });
+            replyMessageId = Number(out?.messageId || 0) || null;
+            replied = true;
+            break;
+          } catch (entityErr) {
+            const text = String(entityErr?.message || "").toLowerCase();
+            const isEntityError =
+              text.includes("cannot find any entity corresponding to") ||
+              text.includes("could not find the input entity");
+            if (!isEntityError) throw entityErr;
+            lastEntityError = entityErr;
+          }
+        }
+        if (!replied && lastEntityError) throw lastEntityError;
+        if (!replyMessageId) {
+          const error = new Error("Failed to publish comment to Telegram");
+          error.status = 400;
+          throw error;
+        }
+        req._commentMessageId = replyMessageId;
+        req._commentText = commentText;
       }
       if (actionKind === "like") {
         const creds = parseStoredMtprotoCredentials(worker);
@@ -315,6 +375,8 @@ async function submitTaskCompletion(req, res) {
             ? `tg-like-${tUid}-${channelId}-${Number(parsedMessage.messageId)}--${encodeURIComponent(
               typeof reaction === "string" && reaction.trim() ? reaction.trim() : "👍"
             )}`
+            : actionKind === "comment" && parsedMessage?.messageId && req._commentMessageId
+              ? `tg-com-${tUid}-${channelId}-${Number(parsedMessage.messageId)}-${Number(req._commentMessageId)}`
             : `tg-mem-${tUid}-${channelId}`;
 
       await db.Engagement.create(
@@ -330,7 +392,7 @@ async function submitTaskCompletion(req, res) {
             actionKind === "subscribe"
               ? "Telegram: channel membership verified for subscribe campaign"
               : actionKind === "comment"
-                ? "Telegram: bot-detected discussion comment"
+                ? `Telegram: mtproto comment sent :: ${String(req._commentText || "").slice(0, 160)}`
                 : "Telegram: like action recorded after channel check"
         },
         { transaction }
@@ -425,7 +487,7 @@ async function getAvailableTasks(req, res) {
             campaignId: { [Op.in]: campaignIds },
             actionKind: { [Op.ne]: null }
           },
-          attributes: ["id", "campaignId", "taskId", "actionKind"]
+          attributes: ["id", "campaignId", "taskId", "actionKind", "verificationDetails", "metaEngagementId"]
         });
   return res.json({ tasks: serialized, myEngagements });
 }
@@ -564,6 +626,54 @@ async function revertEngagement(req, res) {
         if (!cleared) {
           const error = new Error(
             (lastErr && lastErr.message) || "Could not remove Telegram reaction. Try again."
+          );
+          error.status = 400;
+          throw error;
+        }
+      }
+      if (actionKind === "comment") {
+        const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error("Telegram user session is required to delete comment");
+          error.status = 400;
+          throw error;
+        }
+        const parsed = parseCommentMeta(engagement.metaEngagementId);
+        if (!parsed) {
+          const error = new Error("Could not resolve Telegram comment message for delete");
+          error.status = 400;
+          throw error;
+        }
+        const msgUrl = campaign.messageUrl || campaign.soundcloudPostUrl || "";
+        const parsedMessage = tg.parseTmeMessageUrl(String(msgUrl || ""));
+        const chatCandidates = [];
+        if (parsedMessage?.kind === "public" && parsedMessage?.username) {
+          chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
+        }
+        chatCandidates.push(String(parsed.channelId));
+        let deleted = false;
+        let lastErr = null;
+        for (const chatRef of chatCandidates) {
+          try {
+            await runBridge("delete_message", {
+              apiId: creds.apiId,
+              apiHash: creds.apiHash,
+              proxy: creds.proxy || null,
+              sessionString,
+              chat: chatRef,
+              msgId: Number(parsed.commentMessageId)
+            });
+            deleted = true;
+            break;
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        if (!deleted) {
+          const error = new Error(
+            (lastErr && lastErr.message) || "Could not delete Telegram comment. Try again."
           );
           error.status = 400;
           throw error;

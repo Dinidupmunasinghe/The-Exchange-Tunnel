@@ -246,7 +246,14 @@ export const api = {
   getTasks: () =>
     authRequest("/tasks") as Promise<{
       tasks: any[];
-      myEngagements: { id: number; campaignId: number; taskId: number; actionKind: string }[];
+      myEngagements: {
+        id: number;
+        campaignId: number;
+        taskId: number;
+        actionKind: string;
+        verificationDetails?: string | null;
+        metaEngagementId?: string | null;
+      }[];
     }>,
   completeTask: (payload: {
     taskId: number;
