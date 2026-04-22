@@ -69,6 +69,13 @@ function parseStoredSessionString(user) {
   }
 }
 
+function parseLikeMeta(metaEngagementId) {
+  const raw = String(metaEngagementId || "");
+  const m = /^tg-like-\d+-(-?\d+)-(\d+)(?:--(.+))?$/.exec(raw);
+  if (!m) return null;
+  return { channelId: String(m[1]), messageId: Number(m[2]) };
+}
+
 async function submitTaskCompletion(req, res) {
   const { taskId, engagementType, proofText: proofRaw, actionKind, commentVerifyToken, reaction } = req.body;
   const proofText = typeof proofRaw === "string" ? proofRaw : "";
@@ -513,6 +520,54 @@ async function revertEngagement(req, res) {
         const error = new Error("Cannot revert on your own campaign");
         error.status = 400;
         throw error;
+      }
+      if (actionKind === "like") {
+        const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error("Telegram user session is required to remove like");
+          error.status = 400;
+          throw error;
+        }
+        const parsed = parseLikeMeta(engagement.metaEngagementId);
+        if (!parsed) {
+          const error = new Error("Could not resolve Telegram message for unlike");
+          error.status = 400;
+          throw error;
+        }
+        const msgUrl = campaign.messageUrl || campaign.soundcloudPostUrl || "";
+        const parsedMessage = tg.parseTmeMessageUrl(String(msgUrl || ""));
+        const chatCandidates = [];
+        if (parsedMessage?.kind === "public" && parsedMessage?.username) {
+          chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
+        }
+        chatCandidates.push(String(parsed.channelId));
+        let cleared = false;
+        let lastErr = null;
+        for (const chatRef of chatCandidates) {
+          try {
+            await runBridge("clear_reaction", {
+              apiId: creds.apiId,
+              apiHash: creds.apiHash,
+              proxy: creds.proxy || null,
+              sessionString,
+              chat: chatRef,
+              msgId: Number(parsed.messageId)
+            });
+            cleared = true;
+            break;
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        if (!cleared) {
+          const error = new Error(
+            (lastErr && lastErr.message) || "Could not remove Telegram reaction. Try again."
+          );
+          error.status = 400;
+          throw error;
+        }
       }
       const amount = task.rewardCredits;
       await reverseEarnCredits({
