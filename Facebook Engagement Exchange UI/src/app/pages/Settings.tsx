@@ -7,6 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
 import { toast } from "sonner";
@@ -33,6 +34,15 @@ type ManagedPage = {
   selected: boolean;
 };
 
+const COUNTRY_CODES = [
+  { code: "+94", label: "Sri Lanka (+94)" },
+  { code: "+91", label: "India (+91)" },
+  { code: "+1", label: "United States (+1)" },
+  { code: "+44", label: "United Kingdom (+44)" },
+  { code: "+971", label: "UAE (+971)" },
+  { code: "+61", label: "Australia (+61)" },
+];
+
 export function Settings() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pages, setPages] = useState<ManagedPage[]>([]);
@@ -43,6 +53,7 @@ export function Settings() {
   const [selectingPageId, setSelectingPageId] = useState<string | null>(null);
   const [clearingSelection, setClearingSelection] = useState(false);
   const [rechecking, setRechecking] = useState(false);
+  const [mtprotoCountryCode, setMtprotoCountryCode] = useState("+94");
   const [mtprotoPhone, setMtprotoPhone] = useState("");
   const [mtprotoCode, setMtprotoCode] = useState("");
   const [mtprotoCodeHash, setMtprotoCodeHash] = useState("");
@@ -202,14 +213,18 @@ export function Settings() {
   }
 
   async function handleSendMtprotoCode() {
-    if (!mtprotoPhone.trim()) {
-      toast.error("Enter your Telegram phone with country code");
+    const raw = mtprotoPhone.trim();
+    if (!raw) {
+      toast.error("Enter your Telegram phone number");
       return;
     }
+    const normalizedPhone = raw.startsWith("+")
+      ? raw
+      : `${mtprotoCountryCode}${raw.replace(/^0+/, "")}`;
     setSendingCode(true);
     try {
       const res = await api.mtprotoSendCode({
-        phone: mtprotoPhone.trim(),
+        phone: normalizedPhone,
       });
       setMtprotoCodeHash(res.phoneCodeHash || "");
       setMtprotoNeeds2fa(false);
@@ -222,14 +237,18 @@ export function Settings() {
   }
 
   async function handleMtprotoSignIn() {
-    if (!mtprotoPhone.trim() || !mtprotoCode.trim()) {
-      toast.error("Enter both phone and code");
+    const raw = mtprotoPhone.trim();
+    if (!raw || !mtprotoCode.trim()) {
+      toast.error("Enter phone number and code");
       return;
     }
+    const normalizedPhone = raw.startsWith("+")
+      ? raw
+      : `${mtprotoCountryCode}${raw.replace(/^0+/, "")}`;
     setSigningIn(true);
     try {
       const res = await api.mtprotoSignIn({
-        phone: mtprotoPhone.trim(),
+        phone: normalizedPhone,
         phoneCode: mtprotoCode.trim(),
         phoneCodeHash: mtprotoCodeHash || undefined,
       });
@@ -535,14 +554,29 @@ export function Settings() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <div className="grid gap-3 sm:grid-cols-[220px_1fr_auto]">
+            <div className="space-y-2">
+              <Label htmlFor="mtproto-country">Country</Label>
+              <Select value={mtprotoCountryCode} onValueChange={setMtprotoCountryCode}>
+                <SelectTrigger id="mtproto-country">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRY_CODES.map((item) => (
+                    <SelectItem key={item.code} value={item.code}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="mtproto-phone">Telegram phone</Label>
               <Input
                 id="mtproto-phone"
                 value={mtprotoPhone}
                 onChange={(e) => setMtprotoPhone(e.target.value)}
-                placeholder="+94..."
+                placeholder="771234567 or +94771234567"
               />
             </div>
             <Button type="button" variant="outline" className="self-end" onClick={() => void handleSendMtprotoCode()} disabled={sendingCode}>
