@@ -62,6 +62,7 @@ export function Settings() {
   const [sendingCode, setSendingCode] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [submitting2fa, setSubmitting2fa] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const refreshProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -120,6 +121,14 @@ export function Settings() {
     const node = document.getElementById("user-session");
     if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = window.setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resendCooldown]);
 
   const selectedPage = useMemo(
     () => pages.find((page) => page.id === profile?.telegramActingChannelId) ?? null,
@@ -228,6 +237,7 @@ export function Settings() {
       });
       setMtprotoCodeHash(res.phoneCodeHash || "");
       setMtprotoNeeds2fa(false);
+      setResendCooldown(30);
       toast.success("Code sent to your Telegram app.");
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not send code");
@@ -594,6 +604,20 @@ export function Settings() {
                 onChange={(e) => setMtprotoCode(e.target.value)}
                 placeholder="Telegram login code"
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                disabled={sendingCode || resendCooldown > 0}
+                onClick={() => void handleSendMtprotoCode()}
+              >
+                {sendingCode
+                  ? "Sending..."
+                  : resendCooldown > 0
+                    ? `Resend code in ${resendCooldown}s`
+                    : "Resend code"}
+              </Button>
             </div>
             <Button type="button" className="self-end" onClick={() => void handleMtprotoSignIn()} disabled={signingIn}>
               {signingIn ? "Verifying..." : "Connect session"}
