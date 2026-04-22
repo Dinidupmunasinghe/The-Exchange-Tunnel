@@ -289,10 +289,22 @@ class TelegramClientManager:
         if message is None or message.reactions is None:
             return False
 
+        # Telethon objects differ across versions:
+        # - some expose reaction_result.chosen
+        # - some only provide aggregate counts in results and user picks in recent_reactions
         for reaction_result in message.reactions.results:
             reaction_obj = reaction_result.reaction
             if isinstance(reaction_obj, types.ReactionEmoji):
-                if reaction_obj.emoticon == reaction and bool(reaction_result.chosen):
+                chosen_attr = bool(getattr(reaction_result, "chosen", False))
+                if reaction_obj.emoticon == reaction and chosen_attr:
+                    return True
+
+        recent = getattr(message.reactions, "recent_reactions", None) or []
+        for recent_item in recent:
+            reaction_obj = getattr(recent_item, "reaction", None)
+            chosen_attr = bool(getattr(recent_item, "chosen", False))
+            if isinstance(reaction_obj, types.ReactionEmoji):
+                if reaction_obj.emoticon == reaction and chosen_attr:
                     return True
         return False
 
