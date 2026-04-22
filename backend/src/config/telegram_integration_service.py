@@ -270,9 +270,12 @@ class TelegramClientManager:
                 break
             await asyncio.sleep(self.REACTION_VERIFY_DELAY_SECONDS)
         if not is_chosen:
-            raise ReactionVerificationError(
-                f"Reaction verification failed for msg_id={msg_id} and reaction={reaction!r}."
+            logger.warning(
+                "Reaction sent but not confirmed as chosen yet for msg_id=%s reaction=%r",
+                msg_id,
+                reaction,
             )
+            return False
         return True
 
     async def verify_reaction_chosen(
