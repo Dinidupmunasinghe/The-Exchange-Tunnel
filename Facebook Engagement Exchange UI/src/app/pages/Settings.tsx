@@ -43,8 +43,6 @@ export function Settings() {
   const [selectingPageId, setSelectingPageId] = useState<string | null>(null);
   const [clearingSelection, setClearingSelection] = useState(false);
   const [rechecking, setRechecking] = useState(false);
-  const [mtprotoApiId, setMtprotoApiId] = useState("");
-  const [mtprotoApiHash, setMtprotoApiHash] = useState("");
   const [mtprotoPhone, setMtprotoPhone] = useState("");
   const [mtprotoCode, setMtprotoCode] = useState("");
   const [mtprotoCodeHash, setMtprotoCodeHash] = useState("");
@@ -211,8 +209,6 @@ export function Settings() {
     setSendingCode(true);
     try {
       const res = await api.mtprotoSendCode({
-        apiId: mtprotoApiId.trim() || undefined,
-        apiHash: mtprotoApiHash.trim() || undefined,
         phone: mtprotoPhone.trim(),
       });
       setMtprotoCodeHash(res.phoneCodeHash || "");
@@ -233,8 +229,6 @@ export function Settings() {
     setSigningIn(true);
     try {
       const res = await api.mtprotoSignIn({
-        apiId: mtprotoApiId.trim() || undefined,
-        apiHash: mtprotoApiHash.trim() || undefined,
         phone: mtprotoPhone.trim(),
         phoneCode: mtprotoCode.trim(),
         phoneCodeHash: mtprotoCodeHash || undefined,
@@ -538,27 +532,6 @@ export function Settings() {
               <Badge variant={profile?.hasMtprotoSession ? "default" : "outline"}>
                 {profile?.hasMtprotoSession ? "Connected" : "Not connected"}
               </Badge>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="mtproto-api-id">API ID (optional if backend env set)</Label>
-              <Input
-                id="mtproto-api-id"
-                value={mtprotoApiId}
-                onChange={(e) => setMtprotoApiId(e.target.value)}
-                placeholder="e.g. 123456"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mtproto-api-hash">API Hash (optional if backend env set)</Label>
-              <Input
-                id="mtproto-api-hash"
-                value={mtprotoApiHash}
-                onChange={(e) => setMtprotoApiHash(e.target.value)}
-                placeholder="32-char hash"
-              />
             </div>
           </div>
 
