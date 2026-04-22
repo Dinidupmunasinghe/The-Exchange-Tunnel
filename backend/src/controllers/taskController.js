@@ -2,10 +2,12 @@ const { Op } = require("sequelize");
 const db = require("../models");
 const sequelize = require("../config/database");
 const tg = require("../services/telegramService");
+const { runBridge } = require("../services/telegramMtprotoService");
 const { verifyEngagement } = require("../services/engagementVerification");
 const { earnCredits, refundCredits, reverseEarnCredits } = require("../services/creditService");
 const { ENGAGEMENT_TYPES, ACTION_KINDS, bundleAllowsAction } = require("../constants/engagement");
 const commentDetectionStore = require("../services/commentDetectionStore");
+const { decrypt } = require("../utils/crypto");
 const crypto = require("crypto");
 
 function runnableCampaignWhere() {
@@ -43,6 +45,28 @@ function parseTmeChannelUsername(url) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseStoredMtprotoCredentials(user) {
+  if (!user?.userOAuthTokenEncrypted) return null;
+  try {
+    const raw = decrypt(user.userOAuthTokenEncrypted);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.apiId || !parsed.apiHash) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function parseStoredSessionString(user) {
+  if (!user?.userActingTokenEncrypted) return null;
+  try {
+    return decrypt(user.userActingTokenEncrypted);
+  } catch {
+    return null;
+  }
 }
 
 async function submitTaskCompletion(req, res) {
@@ -123,6 +147,7 @@ async function submitTaskCompletion(req, res) {
         throw error;
       }
       let resolved;
+      let parsedMessage = null;
       if (engagementType === "subscribe") {
         const username = parseTmeChannelUsername(String(msgUrl));
         if (!username) {
@@ -138,13 +163,13 @@ async function submitTaskCompletion(req, res) {
         }
         resolved = { chatId: String(chat.id), title: chat.title || null };
       } else {
-        const parsed = tg.parseTmeMessageUrl(String(msgUrl));
-        if (!parsed) {
+        parsedMessage = tg.parseTmeMessageUrl(String(msgUrl));
+        if (!parsedMessage) {
           const error = new Error("Invalid t.me post URL on campaign");
           error.status = 400;
           throw error;
         }
-        resolved = await tg.resolveChannelChatIdFromTme(parsed, null);
+        resolved = await tg.resolveChannelChatIdFromTme(parsedMessage, null);
       }
       if (resolved == null) {
         const error = new Error("Could not resolve this Telegram post");
@@ -194,6 +219,45 @@ async function submitTaskCompletion(req, res) {
             "Comment was not detected by bot yet. Open Telegram post, comment there, then retry."
           );
           error.status = 400;
+          throw error;
+        }
+      }
+      if (actionKind === "like") {
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error(
+            "Like requires Telegram user session auth first. Open Settings and complete Telegram user auth."
+          );
+          error.status = 400;
+          throw error;
+        }
+        if (!parsedMessage || !parsedMessage.messageId) {
+          const error = new Error("Could not resolve Telegram message id for like action");
+          error.status = 400;
+          throw error;
+        }
+        try {
+          await runBridge("react", {
+            apiId: creds.apiId,
+            apiHash: creds.apiHash,
+            proxy: creds.proxy || null,
+            sessionString,
+            chat: String(channelId),
+            msgId: Number(parsedMessage.messageId),
+            reaction: "👍"
+          });
+        } catch (bridgeError) {
+          const e = bridgeError;
+          const waitSeconds = Number(e?.waitSeconds || 0);
+          const code = String(e?.code || "");
+          const msg = e instanceof Error ? e.message : "Failed to publish like to Telegram";
+          const error = new Error(
+            code === "FLOOD_WAIT" && waitSeconds > 0
+              ? `Telegram rate limit reached. Retry in about ${waitSeconds}s.`
+              : msg
+          );
+          error.status = code === "FLOOD_WAIT" ? 429 : 400;
           throw error;
         }
       }
