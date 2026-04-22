@@ -238,15 +238,36 @@ async function submitTaskCompletion(req, res) {
           throw error;
         }
         try {
-          await runBridge("react", {
-            apiId: creds.apiId,
-            apiHash: creds.apiHash,
-            proxy: creds.proxy || null,
-            sessionString,
-            chat: String(channelId),
-            msgId: Number(parsedMessage.messageId),
-            reaction: "👍"
-          });
+          const chatCandidates = [];
+          if (parsedMessage.kind === "public" && parsedMessage.username) {
+            chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
+          }
+          chatCandidates.push(String(channelId));
+          let lastEntityError = null;
+          let reacted = false;
+          for (const chatRef of chatCandidates) {
+            try {
+              await runBridge("react", {
+                apiId: creds.apiId,
+                apiHash: creds.apiHash,
+                proxy: creds.proxy || null,
+                sessionString,
+                chat: chatRef,
+                msgId: Number(parsedMessage.messageId),
+                reaction: "👍"
+              });
+              reacted = true;
+              break;
+            } catch (entityErr) {
+              const text = String(entityErr?.message || "").toLowerCase();
+              const isEntityError =
+                text.includes("cannot find any entity corresponding to") ||
+                text.includes("could not find the input entity");
+              if (!isEntityError) throw entityErr;
+              lastEntityError = entityErr;
+            }
+          }
+          if (!reacted && lastEntityError) throw lastEntityError;
         } catch (bridgeError) {
           const e = bridgeError;
           const waitSeconds = Number(e?.waitSeconds || 0);
