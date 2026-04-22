@@ -7,6 +7,7 @@ import {
   BarChart3, 
   Wallet, 
   Settings,
+  UserRoundCheck,
   Waypoints,
   X
 } from "lucide-react";
@@ -19,6 +20,7 @@ const navigation = [
   { name: "My Campaigns", href: "/campaigns", icon: FolderOpen },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Wallet", href: "/wallet", icon: Wallet },
+  { name: "User Session", href: "/settings#user-session", icon: UserRoundCheck },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -59,7 +61,8 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-4">
         {navigation.map((item) => {
-          const isActive = location.pathname === item.href;
+          const current = `${location.pathname}${location.hash}`;
+          const isActive = item.href.includes("#") ? current === item.href : location.pathname === item.href;
           const Icon = item.icon;
 
           return (

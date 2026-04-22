@@ -6,6 +6,7 @@ const db = require("./models");
 const { activateDueCampaigns } = require("./services/campaignScheduler");
 const { auditSubscribeEngagements } = require("./services/subscriptionAuditService");
 const { auditCommentMembershipEngagements } = require("./services/commentMembershipAuditService");
+const { auditLikeEngagements } = require("./services/likeEngagementAuditService");
 
 async function addColumnIfMissing(queryInterface, tableName, columnName, definition) {
   const columns = await queryInterface.describeTable(tableName);
@@ -45,6 +46,7 @@ async function bootstrap() {
     await activateDueCampaigns();
     await auditSubscribeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
     await auditCommentMembershipEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
+    await auditLikeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
     setInterval(() => {
       activateDueCampaigns().catch(() => undefined);
     }, 60 * 1000);
@@ -53,6 +55,9 @@ async function bootstrap() {
     }, 30 * 1000);
     setInterval(() => {
       auditCommentMembershipEngagements().catch(() => undefined);
+    }, 30 * 1000);
+    setInterval(() => {
+      auditLikeEngagements().catch(() => undefined);
     }, 30 * 1000);
     const server = http.createServer(app);
     const io = new Server(server, {

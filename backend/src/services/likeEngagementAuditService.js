@@ -1,26 +1,43 @@
 const { Op } = require("sequelize");
 const db = require("../models");
 const sequelize = require("../config/database");
-const tg = require("./telegramService");
+const { runBridge } = require("./telegramMtprotoService");
+const { decrypt } = require("../utils/crypto");
 const { reverseEarnCredits, refundCredits } = require("./creditService");
 
-function parseChannelIdFromMeta(metaEngagementId) {
+function parseLikeMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
-  const m = /^tg-mem-\d+-(-?\d+)$/.exec(raw);
-  return m ? m[1] : null;
+  const m = /^tg-like-\d+-(-?\d+)-(\d+)$/.exec(raw);
+  if (!m) return null;
+  return { channelId: String(m[1]), messageId: Number(m[2]) };
 }
 
-/**
- * Best-effort periodic audit for comment engagements.
- * Mirrors subscribe audit behavior: if worker is no longer a member of the channel,
- * reverse worker credits, refund campaign owner, and reopen the task.
- */
-async function auditCommentMembershipEngagements() {
-  if (!tg.isConfigured()) return { scanned: 0, reversed: 0 };
+function parseStoredMtprotoCredentials(user) {
+  if (!user?.userOAuthTokenEncrypted) return null;
+  try {
+    const raw = decrypt(user.userOAuthTokenEncrypted);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.apiId || !parsed.apiHash) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
+function parseStoredSessionString(user) {
+  if (!user?.userActingTokenEncrypted) return null;
+  try {
+    return decrypt(user.userActingTokenEncrypted);
+  } catch {
+    return null;
+  }
+}
+
+async function auditLikeEngagements() {
   const rows = await db.Engagement.findAll({
     where: {
-      actionKind: "comment",
+      actionKind: "like",
       verificationStatus: "verified"
     },
     include: [
@@ -35,7 +52,7 @@ async function auditCommentMembershipEngagements() {
         as: "campaign",
         required: true,
         where: {
-          engagementType: { [Op.in]: ["comment", "like_comment"] },
+          engagementType: { [Op.in]: ["like", "like_comment"] },
           status: { [Op.ne]: "paused" }
         }
       },
@@ -43,7 +60,14 @@ async function auditCommentMembershipEngagements() {
         model: db.User,
         as: "user",
         required: true,
-        attributes: ["id", "telegramUserId", "credits", "dailyEarnedAt", "dailyEarnedCredits"]
+        attributes: [
+          "id",
+          "credits",
+          "dailyEarnedAt",
+          "dailyEarnedCredits",
+          "userOAuthTokenEncrypted",
+          "userActingTokenEncrypted"
+        ]
       }
     ],
     order: [["id", "DESC"]],
@@ -52,14 +76,30 @@ async function auditCommentMembershipEngagements() {
 
   let reversed = 0;
   for (const e of rows) {
-    const workerTelegramId = e.user?.telegramUserId ? String(e.user.telegramUserId) : null;
-    if (!workerTelegramId) continue;
+    const parsed = parseLikeMeta(e.metaEngagementId);
+    if (!parsed) continue;
 
-    const channelId = parseChannelIdFromMeta(e.metaEngagementId);
-    if (!channelId) continue;
+    const creds = parseStoredMtprotoCredentials(e.user);
+    const sessionString = parseStoredSessionString(e.user);
+    if (!creds || !sessionString) continue;
 
-    const detail = await tg.getUserChatMemberStatus(String(channelId), workerTelegramId);
-    if (detail.ok) continue;
+    let stillChosen = false;
+    try {
+      const out = await runBridge("verify_reaction", {
+        apiId: creds.apiId,
+        apiHash: creds.apiHash,
+        proxy: creds.proxy || null,
+        sessionString,
+        chat: parsed.channelId,
+        msgId: parsed.messageId,
+        reaction: "👍"
+      });
+      stillChosen = Boolean(out?.chosen);
+    } catch {
+      // Skip this row when Telegram/bridge errors occur.
+      continue;
+    }
+    if (stillChosen) continue;
 
     try {
       await sequelize.transaction(async (transaction) => {
@@ -72,7 +112,7 @@ async function auditCommentMembershipEngagements() {
           ]
         });
         if (!fresh) return;
-        if (fresh.actionKind !== "comment") return;
+        if (fresh.actionKind !== "like") return;
         if (!fresh.task || fresh.task.status !== "completed") return;
         if (!fresh.campaign || fresh.campaign.status === "paused") return;
 
@@ -80,7 +120,7 @@ async function auditCommentMembershipEngagements() {
         await reverseEarnCredits({
           userId: fresh.userId,
           amount,
-          reason: `Auto-reversal: left channel after comment on campaign #${fresh.campaignId} (task #${fresh.taskId})`,
+          reason: `Auto-reversal: removed like on campaign #${fresh.campaignId} (task #${fresh.taskId})`,
           referenceType: "task",
           referenceId: fresh.taskId,
           transaction
@@ -88,7 +128,7 @@ async function auditCommentMembershipEngagements() {
         await refundCredits({
           userId: fresh.campaign.userId,
           amount,
-          reason: `Auto-refund: worker left channel after comment on campaign #${fresh.campaignId}`,
+          reason: `Auto-refund: worker removed like on campaign #${fresh.campaignId}`,
           referenceType: "campaign",
           referenceId: fresh.campaignId,
           transaction
@@ -116,4 +156,4 @@ async function auditCommentMembershipEngagements() {
   return { scanned: rows.length, reversed };
 }
 
-module.exports = { auditCommentMembershipEngagements };
+module.exports = { auditLikeEngagements };

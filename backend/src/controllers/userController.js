@@ -13,10 +13,15 @@ async function getProfile(req, res) {
       "telegramUserId",
       "telegramActingChannelId",
       "telegramActingChannelTitle",
+      "userActingTokenEncrypted",
       "createdAt"
     ]
   });
-  return res.json({ user });
+  if (!user) return res.status(404).json({ message: "User not found" });
+  const data = user.toJSON();
+  const hasMtprotoSession = Boolean(data.userActingTokenEncrypted);
+  delete data.userActingTokenEncrypted;
+  return res.json({ user: { ...data, hasMtprotoSession } });
 }
 
 async function getDashboard(req, res) {

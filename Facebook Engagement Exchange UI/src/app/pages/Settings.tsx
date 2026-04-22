@@ -19,6 +19,7 @@ type Profile = {
   telegramUserId?: string;
   telegramActingChannelId?: string | null;
   telegramActingChannelTitle?: string | null;
+  hasMtprotoSession?: boolean;
   email?: string;
   name?: string;
 };
@@ -42,6 +43,16 @@ export function Settings() {
   const [selectingPageId, setSelectingPageId] = useState<string | null>(null);
   const [clearingSelection, setClearingSelection] = useState(false);
   const [rechecking, setRechecking] = useState(false);
+  const [mtprotoApiId, setMtprotoApiId] = useState("");
+  const [mtprotoApiHash, setMtprotoApiHash] = useState("");
+  const [mtprotoPhone, setMtprotoPhone] = useState("");
+  const [mtprotoCode, setMtprotoCode] = useState("");
+  const [mtprotoCodeHash, setMtprotoCodeHash] = useState("");
+  const [mtprotoPassword, setMtprotoPassword] = useState("");
+  const [mtprotoNeeds2fa, setMtprotoNeeds2fa] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [submitting2fa, setSubmitting2fa] = useState(false);
 
   const refreshProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -94,6 +105,12 @@ export function Settings() {
       window.removeEventListener("focus", onFocus);
     };
   }, [profile?.telegramUserId, refreshPages, refreshProfile]);
+
+  useEffect(() => {
+    if (window.location.hash !== "#user-session") return;
+    const node = document.getElementById("user-session");
+    if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const selectedPage = useMemo(
     () => pages.find((page) => page.id === profile?.telegramActingChannelId) ?? null,
@@ -183,6 +200,76 @@ export function Settings() {
       toast.error("Could not recheck setup");
     } finally {
       setRechecking(false);
+    }
+  }
+
+  async function handleSendMtprotoCode() {
+    if (!mtprotoPhone.trim()) {
+      toast.error("Enter your Telegram phone with country code");
+      return;
+    }
+    setSendingCode(true);
+    try {
+      const res = await api.mtprotoSendCode({
+        apiId: mtprotoApiId.trim() || undefined,
+        apiHash: mtprotoApiHash.trim() || undefined,
+        phone: mtprotoPhone.trim(),
+      });
+      setMtprotoCodeHash(res.phoneCodeHash || "");
+      setMtprotoNeeds2fa(false);
+      toast.success("Code sent to your Telegram app.");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not send code");
+    } finally {
+      setSendingCode(false);
+    }
+  }
+
+  async function handleMtprotoSignIn() {
+    if (!mtprotoPhone.trim() || !mtprotoCode.trim()) {
+      toast.error("Enter both phone and code");
+      return;
+    }
+    setSigningIn(true);
+    try {
+      const res = await api.mtprotoSignIn({
+        apiId: mtprotoApiId.trim() || undefined,
+        apiHash: mtprotoApiHash.trim() || undefined,
+        phone: mtprotoPhone.trim(),
+        phoneCode: mtprotoCode.trim(),
+        phoneCodeHash: mtprotoCodeHash || undefined,
+      });
+      if (res.requires2fa) {
+        setMtprotoNeeds2fa(true);
+        toast.info("2FA password required. Enter it below.");
+      } else {
+        setMtprotoNeeds2fa(false);
+        toast.success("Telegram user session connected.");
+        await refreshProfile();
+      }
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not sign in");
+    } finally {
+      setSigningIn(false);
+    }
+  }
+
+  async function handleMtproto2fa() {
+    if (!mtprotoPassword.trim()) {
+      toast.error("Enter your Telegram 2FA password");
+      return;
+    }
+    setSubmitting2fa(true);
+    try {
+      await api.mtprotoSignIn2fa({ password: mtprotoPassword.trim() });
+      setMtprotoNeeds2fa(false);
+      setMtprotoPassword("");
+      toast.success("Telegram user session connected.");
+      await refreshProfile();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not verify 2FA password");
+    } finally {
+      setSubmitting2fa(false);
     }
   }
 
@@ -297,6 +384,20 @@ export function Settings() {
             </Button>
             <p className="text-xs text-muted-foreground">Returns from Telegram auto-refresh this page too.</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-amber-500/30 bg-amber-500/10">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">New: Telegram User Session required for Like</p>
+            <p className="text-xs text-muted-foreground">
+              If Like fails, complete this once. Then Like works normally.
+            </p>
+          </div>
+          <Button size="sm" asChild>
+            <a href="#user-session">Open User Session setup</a>
+          </Button>
         </CardContent>
       </Card>
 
@@ -420,6 +521,94 @@ export function Settings() {
               );
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card id="user-session" className="border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/20">
+        <CardHeader>
+          <CardTitle className="text-foreground">Telegram User Session (for Like)</CardTitle>
+          <CardDescription>
+            Required for publishing real Telegram reactions as the user. This is separate from normal Telegram login.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-md border border-border bg-secondary/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
+            <div className="mt-2">
+              <Badge variant={profile?.hasMtprotoSession ? "default" : "outline"}>
+                {profile?.hasMtprotoSession ? "Connected" : "Not connected"}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="mtproto-api-id">API ID (optional if backend env set)</Label>
+              <Input
+                id="mtproto-api-id"
+                value={mtprotoApiId}
+                onChange={(e) => setMtprotoApiId(e.target.value)}
+                placeholder="e.g. 123456"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mtproto-api-hash">API Hash (optional if backend env set)</Label>
+              <Input
+                id="mtproto-api-hash"
+                value={mtprotoApiHash}
+                onChange={(e) => setMtprotoApiHash(e.target.value)}
+                placeholder="32-char hash"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="space-y-2">
+              <Label htmlFor="mtproto-phone">Telegram phone</Label>
+              <Input
+                id="mtproto-phone"
+                value={mtprotoPhone}
+                onChange={(e) => setMtprotoPhone(e.target.value)}
+                placeholder="+94..."
+              />
+            </div>
+            <Button type="button" variant="outline" className="self-end" onClick={() => void handleSendMtprotoCode()} disabled={sendingCode}>
+              {sendingCode ? "Sending..." : "Send code"}
+            </Button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="space-y-2">
+              <Label htmlFor="mtproto-code">Code</Label>
+              <Input
+                id="mtproto-code"
+                value={mtprotoCode}
+                onChange={(e) => setMtprotoCode(e.target.value)}
+                placeholder="Telegram login code"
+              />
+            </div>
+            <Button type="button" className="self-end" onClick={() => void handleMtprotoSignIn()} disabled={signingIn}>
+              {signingIn ? "Verifying..." : "Connect session"}
+            </Button>
+          </div>
+
+          {mtprotoNeeds2fa ? (
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="space-y-2">
+                <Label htmlFor="mtproto-password">Telegram 2FA password</Label>
+                <Input
+                  id="mtproto-password"
+                  type="password"
+                  value={mtprotoPassword}
+                  onChange={(e) => setMtprotoPassword(e.target.value)}
+                  placeholder="Your Telegram cloud password"
+                />
+              </div>
+              <Button type="button" className="self-end" onClick={() => void handleMtproto2fa()} disabled={submitting2fa}>
+                {submitting2fa ? "Checking..." : "Submit 2FA"}
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

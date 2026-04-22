@@ -280,7 +280,11 @@ async function submitTaskCompletion(req, res) {
       await task.save({ transaction });
 
       const metaId =
-        actionKind === "subscribe" ? `tg-sub-${tUid}-${channelId}` : `tg-mem-${tUid}-${channelId}`;
+        actionKind === "subscribe"
+          ? `tg-sub-${tUid}-${channelId}`
+          : actionKind === "like" && parsedMessage?.messageId
+            ? `tg-like-${tUid}-${channelId}-${Number(parsedMessage.messageId)}`
+            : `tg-mem-${tUid}-${channelId}`;
 
       await db.Engagement.create(
         {

@@ -281,4 +281,25 @@ export const api = {
       description: string | null;
       isVideo?: boolean;
     }>,
+  mtprotoSendCode: (payload: { apiId?: string | number; apiHash?: string; phone: string }) =>
+    authRequest("/telegram/user-auth/send-code", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as Promise<{ ok: boolean; phoneCodeHash: string }>,
+  mtprotoSignIn: (payload: {
+    apiId?: string | number;
+    apiHash?: string;
+    phone: string;
+    phoneCode: string;
+    phoneCodeHash?: string;
+  }) =>
+    authRequest("/telegram/user-auth/sign-in", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as Promise<{ ok: boolean; requires2fa?: boolean; sessionSaved?: boolean }>,
+  mtprotoSignIn2fa: (payload: { password: string }) =>
+    authRequest("/telegram/user-auth/sign-in-2fa", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as Promise<{ ok: boolean; sessionSaved?: boolean }>,
 };

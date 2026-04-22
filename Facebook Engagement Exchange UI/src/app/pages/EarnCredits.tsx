@@ -74,13 +74,17 @@ export function EarnCredits() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
+  const [hasMtprotoSession, setHasMtprotoSession] = useState<boolean | null>(null);
 
   const loadProfileStatus = useCallback(async () => {
     try {
       const res = await api.getProfile();
-      setHasTelegram(Boolean((res.user as { telegramUserId?: string | null })?.telegramUserId));
+      const u = res.user as { telegramUserId?: string | null; hasMtprotoSession?: boolean };
+      setHasTelegram(Boolean(u?.telegramUserId));
+      setHasMtprotoSession(Boolean(u?.hasMtprotoSession));
     } catch {
       setHasTelegram(null);
+      setHasMtprotoSession(null);
     }
   }, []);
 
@@ -258,15 +262,13 @@ export function EarnCredits() {
       if (action === "like") {
         const key = `${campaignId}-like`;
         setBusy(key);
-        const campaignLink = task.campaign?.messageUrl || task.campaign?.soundcloudPostUrl || "";
-        if (campaignLink) {
-          const opened = window.open(campaignLink, "_blank", "noopener,noreferrer");
-          if (!opened) {
-            window.location.href = campaignLink;
-          }
-          toast.info("Opened Telegram post", {
-            description: "Tap like/react there. The app will mark this action now.",
+        if (hasMtprotoSession !== true) {
+          toast.error("Like requires Telegram user session auth first.", {
+            description: "Opening Settings now. Complete User Session setup and try again.",
           });
+          setBusy(null);
+          window.location.href = "/settings#user-session";
+          return;
         }
         await api.completeTask({
           taskId: task.id,
@@ -283,7 +285,12 @@ export function EarnCredits() {
         return;
       }
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Could not update engagement");
+      const msg = error instanceof Error ? error.message : "Could not update engagement";
+      toast.error(msg);
+      if (msg.includes("Like requires Telegram user session auth first")) {
+        toast.info("Open Settings to connect Telegram User Session for Like.");
+        window.location.href = "/settings#user-session";
+      }
       setBusy(null);
     }
   };
@@ -315,6 +322,15 @@ export function EarnCredits() {
             Login
           </Link>{" "}
           first. The app checks your Telegram user id and channel subscription.
+        </div>
+      ) : null}
+      {hasTelegram && hasMtprotoSession === false ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Like requires Telegram user session connection. Go to{" "}
+          <Link to="/settings" className="font-medium underline underline-offset-2">
+            Settings
+          </Link>{" "}
+          and complete Telegram User Session setup.
         </div>
       ) : null}
 
@@ -418,7 +434,13 @@ export function EarnCredits() {
                       : "rounded-full border-amber-500/25 bg-background/80 pr-3 hover:bg-amber-500/10"
                   }
                   onClick={() => void handleAction(cid, campaignTasks, et, "like")}
-                  disabled={!bundleAllowsAction(et, "like") || liked || busy !== null || hasTelegram === false}
+                  disabled={
+                    !bundleAllowsAction(et, "like") ||
+                    liked ||
+                    busy !== null ||
+                    hasTelegram === false ||
+                    hasMtprotoSession !== true
+                  }
                 >
                   <ThumbsUp className="mr-2 h-4 w-4" />
                   {liked ? "Liked" : "Like"}

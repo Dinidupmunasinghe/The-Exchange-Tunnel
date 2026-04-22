@@ -87,6 +87,21 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
             )
             return {"ok": True, "chosen": bool(chosen)}
 
+        if operation == "verify_reaction":
+            chosen = await manager.verify_reaction_chosen(
+                chat=payload["chat"],
+                msg_id=int(payload["msgId"]),
+                reaction=str(payload["reaction"]),
+            )
+            return {"ok": True, "chosen": bool(chosen)}
+
+        if operation == "clear_reaction":
+            await manager.clear_reaction(
+                chat=payload["chat"],
+                msg_id=int(payload["msgId"]),
+            )
+            return {"ok": True}
+
         if operation == "reply":
             message = await manager.post_reply(
                 chat=payload["chat"],

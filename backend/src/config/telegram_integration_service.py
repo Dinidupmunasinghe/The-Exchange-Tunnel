@@ -296,6 +296,33 @@ class TelegramClientManager:
                     return True
         return False
 
+    async def clear_reaction(
+        self,
+        chat: str | int | types.TypeInputPeer,
+        msg_id: int,
+    ) -> bool:
+        """
+        Remove current user's reaction from a message.
+        """
+        await self.connect()
+        await self._enforce_write_delay()
+        peer = await self._client.get_input_entity(chat)
+        try:
+            await self._client(
+                functions.messages.SendReactionRequest(
+                    peer=peer,
+                    msg_id=msg_id,
+                    reaction=[],
+                )
+            )
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"clear_reaction failed: {exc}") from exc
+        return True
+
     async def post_reply(
         self,
         chat: str | int | types.TypeInputPeer,
