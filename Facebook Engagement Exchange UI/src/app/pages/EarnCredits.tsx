@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus } from "lucide-react";
+import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
@@ -255,6 +255,33 @@ export function EarnCredits() {
         setBusy(null);
         return;
       }
+      if (action === "like") {
+        const key = `${campaignId}-like`;
+        setBusy(key);
+        const campaignLink = task.campaign?.messageUrl || task.campaign?.soundcloudPostUrl || "";
+        if (campaignLink) {
+          const opened = window.open(campaignLink, "_blank", "noopener,noreferrer");
+          if (!opened) {
+            window.location.href = campaignLink;
+          }
+          toast.info("Opened Telegram post", {
+            description: "Tap like/react there. The app will mark this action now.",
+          });
+        }
+        await api.completeTask({
+          taskId: task.id,
+          engagementType,
+          actionKind: "like",
+        });
+        toast.success(`Earned ${task.rewardCredits} credits`, {
+          description: `Recorded · like · task #${task.id}`,
+        });
+        const refreshed = await api.getTasks();
+        setTasks(refreshed.tasks as TaskRow[]);
+        setMyEngagements(refreshed.myEngagements ?? []);
+        setBusy(null);
+        return;
+      }
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not update engagement");
       setBusy(null);
@@ -278,7 +305,7 @@ export function EarnCredits() {
         <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-sm leading-relaxed text-muted-foreground">
           <span className="font-medium text-foreground">Log in with Telegram</span> so we can verify your subscription to
-          the target channel. Comment campaigns use one-tap trust mode completion.
+          the target channel. Post campaigns can include like and/or comment actions.
         </p>
       </div>
       {hasTelegram === false ? (
@@ -310,6 +337,7 @@ export function EarnCredits() {
           const postedAgo = relativeCampaignTime(campaign.createdAt);
           const initials = campaignInitials(title);
           const cid = campaign.id;
+          const liked = hasEngagement(myEngagements, cid, "like");
           const commented = hasEngagement(myEngagements, cid, "comment");
           const subscribed = hasCompletedTask(campaignTasks);
           const isSubscribeCampaign = et === "subscribe";
@@ -378,6 +406,26 @@ export function EarnCredits() {
                       +{reward}
                     </Badge>
                   </Button>
+                ) : null}
+                {!isSubscribeCampaign ? (
+                <Button
+                  type="button"
+                  variant={liked ? "default" : "outline"}
+                  size="sm"
+                  className={
+                    liked
+                      ? "rounded-full pr-3"
+                      : "rounded-full border-amber-500/25 bg-background/80 pr-3 hover:bg-amber-500/10"
+                  }
+                  onClick={() => void handleAction(cid, campaignTasks, et, "like")}
+                  disabled={!bundleAllowsAction(et, "like") || liked || busy !== null || hasTelegram === false}
+                >
+                  <ThumbsUp className="mr-2 h-4 w-4" />
+                  {liked ? "Liked" : "Like"}
+                  <Badge className="ml-2 rounded-full bg-amber-500/15 px-2 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15">
+                    +{reward}
+                  </Badge>
+                </Button>
                 ) : null}
                 {!isSubscribeCampaign ? (
                 <Button

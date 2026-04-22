@@ -230,7 +230,9 @@ async function submitTaskCompletion(req, res) {
           verificationDetails:
             actionKind === "subscribe"
               ? "Telegram: channel membership verified for subscribe campaign"
-              : "Telegram: bot-detected discussion comment"
+              : actionKind === "comment"
+                ? "Telegram: bot-detected discussion comment"
+                : "Telegram: like action recorded after channel check"
         },
         { transaction }
       );
@@ -342,7 +344,7 @@ async function startCommentDetection(req, res) {
     if (task.status !== "open" && !(task.status === "assigned" && task.assignedUserId === req.user.id)) {
       return res.status(400).json({ message: "Task is not open for comment detection" });
     }
-    if (task.campaign.engagementType !== "comment") {
+    if (task.campaign.engagementType !== "comment" && task.campaign.engagementType !== "like_comment") {
       return res.status(400).json({ message: "Comment detection only applies to comment campaigns" });
     }
     if (task.campaign.userId === req.user.id) {

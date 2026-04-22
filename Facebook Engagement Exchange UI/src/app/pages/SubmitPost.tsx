@@ -23,6 +23,7 @@ import {
 } from "../lib/engagement";
 
 const defaultSelection: Record<BaseEngagementKind, boolean> = {
+  like: true,
   comment: true
 };
 
@@ -372,7 +373,7 @@ export function SubmitPost() {
                       )}
                     >
                       <p className="font-medium text-foreground">Boost a post</p>
-                      <p className="text-xs text-muted-foreground">Workers comment on one t.me post.</p>
+                      <p className="text-xs text-muted-foreground">Workers like and/or comment on one t.me post.</p>
                     </button>
                   </div>
                 </div>
@@ -509,9 +510,9 @@ export function SubmitPost() {
                   <div className="space-y-3">
                     <Label>Action</Label>
                     <p className="text-xs text-muted-foreground -mt-1">
-                      Comments only. Like and Share are disabled for verification reliability.
+                      Pick the actions workers should complete on your Telegram post.
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-1">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       {BASE_ENGAGEMENT_CHOICES.map((opt) => {
                         const id = `eng-${opt.id}`;
                         const on = selection[opt.id];
@@ -618,7 +619,7 @@ export function SubmitPost() {
               <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />
               <p className="text-xs text-muted-foreground">
                 Earners must subscribe to the channel; the app confirms subscription with your bot. For post campaigns, they
-                must post a verifiable comment and submit comment proof.
+                can complete like and/or comment actions based on your selected bundle.
               </p>
             </CardContent>
           </Card>

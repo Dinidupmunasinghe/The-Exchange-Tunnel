@@ -234,7 +234,7 @@ export const api = {
     messageKey?: string;
     messageUrl?: string;
     channelUrl?: string;
-    engagementType: "subscribe" | "comment";
+    engagementType: "subscribe" | "like" | "comment" | "like_comment";
     creditsPerEngagement: number;
     maxEngagements: number;
     scheduledLaunchAt?: string | null;
@@ -251,7 +251,7 @@ export const api = {
   completeTask: (payload: {
     taskId: number;
     engagementType: string;
-    actionKind: "subscribe" | "comment";
+    actionKind: "subscribe" | "like" | "comment";
     commentVerifyToken?: string;
     proofText?: string;
   }) =>
