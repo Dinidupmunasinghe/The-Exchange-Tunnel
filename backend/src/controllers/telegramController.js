@@ -8,6 +8,7 @@ const {
 const { runBridge } = require("../services/telegramMtprotoService");
 const { encrypt, decrypt } = require("../utils/crypto");
 const env = require("../config/env");
+const mtprotoAuthStore = require("../services/mtprotoAuthStore");
 
 function parseStoredMtprotoCredentials(user) {
   if (!user.userOAuthTokenEncrypted) return null;
@@ -192,6 +193,9 @@ async function sendMtprotoCode(req, res) {
   }
   try {
     const result = await runBridge("send_code", { apiId: creds.apiId, apiHash: creds.apiHash, phone, proxy });
+    if (result?.phoneCodeHash) {
+      mtprotoAuthStore.setPhoneCodeHash(req.user.id, String(phone), String(result.phoneCodeHash));
+    }
     return res.json(result);
   } catch (error) {
     return handleMtprotoError(res, error, "Failed to send Telegram code");
@@ -205,12 +209,13 @@ async function mtprotoSignIn(req, res) {
     return res.status(400).json({ message: "phone and phoneCode are required, and MTProto credentials must be configured" });
   }
   try {
+    const fallbackPhoneCodeHash = mtprotoAuthStore.getPhoneCodeHash(req.user.id, String(phone));
     const result = await runBridge("sign_in", {
       apiId: creds.apiId,
       apiHash: creds.apiHash,
       phone,
       phoneCode,
-      phoneCodeHash,
+      phoneCodeHash: phoneCodeHash || fallbackPhoneCodeHash || undefined,
       proxy
     });
     if (result.requires2fa) {
@@ -220,6 +225,7 @@ async function mtprotoSignIn(req, res) {
       if (result.sessionString) {
         req.user.userActingTokenEncrypted = encrypt(result.sessionString);
       }
+      mtprotoAuthStore.clearPhoneCodeHash(req.user.id, String(phone));
       await req.user.save();
       return res.status(200).json({ ...result, sessionSaved: true });
     }
@@ -227,12 +233,34 @@ async function mtprotoSignIn(req, res) {
       JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: proxy || null })
     );
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
+    mtprotoAuthStore.clearPhoneCodeHash(req.user.id, String(phone));
     await req.user.save();
     return res.json({
       ...result,
       sessionSaved: true
     });
   } catch (error) {
+    const msg = String(error?.message || "").toLowerCase();
+    const isExpired = msg.includes("code has expired") || msg.includes("phone_code_expired");
+    if (isExpired) {
+      try {
+        const resent = await runBridge("send_code", {
+          apiId: creds.apiId,
+          apiHash: creds.apiHash,
+          phone,
+          proxy
+        });
+        if (resent?.phoneCodeHash) {
+          mtprotoAuthStore.setPhoneCodeHash(req.user.id, String(phone), String(resent.phoneCodeHash));
+        }
+      } catch {
+        // ignore resend failure; still return an actionable error
+      }
+      return res.status(400).json({
+        code: "PHONE_CODE_EXPIRED",
+        message: "That OTP expired. A new code has been sent to Telegram. Enter the latest code and try again."
+      });
+    }
     return handleMtprotoError(res, error, "Failed to sign in to Telegram");
   }
 }
