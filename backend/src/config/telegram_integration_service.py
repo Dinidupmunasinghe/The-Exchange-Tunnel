@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from telethon import TelegramClient, functions, types
 from telethon.errors import (
+    FloodWaitError,
     RPCError,
     SessionPasswordNeededError,
 )
@@ -47,6 +48,8 @@ class TelegramClientManager:
     """
 
     WRITE_OPERATION_DELAY_SECONDS = 5.0
+    REACTION_VERIFY_RETRIES = 6
+    REACTION_VERIFY_DELAY_SECONDS = 0.6
 
     def __init__(
         self,
@@ -143,7 +146,14 @@ class TelegramClientManager:
         """
         await self.connect()
         await self._enforce_write_delay()
-        code = await self._client.send_code_request(phone=phone)
+        try:
+            code = await self._client.send_code_request(phone=phone)
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"send_code_request failed: {exc}") from exc
         self._phone_code_hash[phone] = code.phone_code_hash
         return code.phone_code_hash
 
@@ -175,6 +185,10 @@ class TelegramClientManager:
                 code=phone_code,
                 phone_code_hash=resolved_hash,
             )
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
         except SessionPasswordNeededError as exc:
             raise TwoFactorRequiredError(
                 "Two-factor authentication is enabled; password is required."
@@ -192,6 +206,10 @@ class TelegramClientManager:
         await self._enforce_write_delay()
         try:
             result = await self._client.sign_in(password=password)
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
         except RPCError as exc:
             raise TelegramClientManagerError(f"2FA sign_in failed: {exc}") from exc
 
@@ -202,8 +220,15 @@ class TelegramClientManager:
     async def join_channel(self, channel: str | types.TypeInputChannel) -> Any:
         await self.connect()
         await self._enforce_write_delay()
-        entity = await self._client.get_input_entity(channel)
-        return await self._client(functions.channels.JoinChannelRequest(channel=entity))
+        try:
+            entity = await self._client.get_input_entity(channel)
+            return await self._client(functions.channels.JoinChannelRequest(channel=entity))
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"join_channel failed: {exc}") from exc
 
     @staticmethod
     def _normalize_reaction_input(reaction: str) -> list[types.TypeReaction]:
@@ -223,15 +248,27 @@ class TelegramClientManager:
 
         peer = await self._client.get_input_entity(chat)
         normalized_reaction = self._normalize_reaction_input(reaction)
-        await self._client(
-            functions.messages.SendReactionRequest(
-                peer=peer,
-                msg_id=msg_id,
-                reaction=normalized_reaction,
+        try:
+            await self._client(
+                functions.messages.SendReactionRequest(
+                    peer=peer,
+                    msg_id=msg_id,
+                    reaction=normalized_reaction,
+                )
             )
-        )
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"react_to_message failed: {exc}") from exc
 
-        is_chosen = await self.verify_reaction_chosen(chat=chat, msg_id=msg_id, reaction=reaction)
+        is_chosen = False
+        for _ in range(self.REACTION_VERIFY_RETRIES):
+            is_chosen = await self.verify_reaction_chosen(chat=chat, msg_id=msg_id, reaction=reaction)
+            if is_chosen:
+                break
+            await asyncio.sleep(self.REACTION_VERIFY_DELAY_SECONDS)
         if not is_chosen:
             raise ReactionVerificationError(
                 f"Reaction verification failed for msg_id={msg_id} and reaction={reaction!r}."
@@ -267,7 +304,14 @@ class TelegramClientManager:
     ) -> types.Message:
         await self.connect()
         await self._enforce_write_delay()
-        message = await self._client.send_message(entity=chat, message=text, reply_to=msg_id)
+        try:
+            message = await self._client.send_message(entity=chat, message=text, reply_to=msg_id)
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"post_reply failed: {exc}") from exc
         if not isinstance(message, types.Message):
             raise TelegramClientManagerError("Unexpected send_message response type.")
         return message

@@ -11,6 +11,7 @@ if str(PROJECT_SRC) not in sys.path:
     sys.path.insert(0, str(PROJECT_SRC))
 
 from config.telegram_integration_service import (  # noqa: E402
+    ReactionVerificationError,
     Socks5ProxyConfig,
     TelegramClientManager,
     TelegramClientManagerError,
@@ -114,8 +115,30 @@ def main() -> int:
         result = asyncio.run(_run(operation, payload))
         sys.stdout.write(json.dumps(result))
         return 0
+    except ReactionVerificationError as exc:
+        sys.stdout.write(json.dumps({"ok": False, "code": "REACTION_NOT_VERIFIED", "message": str(exc)}))
+        return 2
+    except TelegramClientManagerError as exc:
+        raw = str(exc)
+        if raw.startswith("FLOOD_WAIT:"):
+            parts = raw.split(":", 2)
+            wait_seconds = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+            message = parts[2] if len(parts) > 2 else raw
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "code": "FLOOD_WAIT",
+                        "waitSeconds": wait_seconds,
+                        "message": message
+                    }
+                )
+            )
+            return 2
+        sys.stdout.write(json.dumps({"ok": False, "code": "MTPROTO_ERROR", "message": raw}))
+        return 2
     except Exception as exc:  # noqa: BLE001
-        sys.stderr.write(str(exc))
+        sys.stdout.write(json.dumps({"ok": False, "code": "BRIDGE_ERROR", "message": str(exc)}))
         return 1
 
 

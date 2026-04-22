@@ -27,7 +27,9 @@ const env = {
     botName: process.env.TELEGRAM_BOT_NAME || "",
     webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
     mtproto: {
-      pythonBinary: process.env.TELEGRAM_MTPROTO_PYTHON || "python"
+      pythonBinary: process.env.TELEGRAM_MTPROTO_PYTHON || "python",
+      apiId: process.env.TELEGRAM_MTPROTO_API_ID || "",
+      apiHash: process.env.TELEGRAM_MTPROTO_API_HASH || ""
     }
   },
   limits: {

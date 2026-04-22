@@ -53,15 +53,15 @@ router.delete("/pages/select", clearSelectedAccount);
 router.get("/posts", getMyPosts);
 router.post(
   "/user-auth/send-code",
-  [body("apiId").notEmpty(), body("apiHash").isString().isLength({ min: 8 }), body("phone").isString()],
+  [body("apiId").optional().notEmpty(), body("apiHash").optional().isString().isLength({ min: 8 }), body("phone").isString()],
   validateRequest,
   sendMtprotoCode
 );
 router.post(
   "/user-auth/sign-in",
   [
-    body("apiId").notEmpty(),
-    body("apiHash").isString().isLength({ min: 8 }),
+    body("apiId").optional().notEmpty(),
+    body("apiHash").optional().isString().isLength({ min: 8 }),
     body("phone").isString(),
     body("phoneCode").isString(),
     body("phoneCodeHash").optional().isString()

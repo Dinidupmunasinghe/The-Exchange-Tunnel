@@ -7,6 +7,7 @@ const {
 } = require("../services/telegramService");
 const { runBridge } = require("../services/telegramMtprotoService");
 const { encrypt, decrypt } = require("../utils/crypto");
+const env = require("../config/env");
 
 function parseStoredMtprotoCredentials(user) {
   if (!user.userOAuthTokenEncrypted) return null;
@@ -28,6 +29,33 @@ function parseStoredSessionString(user) {
   } catch {
     return null;
   }
+}
+
+function resolveMtprotoCredentials(body) {
+  const reqApiId = body?.apiId;
+  const reqApiHash = body?.apiHash;
+  const apiId = reqApiId || env.telegram.mtproto.apiId;
+  const apiHash = reqApiHash || env.telegram.mtproto.apiHash;
+  if (!apiId || !apiHash) return null;
+  return { apiId, apiHash };
+}
+
+function handleMtprotoError(res, error, fallbackMessage) {
+  const code = error?.code;
+  if (code === "FLOOD_WAIT") {
+    return res.status(429).json({
+      code,
+      waitSeconds: Number(error.waitSeconds || 0),
+      message: error.message || "Too many Telegram requests. Please retry later."
+    });
+  }
+  if (code === "BRIDGE_TIMEOUT") {
+    return res.status(504).json({ code, message: "Telegram bridge timed out. Please retry." });
+  }
+  if (code === "REACTION_NOT_VERIFIED") {
+    return res.status(400).json({ code, message: error.message || fallbackMessage });
+  }
+  return res.status(400).json({ code: code || "MTPROTO_ERROR", message: error.message || fallbackMessage });
 }
 
 async function connectChannelToUser(req, res) {
@@ -157,41 +185,47 @@ async function clearSelectedAccount(req, res) {
 }
 
 async function sendMtprotoCode(req, res) {
-  const { apiId, apiHash, phone, proxy } = req.body || {};
-  if (!apiId || !apiHash || !phone) {
-    return res.status(400).json({ message: "apiId, apiHash, and phone are required" });
+  const { phone, proxy } = req.body || {};
+  const creds = resolveMtprotoCredentials(req.body || {});
+  if (!creds || !phone) {
+    return res.status(400).json({ message: "phone is required, and MTProto credentials must be configured" });
   }
   try {
-    const result = await runBridge("send_code", { apiId, apiHash, phone, proxy });
+    const result = await runBridge("send_code", { apiId: creds.apiId, apiHash: creds.apiHash, phone, proxy });
     return res.json(result);
   } catch (error) {
-    return res.status(400).json({ message: error.message || "Failed to send Telegram code" });
+    return handleMtprotoError(res, error, "Failed to send Telegram code");
   }
 }
 
 async function mtprotoSignIn(req, res) {
-  const { apiId, apiHash, phone, phoneCode, phoneCodeHash, proxy } = req.body || {};
-  if (!apiId || !apiHash || !phone || !phoneCode) {
-    return res.status(400).json({ message: "apiId, apiHash, phone, and phoneCode are required" });
+  const { phone, phoneCode, phoneCodeHash, proxy } = req.body || {};
+  const creds = resolveMtprotoCredentials(req.body || {});
+  if (!creds || !phone || !phoneCode) {
+    return res.status(400).json({ message: "phone and phoneCode are required, and MTProto credentials must be configured" });
   }
   try {
     const result = await runBridge("sign_in", {
-      apiId,
-      apiHash,
+      apiId: creds.apiId,
+      apiHash: creds.apiHash,
       phone,
       phoneCode,
       phoneCodeHash,
       proxy
     });
     if (result.requires2fa) {
-      req.user.userOAuthTokenEncrypted = encrypt(JSON.stringify({ apiId, apiHash, proxy: proxy || null }));
+      req.user.userOAuthTokenEncrypted = encrypt(
+        JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: proxy || null })
+      );
       if (result.sessionString) {
         req.user.userActingTokenEncrypted = encrypt(result.sessionString);
       }
       await req.user.save();
       return res.status(200).json({ ...result, sessionSaved: true });
     }
-    req.user.userOAuthTokenEncrypted = encrypt(JSON.stringify({ apiId, apiHash, proxy: proxy || null }));
+    req.user.userOAuthTokenEncrypted = encrypt(
+      JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: proxy || null })
+    );
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
     await req.user.save();
     return res.json({
@@ -199,7 +233,7 @@ async function mtprotoSignIn(req, res) {
       sessionSaved: true
     });
   } catch (error) {
-    return res.status(400).json({ message: error.message || "Failed to sign in to Telegram" });
+    return handleMtprotoError(res, error, "Failed to sign in to Telegram");
   }
 }
 
@@ -230,7 +264,7 @@ async function mtprotoSignInPassword(req, res) {
       sessionSaved: true
     });
   } catch (error) {
-    return res.status(400).json({ message: error.message || "2FA sign-in failed" });
+    return handleMtprotoError(res, error, "2FA sign-in failed");
   }
 }
 
@@ -254,7 +288,7 @@ async function mtprotoJoinChannel(req, res) {
     });
     return res.json(result);
   } catch (error) {
-    return res.status(400).json({ message: error.message || "Failed to join channel" });
+    return handleMtprotoError(res, error, "Failed to join channel");
   }
 }
 
@@ -280,7 +314,7 @@ async function mtprotoReact(req, res) {
     });
     return res.json(result);
   } catch (error) {
-    return res.status(400).json({ message: error.message || "Failed to react to message" });
+    return handleMtprotoError(res, error, "Failed to react to message");
   }
 }
 
@@ -306,7 +340,7 @@ async function mtprotoReply(req, res) {
     });
     return res.json(result);
   } catch (error) {
-    return res.status(400).json({ message: error.message || "Failed to post reply" });
+    return handleMtprotoError(res, error, "Failed to post reply");
   }
 }
 
