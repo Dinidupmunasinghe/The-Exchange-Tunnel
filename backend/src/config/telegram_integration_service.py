@@ -426,11 +426,22 @@ class TelegramClientManager:
         mid = getattr(message, "id", None)
         return bool(mid and int(mid) == int(msg_id))
 
-    async def _resolve_input_entity(self, chat: str | int | types.TypeInputPeer) -> types.TypeInputPeer:
+    async def _resolve_input_entity(self, chat: str | int | dict[str, Any] | types.TypeInputPeer) -> types.TypeInputPeer:
         """
         Resolve chat to input peer with dialog-scan fallback for numeric ids.
         Helps with cases where raw -100... ids are not yet cached.
         """
+        if isinstance(chat, dict):
+            chat_id = chat.get("chatId")
+            access_hash = chat.get("accessHash")
+            if chat_id is not None and access_hash is not None:
+                chat_id_num = int(str(chat_id))
+                access_hash_num = int(str(access_hash))
+                channel_id = abs(chat_id_num)
+                if str(chat_id_num).startswith("-100"):
+                    channel_id = int(str(chat_id_num)[4:])
+                return types.InputPeerChannel(channel_id=channel_id, access_hash=access_hash_num)
+
         try:
             return await self._client.get_input_entity(chat)
         except Exception:

@@ -115,13 +115,19 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
             )
             peer = getattr(message, "peer_id", None)
             chat_id = None
+            chat_access_hash = None
             if isinstance(peer, telethon_types.PeerChannel):
                 chat_id = f"-100{peer.channel_id}"
+                try:
+                    entity = await manager._client.get_entity(peer)  # noqa: SLF001
+                    chat_access_hash = str(getattr(entity, "access_hash", "") or "")
+                except Exception:
+                    chat_access_hash = None
             elif isinstance(peer, telethon_types.PeerChat):
                 chat_id = f"-{peer.chat_id}"
             elif isinstance(peer, telethon_types.PeerUser):
                 chat_id = str(peer.user_id)
-            return {"ok": True, "messageId": message.id, "chatId": chat_id}
+            return {"ok": True, "messageId": message.id, "chatId": chat_id, "chatAccessHash": chat_access_hash}
 
         if operation == "delete_message":
             deleted = await manager.delete_message(

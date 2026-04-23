@@ -78,6 +78,14 @@ function parseLikeMeta(metaEngagementId) {
 
 function parseCommentMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
+  const v3 = /^tg-com-\d+--(.+)--(\d+)--(.+)$/.exec(raw);
+  if (v3) {
+    return {
+      commentChatId: decodeURIComponent(v3[1]),
+      commentMessageId: Number(v3[2]),
+      commentChatAccessHash: decodeURIComponent(v3[3] || "")
+    };
+  }
   const v2 = /^tg-com-\d+--(.+)--(\d+)$/.exec(raw);
   if (v2) {
     return { commentChatId: decodeURIComponent(v2[1]), commentMessageId: Number(v2[2]) };
@@ -263,6 +271,7 @@ async function submitTaskCompletion(req, res) {
         let replied = false;
         let replyMessageId = null;
         let replyChatId = null;
+        let replyChatAccessHash = null;
         let lastEntityError = null;
         for (const chatRef of chatCandidates) {
           try {
@@ -277,6 +286,7 @@ async function submitTaskCompletion(req, res) {
             });
             replyMessageId = Number(out?.messageId || 0) || null;
             replyChatId = out?.chatId ? String(out.chatId) : null;
+            replyChatAccessHash = out?.chatAccessHash ? String(out.chatAccessHash) : null;
             replied = true;
             break;
           } catch (entityErr) {
@@ -296,6 +306,7 @@ async function submitTaskCompletion(req, res) {
         }
         req._commentMessageId = replyMessageId;
         req._commentChatId = replyChatId || String(channelId);
+        req._commentChatAccessHash = replyChatAccessHash || "";
         req._commentText = commentText;
       }
       if (actionKind === "like") {
@@ -387,7 +398,7 @@ async function submitTaskCompletion(req, res) {
             : actionKind === "comment" && req._commentMessageId
               ? `tg-com-${tUid}--${encodeURIComponent(String(req._commentChatId || channelId))}--${Number(
                 req._commentMessageId
-              )}`
+              )}--${encodeURIComponent(String(req._commentChatAccessHash || ""))}`
             : `tg-mem-${tUid}-${channelId}`;
 
       await db.Engagement.create(
@@ -658,9 +669,15 @@ async function revertEngagement(req, res) {
           throw error;
         }
         const chatCandidates = [String(parsed.commentChatId)];
+        const chatPayloads = [
+          parsed.commentChatAccessHash
+            ? { chatId: String(parsed.commentChatId), accessHash: String(parsed.commentChatAccessHash) }
+            : null,
+          ...chatCandidates
+        ].filter(Boolean);
         let deleted = false;
         let lastErr = null;
-        for (const chatRef of chatCandidates) {
+        for (const chatRef of chatPayloads) {
           try {
             await runBridge("delete_message", {
               apiId: creds.apiId,

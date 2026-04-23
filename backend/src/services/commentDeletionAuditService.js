@@ -8,6 +8,14 @@ const tg = require("./telegramService");
 
 function parseCommentMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
+  const v3 = /^tg-com-\d+--(.+)--(\d+)--(.+)$/.exec(raw);
+  if (v3) {
+    return {
+      commentChatId: decodeURIComponent(v3[1]),
+      commentMessageId: Number(v3[2]),
+      commentChatAccessHash: decodeURIComponent(v3[3] || "")
+    };
+  }
   const v2 = /^tg-com-\d+--(.+)--(\d+)$/.exec(raw);
   if (v2) {
     return { commentChatId: decodeURIComponent(v2[1]), commentMessageId: Number(v2[2]) };
@@ -77,7 +85,12 @@ async function auditCommentDeletions() {
 
     let exists = true;
     try {
-      const chatCandidates = [String(parsed.commentChatId)];
+      const chatCandidates = [
+        parsed.commentChatAccessHash
+          ? { chatId: String(parsed.commentChatId), accessHash: String(parsed.commentChatAccessHash) }
+          : null,
+        String(parsed.commentChatId)
+      ].filter(Boolean);
       let lastErr = null;
       for (const chatRef of chatCandidates) {
         try {
