@@ -21,7 +21,10 @@ async function getProfile(req, res) {
   const data = user.toJSON();
   const hasMtprotoSession = Boolean(data.userActingTokenEncrypted);
   delete data.userActingTokenEncrypted;
-  return res.json({ user: { ...data, hasMtprotoSession } });
+  const pendingRefundDebt = await db.PendingRefund.sum("amountRemaining", {
+    where: { workerUserId: req.user.id, status: "pending" }
+  });
+  return res.json({ user: { ...data, hasMtprotoSession, pendingRefundDebt: Number(pendingRefundDebt || 0) } });
 }
 
 async function getDashboard(req, res) {

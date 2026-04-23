@@ -747,22 +747,26 @@ async function revertEngagement(req, res) {
         }
       }
       const amount = task.rewardCredits;
-      await reverseEarnCredits({
+      const reversal = await reverseEarnCredits({
         userId: req.user.id,
         amount,
         reason: `Reverted ${actionKind} on campaign #${campaignId} (task #${task.id})`,
         referenceType: "task",
         referenceId: task.id,
+        beneficiaryUserId: campaign.userId,
         transaction
       });
-      await refundCredits({
-        userId: campaign.userId,
-        amount,
-        reason: `Refund: ${actionKind} reverted on campaign #${campaignId}`,
-        referenceType: "campaign",
-        referenceId: campaign.id,
-        transaction
-      });
+      const collected = Number(reversal?.collected || 0);
+      if (collected > 0) {
+        await refundCredits({
+          userId: campaign.userId,
+          amount: collected,
+          reason: `Refund: ${actionKind} reverted on campaign #${campaignId}`,
+          referenceType: "campaign",
+          referenceId: campaign.id,
+          transaction
+        });
+      }
       await engagement.destroy({ transaction });
       if (campaign.messageKey && actionKind !== "subscribe") {
         await db.UserPostAction.destroy({

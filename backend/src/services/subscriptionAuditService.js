@@ -87,22 +87,26 @@ async function auditSubscribeEngagements() {
         if (!fresh.campaign || fresh.campaign.status === "paused") return;
 
         const amount = fresh.task.rewardCredits;
-        await reverseEarnCredits({
+        const reversal = await reverseEarnCredits({
           userId: fresh.userId,
           amount,
           reason: `Auto-reversal: unsubscribed from channel on campaign #${fresh.campaignId} (task #${fresh.taskId})`,
           referenceType: "task",
           referenceId: fresh.taskId,
+          beneficiaryUserId: fresh.campaign.userId,
           transaction
         });
-        await refundCredits({
-          userId: fresh.campaign.userId,
-          amount,
-          reason: `Auto-refund: worker unsubscribed from campaign #${fresh.campaignId}`,
-          referenceType: "campaign",
-          referenceId: fresh.campaignId,
-          transaction
-        });
+        const collected = Number(reversal?.collected || 0);
+        if (collected > 0) {
+          await refundCredits({
+            userId: fresh.campaign.userId,
+            amount: collected,
+            reason: `Auto-refund: worker unsubscribed from campaign #${fresh.campaignId}`,
+            referenceType: "campaign",
+            referenceId: fresh.campaignId,
+            transaction
+          });
+        }
 
         fresh.task.status = "open";
         fresh.task.assignedUserId = null;
