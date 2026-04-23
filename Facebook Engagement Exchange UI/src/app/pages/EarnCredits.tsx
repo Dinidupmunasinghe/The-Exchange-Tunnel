@@ -99,6 +99,18 @@ function telegramProfileLink(owner: { name?: string | null; telegramUserId?: str
   return `tg://user?id=${encodeURIComponent(tgId)}`;
 }
 
+function ownerDisplayHandle(ownerName: string): string {
+  const raw = String(ownerName || "").trim();
+  if (!raw) return "@unknown";
+  if (raw.startsWith("@")) return raw;
+  const handle = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9_ ]/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
+  return `@${handle || "unknown"}`;
+}
+
 function getCommentText(rows: MyEngagementRow[], campaignId: number): string {
   const row = rows.find((e) => e.campaignId === campaignId && e.actionKind === "comment");
   const details = String(row?.verificationDetails || "");
@@ -423,6 +435,7 @@ export function EarnCredits() {
           const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
           const avatarUrl = telegramUserpicUrlFromUsername(avatarUsername);
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
+          const ownerDisplay = ownerDisplayHandle(ownerName);
           const ownerLink = telegramProfileLink(campaign.owner);
 
           return (
@@ -450,10 +463,10 @@ export function EarnCredits() {
                             rel="noreferrer"
                             className="underline underline-offset-2 hover:text-foreground"
                           >
-                            "{ownerName}"
+                            "{ownerDisplay}"
                           </a>
                         ) : (
-                          <span>"{ownerName}"</span>
+                          <span>"{ownerDisplay}"</span>
                         )}
                       </p>
                       <p className="mt-0.5 text-sm text-muted-foreground">{postedAgo}</p>
