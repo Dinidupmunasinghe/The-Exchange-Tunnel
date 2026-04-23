@@ -283,9 +283,13 @@ class TelegramClientManager:
         chat: str | int | types.TypeInputPeer,
         msg_id: int,
         reaction: str,
-    ) -> bool:
+    ) -> bool | None:
         """
         Fetch message state and verify that the given reaction is marked as chosen.
+        Returns:
+          - True: chosen by current user
+          - False: deterministically not chosen
+          - None: cannot determine reliably from this Telegram response shape
         """
         await self.connect()
         message = await self._client.get_messages(chat, ids=msg_id)
@@ -295,20 +299,33 @@ class TelegramClientManager:
         # Telethon objects differ across versions:
         # - some expose reaction_result.chosen
         # - some only provide aggregate counts in results and user picks in recent_reactions
+        had_chosen_field = False
+        reaction_present_in_counts = False
         for reaction_result in message.reactions.results:
             reaction_obj = reaction_result.reaction
             if isinstance(reaction_obj, types.ReactionEmoji):
+                if reaction_obj.emoticon == reaction:
+                    reaction_present_in_counts = True
+                if hasattr(reaction_result, "chosen"):
+                    had_chosen_field = True
                 chosen_attr = bool(getattr(reaction_result, "chosen", False))
                 if reaction_obj.emoticon == reaction and chosen_attr:
                     return True
 
         recent = getattr(message.reactions, "recent_reactions", None) or []
+        had_recent_chosen_field = False
         for recent_item in recent:
             reaction_obj = getattr(recent_item, "reaction", None)
+            if hasattr(recent_item, "chosen"):
+                had_recent_chosen_field = True
             chosen_attr = bool(getattr(recent_item, "chosen", False))
             if isinstance(reaction_obj, types.ReactionEmoji):
                 if reaction_obj.emoticon == reaction and chosen_attr:
                     return True
+        if had_chosen_field or had_recent_chosen_field:
+            return False
+        if reaction_present_in_counts:
+            return None
         return False
 
     async def clear_reaction(

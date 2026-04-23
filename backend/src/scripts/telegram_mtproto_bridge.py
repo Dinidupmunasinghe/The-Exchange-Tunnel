@@ -93,7 +93,11 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
                 msg_id=int(payload["msgId"]),
                 reaction=str(payload["reaction"]),
             )
-            return {"ok": True, "chosen": bool(chosen)}
+            return {
+                "ok": True,
+                "chosen": bool(chosen) if isinstance(chosen, bool) else False,
+                "known": isinstance(chosen, bool),
+            }
 
         if operation == "clear_reaction":
             await manager.clear_reaction(

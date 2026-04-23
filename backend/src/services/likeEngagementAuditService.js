@@ -93,6 +93,7 @@ async function auditLikeEngagements() {
     if (!creds || !sessionString) continue;
 
     let stillChosen = false;
+    let verificationKnown = false;
     try {
       const msgUrl = e.campaign?.messageUrl || e.campaign?.soundcloudPostUrl || "";
       const parsedMessage = tg.parseTmeMessageUrl(String(msgUrl || ""));
@@ -114,6 +115,7 @@ async function auditLikeEngagements() {
             reaction: parsed.reaction || "👍"
           });
           stillChosen = Boolean(out?.chosen);
+          verificationKnown = Boolean(out?.known);
           lastErr = null;
           break;
         } catch (err) {
@@ -123,6 +125,10 @@ async function auditLikeEngagements() {
       if (lastErr) throw lastErr;
     } catch {
       // Skip this row when Telegram/bridge errors occur.
+      continue;
+    }
+    if (!verificationKnown) {
+      // Telegram response shape couldn't reliably tell if current user removed reaction.
       continue;
     }
     if (stillChosen) continue;
