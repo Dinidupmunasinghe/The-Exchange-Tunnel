@@ -17,6 +17,7 @@ from config.telegram_integration_service import (  # noqa: E402
     TelegramClientManagerError,
     TwoFactorRequiredError,
 )
+from telethon import types as telethon_types  # noqa: E402
 
 
 def _proxy_from_payload(payload: dict[str, Any]) -> Socks5ProxyConfig | None:
@@ -112,7 +113,15 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
                 msg_id=int(payload["msgId"]),
                 text=str(payload["text"]),
             )
-            return {"ok": True, "messageId": message.id}
+            peer = getattr(message, "peer_id", None)
+            chat_id = None
+            if isinstance(peer, telethon_types.PeerChannel):
+                chat_id = f"-100{peer.channel_id}"
+            elif isinstance(peer, telethon_types.PeerChat):
+                chat_id = f"-{peer.chat_id}"
+            elif isinstance(peer, telethon_types.PeerUser):
+                chat_id = str(peer.user_id)
+            return {"ok": True, "messageId": message.id, "chatId": chat_id}
 
         if operation == "delete_message":
             deleted = await manager.delete_message(

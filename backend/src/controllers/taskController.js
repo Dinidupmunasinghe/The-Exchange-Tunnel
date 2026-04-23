@@ -78,9 +78,9 @@ function parseLikeMeta(metaEngagementId) {
 
 function parseCommentMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
-  const m = /^tg-com-\d+-(-?\d+)-(\d+)-(\d+)$/.exec(raw);
+  const m = /^tg-com-\d+--(.+)--(\d+)$/.exec(raw);
   if (!m) return null;
-  return { channelId: String(m[1]), postMessageId: Number(m[2]), commentMessageId: Number(m[3]) };
+  return { commentChatId: decodeURIComponent(m[1]), commentMessageId: Number(m[2]) };
 }
 
 async function submitTaskCompletion(req, res) {
@@ -256,6 +256,7 @@ async function submitTaskCompletion(req, res) {
         chatCandidates.push(String(channelId));
         let replied = false;
         let replyMessageId = null;
+        let replyChatId = null;
         let lastEntityError = null;
         for (const chatRef of chatCandidates) {
           try {
@@ -269,6 +270,7 @@ async function submitTaskCompletion(req, res) {
               text: commentText
             });
             replyMessageId = Number(out?.messageId || 0) || null;
+            replyChatId = out?.chatId ? String(out.chatId) : null;
             replied = true;
             break;
           } catch (entityErr) {
@@ -287,6 +289,7 @@ async function submitTaskCompletion(req, res) {
           throw error;
         }
         req._commentMessageId = replyMessageId;
+        req._commentChatId = replyChatId || String(channelId);
         req._commentText = commentText;
       }
       if (actionKind === "like") {
@@ -375,8 +378,10 @@ async function submitTaskCompletion(req, res) {
             ? `tg-like-${tUid}-${channelId}-${Number(parsedMessage.messageId)}--${encodeURIComponent(
               typeof reaction === "string" && reaction.trim() ? reaction.trim() : "👍"
             )}`
-            : actionKind === "comment" && parsedMessage?.messageId && req._commentMessageId
-              ? `tg-com-${tUid}-${channelId}-${Number(parsedMessage.messageId)}-${Number(req._commentMessageId)}`
+            : actionKind === "comment" && req._commentMessageId
+              ? `tg-com-${tUid}--${encodeURIComponent(String(req._commentChatId || channelId))}--${Number(
+                req._commentMessageId
+              )}`
             : `tg-mem-${tUid}-${channelId}`;
 
       await db.Engagement.create(
@@ -646,13 +651,7 @@ async function revertEngagement(req, res) {
           error.status = 400;
           throw error;
         }
-        const msgUrl = campaign.messageUrl || campaign.soundcloudPostUrl || "";
-        const parsedMessage = tg.parseTmeMessageUrl(String(msgUrl || ""));
-        const chatCandidates = [];
-        if (parsedMessage?.kind === "public" && parsedMessage?.username) {
-          chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
-        }
-        chatCandidates.push(String(parsed.channelId));
+        const chatCandidates = [String(parsed.commentChatId)];
         let deleted = false;
         let lastErr = null;
         for (const chatRef of chatCandidates) {

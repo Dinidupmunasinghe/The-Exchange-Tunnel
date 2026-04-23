@@ -8,9 +8,9 @@ const tg = require("./telegramService");
 
 function parseCommentMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
-  const m = /^tg-com-\d+-(-?\d+)-(\d+)-(\d+)$/.exec(raw);
+  const m = /^tg-com-\d+--(.+)--(\d+)$/.exec(raw);
   if (!m) return null;
-  return { channelId: String(m[1]), postMessageId: Number(m[2]), commentMessageId: Number(m[3]) };
+  return { commentChatId: decodeURIComponent(m[1]), commentMessageId: Number(m[2]) };
 }
 
 function parseStoredMtprotoCredentials(user) {
@@ -71,13 +71,7 @@ async function auditCommentDeletions() {
 
     let exists = true;
     try {
-      const msgUrl = e.campaign?.messageUrl || e.campaign?.soundcloudPostUrl || "";
-      const parsedMessage = tg.parseTmeMessageUrl(String(msgUrl || ""));
-      const chatCandidates = [];
-      if (parsedMessage?.kind === "public" && parsedMessage?.username) {
-        chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
-      }
-      chatCandidates.push(String(parsed.channelId));
+      const chatCandidates = [String(parsed.commentChatId)];
       let lastErr = null;
       for (const chatRef of chatCandidates) {
         try {
