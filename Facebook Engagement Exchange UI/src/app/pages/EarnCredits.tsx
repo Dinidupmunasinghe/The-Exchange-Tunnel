@@ -6,7 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
@@ -63,6 +63,25 @@ function relativeCampaignTime(iso: string | undefined): string {
 
 function hasEngagement(rows: MyEngagementRow[], campaignId: number, kind: BaseEngagementKind): boolean {
   return rows.some((e) => e.campaignId === campaignId && e.actionKind === kind);
+}
+
+function extractTelegramUsernameFromUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+    if (host !== "t.me") return null;
+    const parts = (u.pathname || "/").split("/").filter(Boolean);
+    if (!parts[0] || parts[0] === "c") return null;
+    return parts[0].replace(/^@/, "");
+  } catch {
+    return null;
+  }
+}
+
+function telegramUserpicUrlFromUsername(username: string | null): string | null {
+  if (!username) return null;
+  return `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg`;
 }
 
 function getCommentText(rows: MyEngagementRow[], campaignId: number): string {
@@ -386,6 +405,8 @@ export function EarnCredits() {
             hasCompletedTask(campaignTasks) ||
             myEngagements.some((e) => e.campaignId === cid && e.actionKind === "subscribe");
           const isSubscribeCampaign = et === "subscribe";
+          const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
+          const avatarUrl = telegramUserpicUrlFromUsername(avatarUsername);
 
           return (
             <Card
@@ -394,6 +415,7 @@ export function EarnCredits() {
             >
               <div className="flex gap-3 p-4 pb-3">
                 <Avatar className="h-11 w-11 shrink-0 border border-border">
+                  {avatarUrl ? <AvatarImage src={avatarUrl} alt={title} /> : null}
                   <AvatarFallback className="bg-secondary text-sm font-semibold text-foreground">
                     {initials}
                   </AvatarFallback>
