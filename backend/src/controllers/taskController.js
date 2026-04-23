@@ -149,11 +149,12 @@ async function submitTaskCompletion(req, res) {
       }
       const storedActionKind = actionKind === "subscribe" ? null : actionKind;
       if (engagementType === "subscribe") {
-        const dup = await db.Engagement.findOne({
-          where: { userId: req.user.id, campaignId: task.campaignId, engagementType: "subscribe" },
+        const channelKey = String(task.campaign?.messageKey || `sub_${String(task.campaignId)}`);
+        const prior = await db.UserSubscriptionMemory.findOne({
+          where: { userId: req.user.id, channelKey },
           transaction
         });
-        if (dup) {
+        if (prior) {
           const error = new Error("You already completed this action for this post");
           error.status = 400;
           throw error;
@@ -222,6 +223,24 @@ async function submitTaskCompletion(req, res) {
       }
       const channelId = resolved.chatId;
       if (engagementType === "subscribe") {
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error(
+            "Subscribe requires Telegram user session auth first. Open Settings and complete Telegram user auth."
+          );
+          error.status = 400;
+          throw error;
+        }
+        const username = parseTmeChannelUsername(String(msgUrl));
+        const joinRef = username ? `@${username}` : String(channelId);
+        await runBridge("join_channel", {
+          apiId: creds.apiId,
+          apiHash: creds.apiHash,
+          proxy: creds.proxy || null,
+          sessionString,
+          channel: joinRef
+        });
         let memberCheck = await tg.getUserChatMemberStatus(String(channelId), tUid);
         // Telegram can lag briefly right after subscribe; retry a few times for subscribe campaigns.
         if (!memberCheck.ok) {
@@ -442,6 +461,18 @@ async function submitTaskCompletion(req, res) {
           { transaction }
         );
       }
+      if (engagementType === "subscribe") {
+        const channelKey = String(task.campaign?.messageKey || `sub_${String(channelId)}`);
+        await db.UserSubscriptionMemory.upsert(
+          {
+            userId: req.user.id,
+            channelKey,
+            lastEngagementId: createdEngagement.id,
+            details: createdEngagement.verificationDetails || null
+          },
+          { transaction }
+        );
+      }
 
       task.status = "completed";
       task.completedAt = new Date();
@@ -523,6 +554,18 @@ async function getAvailableTasks(req, res) {
     return o;
   });
   const campaignIds = [...new Set(tasks.map((t) => t.campaignId))];
+  const subscribeCampaigns = tasks
+    .map((t) => t.campaign)
+    .filter((c) => c && c.engagementType === "subscribe" && c.messageKey)
+    .map((c) => ({ id: c.id, channelKey: c.messageKey }));
+  const uniqueSubscribeKeys = [...new Set(subscribeCampaigns.map((c) => String(c.channelKey)))];
+  const rememberedSubs =
+    uniqueSubscribeKeys.length === 0
+      ? []
+      : await db.UserSubscriptionMemory.findAll({
+          where: { userId: req.user.id, channelKey: { [Op.in]: uniqueSubscribeKeys } },
+          attributes: ["id", "channelKey", "details"]
+        });
   const campaignList = tasks
     .map((t) => t.campaign)
     .filter(Boolean)
@@ -551,6 +594,25 @@ async function getAvailableTasks(req, res) {
         campaignId: cid,
         taskId: 0,
         actionKind: String(row.actionKind),
+        verificationDetails: row.details || null,
+        metaEngagementId: null
+      });
+    }
+  }
+  const subscribeCampaignIdsByKey = new Map();
+  for (const c of subscribeCampaigns) {
+    const key = String(c.channelKey);
+    if (!subscribeCampaignIdsByKey.has(key)) subscribeCampaignIdsByKey.set(key, []);
+    subscribeCampaignIdsByKey.get(key).push(Number(c.id));
+  }
+  for (const row of rememberedSubs) {
+    const ids = subscribeCampaignIdsByKey.get(String(row.channelKey)) || [];
+    for (const cid of ids) {
+      myEngagements.push({
+        id: Number(row.id),
+        campaignId: cid,
+        taskId: 0,
+        actionKind: "subscribe",
         verificationDetails: row.details || null,
         metaEngagementId: null
       });

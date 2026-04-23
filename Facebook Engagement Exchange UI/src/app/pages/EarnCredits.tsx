@@ -180,45 +180,25 @@ export function EarnCredits() {
         }
         const key = `${campaignId}-subscribe`;
         setBusy(key);
-        const campaignLink =
-          subscribeTask.campaign?.messageUrl || subscribeTask.campaign?.soundcloudPostUrl || undefined;
-        if (campaignLink) {
-          window.open(campaignLink, "_blank", "noopener,noreferrer");
-          toast.info("Opened Telegram channel", {
-            description: "Subscribe there, come back, and we will auto-check for ~20 seconds.",
+        if (hasMtprotoSession !== true) {
+          toast.error("Subscribe requires Telegram user session auth first.", {
+            description: "Opening Settings now. Complete User Session setup and try again.",
           });
+          setBusy(null);
+          window.location.href = "/settings#user-session";
+          return;
         }
-
-        const maxAttempts = 8;
-        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-          try {
-            await api.completeTask({
-              taskId: subscribeTask.id,
-              engagementType,
-              actionKind: "subscribe",
-            });
-            toast.success(`Earned ${subscribeTask.rewardCredits} credits`, {
-              description: `Recorded · subscribe · task #${subscribeTask.id}`,
-            });
-            const refreshed = await api.getTasks();
-            setTasks(refreshed.tasks as TaskRow[]);
-            setMyEngagements(refreshed.myEngagements ?? []);
-            setBusy(null);
-            return;
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : "Could not verify yet";
-            const isTransient =
-              msg.includes("Could not confirm your subscription") ||
-              msg.includes("user not found") ||
-              msg.includes("not subscribed");
-            if (!isTransient) throw err;
-          }
-          await sleep(2500);
-        }
-
-        toast.error("Subscription not detected yet", {
-          description: "After subscribing in Telegram, tap Subscribe again to retry verification.",
+        await api.completeTask({
+          taskId: subscribeTask.id,
+          engagementType,
+          actionKind: "subscribe",
         });
+        toast.success(`Earned ${subscribeTask.rewardCredits} credits`, {
+          description: `Recorded · subscribe · task #${subscribeTask.id}`,
+        });
+        const refreshed = await api.getTasks();
+        setTasks(refreshed.tasks as TaskRow[]);
+        setMyEngagements(refreshed.myEngagements ?? []);
         setBusy(null);
         return;
       }
@@ -388,7 +368,9 @@ export function EarnCredits() {
           const cid = campaign.id;
           const liked = hasEngagement(myEngagements, cid, "like");
           const commented = hasEngagement(myEngagements, cid, "comment");
-          const subscribed = hasCompletedTask(campaignTasks);
+          const subscribed =
+            hasCompletedTask(campaignTasks) ||
+            myEngagements.some((e) => e.campaignId === cid && e.actionKind === "subscribe");
           const isSubscribeCampaign = et === "subscribe";
 
           return (
@@ -449,8 +431,12 @@ export function EarnCredits() {
                     onClick={() => void handleAction(cid, campaignTasks, et, "subscribe")}
                     disabled={subscribed || busy !== null || hasTelegram === false}
                   >
-                    <BellPlus className="mr-2 h-4 w-4" />
-                    {subscribed ? "Subscribed" : busy === `${cid}-subscribe` ? "Checking..." : "Subscribe"}
+                    {busy === `${cid}-subscribe` ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <BellPlus className="mr-2 h-4 w-4" />
+                    )}
+                    {subscribed ? "Subscribed" : busy === `${cid}-subscribe` ? "Subscribing..." : "Subscribe"}
                     <Badge className="ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15">
                       +{reward}
                     </Badge>

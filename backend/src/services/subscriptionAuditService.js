@@ -115,6 +115,15 @@ async function auditSubscribeEngagements() {
         await fresh.task.save({ transaction });
 
         await fresh.destroy({ transaction });
+        if (fresh.campaign?.messageKey) {
+          await db.UserSubscriptionMemory.destroy({
+            where: {
+              userId: fresh.userId,
+              channelKey: String(fresh.campaign.messageKey)
+            },
+            transaction
+          });
+        }
 
         if (fresh.campaign.status === "completed") {
           fresh.campaign.status = "active";
