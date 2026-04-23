@@ -30,6 +30,11 @@ type TaskRow = {
     messageUrl?: string;
     soundcloudPostUrl: string;
     createdAt?: string;
+    owner?: {
+      id?: number;
+      name?: string | null;
+      telegramUserId?: string | null;
+    };
   };
   campaignId?: number;
 };
@@ -82,6 +87,16 @@ function extractTelegramUsernameFromUrl(url: string | undefined): string | null 
 function telegramUserpicUrlFromUsername(username: string | null): string | null {
   if (!username) return null;
   return `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg`;
+}
+
+function telegramProfileLink(owner: { name?: string | null; telegramUserId?: string | null } | undefined): string | null {
+  if (!owner) return null;
+  const name = String(owner.name || "").trim();
+  const maybeAt = name.startsWith("@") ? name.slice(1) : "";
+  if (maybeAt) return `https://t.me/${encodeURIComponent(maybeAt)}`;
+  const tgId = String(owner.telegramUserId || "").trim();
+  if (!tgId) return null;
+  return `tg://user?id=${encodeURIComponent(tgId)}`;
 }
 
 function getCommentText(rows: MyEngagementRow[], campaignId: number): string {
@@ -407,6 +422,8 @@ export function EarnCredits() {
           const isSubscribeCampaign = et === "subscribe";
           const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
           const avatarUrl = telegramUserpicUrlFromUsername(avatarUsername);
+          const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
+          const ownerLink = telegramProfileLink(campaign.owner);
 
           return (
             <Card
@@ -424,6 +441,21 @@ export function EarnCredits() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">{title}</h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        By{" "}
+                        {ownerLink ? (
+                          <a
+                            href={ownerLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline underline-offset-2 hover:text-foreground"
+                          >
+                            "{ownerName}"
+                          </a>
+                        ) : (
+                          <span>"{ownerName}"</span>
+                        )}
+                      </p>
                       <p className="mt-0.5 text-sm text-muted-foreground">{postedAgo}</p>
                     </div>
                     <div className="flex items-start gap-2">

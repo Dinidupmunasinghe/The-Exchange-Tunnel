@@ -543,6 +543,14 @@ async function getAvailableTasks(req, res) {
           "status",
           "createdAt",
           "maxEngagements"
+        ],
+        include: [
+          {
+            model: db.User,
+            as: "owner",
+            required: false,
+            attributes: ["id", "name", "telegramUserId"]
+          }
         ]
       }
     ],
