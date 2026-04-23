@@ -234,6 +234,14 @@ async function submitTaskCompletion(req, res) {
         }
         const username = parseTmeChannelUsername(String(msgUrl));
         const joinRef = username ? `@${username}` : String(channelId);
+        const wasMemberBefore = await tg.getUserChatMemberStatus(String(channelId), tUid);
+        if (wasMemberBefore.ok) {
+          const error = new Error(
+            "This account is already subscribed to the channel. No new subscribe action to reward."
+          );
+          error.status = 400;
+          throw error;
+        }
         await runBridge("join_channel", {
           apiId: creds.apiId,
           apiHash: creds.apiHash,
