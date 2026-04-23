@@ -153,6 +153,7 @@ export function EarnCredits() {
   const [selectedReactionByCampaign, setSelectedReactionByCampaign] = useState<Record<number, string>>({});
   const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
+  const [avatarLoadedByCampaign, setAvatarLoadedByCampaign] = useState<Record<number, boolean>>({});
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -458,7 +459,17 @@ export function EarnCredits() {
             >
               <div className="flex gap-3 p-4 pb-3">
                 <Avatar className="h-11 w-11 shrink-0 border border-border">
-                  <AvatarImage src={avatarUrl} alt={title} />
+                  <AvatarImage
+                    src={avatarUrl}
+                    alt={title}
+                    className={avatarLoadedByCampaign[cid] ? "opacity-100" : "opacity-0"}
+                    onLoad={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      const ok = img.naturalWidth > 8 && img.naturalHeight > 8;
+                      setAvatarLoadedByCampaign((prev) => ({ ...prev, [cid]: ok }));
+                    }}
+                    onError={() => setAvatarLoadedByCampaign((prev) => ({ ...prev, [cid]: false }))}
+                  />
                   <AvatarFallback delayMs={0} className="bg-secondary text-sm font-semibold text-foreground">
                     {initials}
                   </AvatarFallback>
