@@ -148,18 +148,29 @@ async function submitTaskCompletion(req, res) {
         throw error;
       }
       const storedActionKind = actionKind === "subscribe" ? null : actionKind;
-      const dupWhere =
-        engagementType === "subscribe"
-          ? { userId: req.user.id, campaignId: task.campaignId, engagementType: "subscribe" }
-          : { userId: req.user.id, campaignId: task.campaignId, actionKind: storedActionKind };
-      const dup = await db.Engagement.findOne({
-        where: dupWhere,
-        transaction
-      });
-      if (dup) {
-        const error = new Error("You already completed this action for this post");
-        error.status = 400;
-        throw error;
+      if (engagementType === "subscribe") {
+        const dup = await db.Engagement.findOne({
+          where: { userId: req.user.id, campaignId: task.campaignId, engagementType: "subscribe" },
+          transaction
+        });
+        if (dup) {
+          const error = new Error("You already completed this action for this post");
+          error.status = 400;
+          throw error;
+        }
+      } else if (storedActionKind) {
+        const postKey = String(task.campaign.messageKey || "");
+        if (postKey) {
+          const prior = await db.UserPostAction.findOne({
+            where: { userId: req.user.id, postKey, actionKind: storedActionKind },
+            transaction
+          });
+          if (prior) {
+            const error = new Error("You already completed this action for this post");
+            error.status = 400;
+            throw error;
+          }
+        }
       }
       const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
       if (!worker) {
@@ -401,7 +412,7 @@ async function submitTaskCompletion(req, res) {
               )}--${encodeURIComponent(String(req._commentChatAccessHash || ""))}`
             : `tg-mem-${tUid}-${channelId}`;
 
-      await db.Engagement.create(
+      const createdEngagement = await db.Engagement.create(
         {
           userId: req.user.id,
           campaignId: task.campaignId,
@@ -419,6 +430,18 @@ async function submitTaskCompletion(req, res) {
         },
         { transaction }
       );
+      if (storedActionKind && task.campaign?.messageKey) {
+        await db.UserPostAction.upsert(
+          {
+            userId: req.user.id,
+            postKey: String(task.campaign.messageKey),
+            actionKind: storedActionKind,
+            lastEngagementId: createdEngagement.id,
+            details: createdEngagement.verificationDetails || null
+          },
+          { transaction }
+        );
+      }
 
       task.status = "completed";
       task.completedAt = new Date();
@@ -500,17 +523,39 @@ async function getAvailableTasks(req, res) {
     return o;
   });
   const campaignIds = [...new Set(tasks.map((t) => t.campaignId))];
-  const myEngagements =
-    campaignIds.length === 0
+  const campaignList = tasks
+    .map((t) => t.campaign)
+    .filter(Boolean)
+    .map((c) => ({ id: c.id, messageKey: c.messageKey }))
+    .filter((x) => Boolean(x.messageKey));
+  const uniquePostKeys = [...new Set(campaignList.map((c) => String(c.messageKey)))];
+  const remembered =
+    uniquePostKeys.length === 0
       ? []
-      : await db.Engagement.findAll({
-          where: {
-            userId: req.user.id,
-            campaignId: { [Op.in]: campaignIds },
-            actionKind: { [Op.ne]: null }
-          },
-          attributes: ["id", "campaignId", "taskId", "actionKind", "verificationDetails", "metaEngagementId"]
+      : await db.UserPostAction.findAll({
+          where: { userId: req.user.id, postKey: { [Op.in]: uniquePostKeys } },
+          attributes: ["id", "postKey", "actionKind", "details"]
         });
+  const campaignIdsByPostKey = new Map();
+  for (const c of campaignList) {
+    const key = String(c.messageKey);
+    if (!campaignIdsByPostKey.has(key)) campaignIdsByPostKey.set(key, []);
+    campaignIdsByPostKey.get(key).push(Number(c.id));
+  }
+  const myEngagements = [];
+  for (const row of remembered) {
+    const ids = campaignIdsByPostKey.get(String(row.postKey)) || [];
+    for (const cid of ids) {
+      myEngagements.push({
+        id: Number(row.id),
+        campaignId: cid,
+        taskId: 0,
+        actionKind: String(row.actionKind),
+        verificationDetails: row.details || null,
+        metaEngagementId: null
+      });
+    }
+  }
   return res.json({ tasks: serialized, myEngagements });
 }
 
@@ -719,6 +764,16 @@ async function revertEngagement(req, res) {
         transaction
       });
       await engagement.destroy({ transaction });
+      if (campaign.messageKey && actionKind !== "subscribe") {
+        await db.UserPostAction.destroy({
+          where: {
+            userId: req.user.id,
+            postKey: String(campaign.messageKey),
+            actionKind
+          },
+          transaction
+        });
+      }
       task.status = "open";
       task.assignedUserId = null;
       task.assignedAt = null;

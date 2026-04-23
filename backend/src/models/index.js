@@ -6,6 +6,7 @@ const Campaign = require("./campaign")(sequelize, DataTypes);
 const Task = require("./task")(sequelize, DataTypes);
 const Transaction = require("./transaction")(sequelize, DataTypes);
 const Engagement = require("./engagement")(sequelize, DataTypes);
+const UserPostAction = require("./userPostAction")(sequelize, DataTypes);
 
 User.hasMany(Campaign, { foreignKey: "userId", as: "campaigns" });
 Campaign.belongsTo(User, { foreignKey: "userId", as: "owner" });
@@ -28,13 +29,17 @@ Engagement.belongsTo(Campaign, { foreignKey: "campaignId", as: "campaign" });
 Task.hasOne(Engagement, { foreignKey: "taskId", as: "engagement" });
 Engagement.belongsTo(Task, { foreignKey: "taskId", as: "task" });
 
+User.hasMany(UserPostAction, { foreignKey: "userId", as: "postActions" });
+UserPostAction.belongsTo(User, { foreignKey: "userId", as: "user" });
+
 const db = {
   sequelize,
   User,
   Campaign,
   Task,
   Transaction,
-  Engagement
+  Engagement,
+  UserPostAction
 };
 
 module.exports = db;

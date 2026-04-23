@@ -173,6 +173,16 @@ async function auditLikeEngagements() {
         await fresh.task.save({ transaction });
 
         await fresh.destroy({ transaction });
+        if (fresh.campaign?.messageKey) {
+          await db.UserPostAction.destroy({
+            where: {
+              userId: fresh.userId,
+              postKey: String(fresh.campaign.messageKey),
+              actionKind: "like"
+            },
+            transaction
+          });
+        }
 
         if (fresh.campaign.status === "completed") {
           fresh.campaign.status = "active";
