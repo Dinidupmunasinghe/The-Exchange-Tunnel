@@ -436,7 +436,7 @@ export function EarnCredits() {
                     ) : (
                       <BellPlus className="mr-2 h-4 w-4" />
                     )}
-                    {subscribed ? "Subscribed" : busy === `${cid}-subscribe` ? "Subscribing..." : "Subscribe"}
+                    {subscribed ? "Subscribed" : busy === `${cid}-subscribe` ? "Subscribing..." : "Subscribe (Auto)"}
                     <Badge className="ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15">
                       +{reward}
                     </Badge>
