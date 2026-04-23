@@ -89,6 +89,13 @@ function telegramUserpicUrlFromUsername(username: string | null): string | null 
   return `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg`;
 }
 
+function usernameFromOwnerName(ownerName: string): string | null {
+  const raw = String(ownerName || "").trim();
+  if (!raw.startsWith("@")) return null;
+  const u = raw.slice(1).trim();
+  return u || null;
+}
+
 function telegramProfileLink(owner: { name?: string | null; telegramUserId?: string | null } | undefined): string | null {
   if (!owner) return null;
   const name = String(owner.name || "").trim();
@@ -109,6 +116,10 @@ function ownerDisplayHandle(ownerName: string): string {
     .trim()
     .replace(/\s+/g, "_");
   return `@${handle || "unknown"}`;
+}
+
+function fallbackAvatarUrl(seed: string): string {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(seed || "ET")}&background=2a2a2a&color=ffffff&size=128&bold=true`;
 }
 
 function getCommentText(rows: MyEngagementRow[], campaignId: number): string {
@@ -433,8 +444,10 @@ export function EarnCredits() {
             myEngagements.some((e) => e.campaignId === cid && e.actionKind === "subscribe");
           const isSubscribeCampaign = et === "subscribe";
           const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
-          const avatarUrl = telegramUserpicUrlFromUsername(avatarUsername);
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
+          const ownerUsername = usernameFromOwnerName(ownerName);
+          const avatarUrl =
+            telegramUserpicUrlFromUsername(ownerUsername || avatarUsername) || fallbackAvatarUrl(ownerName || initials);
           const ownerDisplay = ownerDisplayHandle(ownerName);
           const ownerLink = telegramProfileLink(campaign.owner);
 
@@ -445,8 +458,8 @@ export function EarnCredits() {
             >
               <div className="flex gap-3 p-4 pb-3">
                 <Avatar className="h-11 w-11 shrink-0 border border-border">
-                  {avatarUrl ? <AvatarImage src={avatarUrl} alt={title} /> : null}
-                  <AvatarFallback className="bg-secondary text-sm font-semibold text-foreground">
+                  <AvatarImage src={avatarUrl} alt={title} />
+                  <AvatarFallback delayMs={0} className="bg-secondary text-sm font-semibold text-foreground">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
@@ -454,7 +467,7 @@ export function EarnCredits() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">{title}</h2>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
+                      <p className="mt-0.5 text-sm text-muted-foreground">
                         By{" "}
                         {ownerLink ? (
                           <a
@@ -469,7 +482,7 @@ export function EarnCredits() {
                           <span>"{ownerDisplay}"</span>
                         )}
                       </p>
-                      <p className="mt-0.5 text-sm text-muted-foreground">{postedAgo}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{postedAgo}</p>
                     </div>
                     <div className="flex items-start gap-2">
                       <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2 py-1">
