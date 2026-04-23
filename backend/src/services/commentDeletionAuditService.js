@@ -8,9 +8,15 @@ const tg = require("./telegramService");
 
 function parseCommentMeta(metaEngagementId) {
   const raw = String(metaEngagementId || "");
-  const m = /^tg-com-\d+--(.+)--(\d+)$/.exec(raw);
-  if (!m) return null;
-  return { commentChatId: decodeURIComponent(m[1]), commentMessageId: Number(m[2]) };
+  const v2 = /^tg-com-\d+--(.+)--(\d+)$/.exec(raw);
+  if (v2) {
+    return { commentChatId: decodeURIComponent(v2[1]), commentMessageId: Number(v2[2]) };
+  }
+  const v1 = /^tg-com-\d+-(-?\d+)-(\d+)-(\d+)$/.exec(raw);
+  if (v1) {
+    return { commentChatId: String(v1[1]), commentMessageId: Number(v1[3]) };
+  }
+  return null;
 }
 
 function parseStoredMtprotoCredentials(user) {

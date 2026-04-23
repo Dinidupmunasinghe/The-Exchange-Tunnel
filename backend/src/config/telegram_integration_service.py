@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from telethon import TelegramClient, functions, types
+from telethon import TelegramClient, functions, types, utils
 from telethon.errors import (
     FloodWaitError,
     RPCError,
@@ -221,7 +221,7 @@ class TelegramClientManager:
         await self.connect()
         await self._enforce_write_delay()
         try:
-            entity = await self._client.get_input_entity(channel)
+            entity = await self._resolve_input_entity(channel)
             return await self._client(functions.channels.JoinChannelRequest(channel=entity))
         except FloodWaitError as exc:
             raise TelegramClientManagerError(
@@ -246,7 +246,7 @@ class TelegramClientManager:
         await self.connect()
         await self._enforce_write_delay()
 
-        peer = await self._client.get_input_entity(chat)
+        peer = await self._resolve_input_entity(chat)
         normalized_reaction = self._normalize_reaction_input(reaction)
         try:
             await self._client(
@@ -338,7 +338,7 @@ class TelegramClientManager:
         """
         await self.connect()
         await self._enforce_write_delay()
-        peer = await self._client.get_input_entity(chat)
+        peer = await self._resolve_input_entity(chat)
         try:
             await self._client(
                 functions.messages.SendReactionRequest(
@@ -400,7 +400,8 @@ class TelegramClientManager:
         await self.connect()
         await self._enforce_write_delay()
         try:
-            deleted = await self._client.delete_messages(entity=chat, message_ids=[msg_id], revoke=True)
+            peer = await self._resolve_input_entity(chat)
+            deleted = await self._client.delete_messages(entity=peer, message_ids=[msg_id], revoke=True)
         except FloodWaitError as exc:
             raise TelegramClientManagerError(
                 f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
@@ -416,10 +417,40 @@ class TelegramClientManager:
     ) -> bool:
         await self.connect()
         try:
-            message = await self._client.get_messages(chat, ids=msg_id)
+            peer = await self._resolve_input_entity(chat)
+            message = await self._client.get_messages(peer, ids=msg_id)
         except RPCError as exc:
             raise TelegramClientManagerError(f"message_exists failed: {exc}") from exc
         if message is None:
             return False
         mid = getattr(message, "id", None)
         return bool(mid and int(mid) == int(msg_id))
+
+    async def _resolve_input_entity(self, chat: str | int | types.TypeInputPeer) -> types.TypeInputPeer:
+        """
+        Resolve chat to input peer with dialog-scan fallback for numeric ids.
+        Helps with cases where raw -100... ids are not yet cached.
+        """
+        try:
+            return await self._client.get_input_entity(chat)
+        except Exception:
+            pass
+
+        target_ids: set[int] = set()
+        try:
+            target_ids.add(int(str(chat)))
+        except Exception:
+            target_ids = set()
+
+        if not target_ids:
+            raise TelegramClientManagerError(f"Cannot resolve Telegram entity for chat={chat!r}")
+
+        try:
+            async for dialog in self._client.iter_dialogs():
+                peer_id = utils.get_peer_id(dialog.entity)
+                if int(peer_id) in target_ids:
+                    return dialog.input_entity
+        except Exception as exc:
+            raise TelegramClientManagerError(f"Cannot resolve Telegram entity for chat={chat!r}: {exc}") from exc
+
+        raise TelegramClientManagerError(f"Cannot resolve Telegram entity for chat={chat!r}")
