@@ -230,6 +230,19 @@ class TelegramClientManager:
         except RPCError as exc:
             raise TelegramClientManagerError(f"join_channel failed: {exc}") from exc
 
+    async def leave_channel(self, channel: str | types.TypeInputChannel) -> Any:
+        await self.connect()
+        await self._enforce_write_delay()
+        try:
+            entity = await self._resolve_input_entity(channel)
+            return await self._client(functions.channels.LeaveChannelRequest(channel=entity))
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"leave_channel failed: {exc}") from exc
+
     @staticmethod
     def _normalize_reaction_input(reaction: str) -> list[types.TypeReaction]:
         return [types.ReactionEmoji(emoticon=reaction)]

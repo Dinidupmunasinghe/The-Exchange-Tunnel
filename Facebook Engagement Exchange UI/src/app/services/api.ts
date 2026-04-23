@@ -267,7 +267,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  revertEngagement: (payload: { campaignId: number; actionKind: "comment" | "like" }) =>
+  revertEngagement: (payload: { campaignId: number; actionKind: "subscribe" | "comment" | "like" }) =>
     authRequest("/tasks/revert", {
       method: "POST",
       body: JSON.stringify(payload),

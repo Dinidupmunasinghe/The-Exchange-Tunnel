@@ -80,6 +80,10 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
             await manager.join_channel(channel=str(payload["channel"]))
             return {"ok": True}
 
+        if operation == "leave_channel":
+            await manager.leave_channel(channel=str(payload["channel"]))
+            return {"ok": True}
+
         if operation == "react":
             chosen = await manager.react_to_message(
                 chat=payload["chat"],

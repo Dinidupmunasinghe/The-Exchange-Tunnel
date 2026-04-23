@@ -686,13 +686,17 @@ async function pollCommentDetection(req, res) {
 
 async function revertEngagement(req, res) {
   const { campaignId, actionKind } = req.body;
-  if (!["comment", "like"].includes(actionKind)) {
+  if (!["subscribe", "comment", "like"].includes(actionKind)) {
     return res.status(400).json({ message: "Invalid action kind" });
   }
   try {
     await sequelize.transaction(async (transaction) => {
+      const engagementWhere =
+        actionKind === "subscribe"
+          ? { userId: req.user.id, campaignId, engagementType: "subscribe" }
+          : { userId: req.user.id, campaignId, actionKind };
       const engagement = await db.Engagement.findOne({
-        where: { userId: req.user.id, campaignId, actionKind },
+        where: engagementWhere,
         transaction,
         lock: true,
         include: [
@@ -711,6 +715,30 @@ async function revertEngagement(req, res) {
         const error = new Error("Cannot revert on your own campaign");
         error.status = 400;
         throw error;
+      }
+      if (actionKind === "subscribe") {
+        const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error("Telegram user session is required to unsubscribe");
+          error.status = 400;
+          throw error;
+        }
+        const username = parseTmeChannelUsername(campaign.messageUrl);
+        const leaveRef = username ? `@${username}` : "";
+        if (!leaveRef) {
+          const error = new Error("Could not resolve Telegram channel for unsubscribe");
+          error.status = 400;
+          throw error;
+        }
+        await runBridge("leave_channel", {
+          apiId: creds.apiId,
+          apiHash: creds.apiHash,
+          proxy: creds.proxy || null,
+          sessionString,
+          channel: leaveRef
+        });
       }
       if (actionKind === "like") {
         const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
@@ -837,6 +865,12 @@ async function revertEngagement(req, res) {
             postKey: String(campaign.messageKey),
             actionKind
           },
+          transaction
+        });
+      }
+      if (campaign.messageKey && actionKind === "subscribe") {
+        await db.UserSubscriptionMemory.destroy({
+          where: { userId: req.user.id, channelKey: String(campaign.messageKey) },
           transaction
         });
       }

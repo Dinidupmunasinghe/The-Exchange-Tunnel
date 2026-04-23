@@ -173,6 +173,20 @@ export function EarnCredits() {
     if (!bundleAllowsAction(engagementType, action)) return;
     try {
       if (action === "subscribe") {
+        const subscribedAlready =
+          hasCompletedTask(campaignTasks) ||
+          myEngagements.some((e) => e.campaignId === campaignId && e.actionKind === "subscribe");
+        if (subscribedAlready) {
+          const key = `${campaignId}-unsubscribe`;
+          setBusy(key);
+          await api.revertEngagement({ campaignId, actionKind: "subscribe" });
+          toast.success("Unsubscribed and credits refunded.");
+          const refreshed = await api.getTasks();
+          setTasks(refreshed.tasks as TaskRow[]);
+          setMyEngagements(refreshed.myEngagements ?? []);
+          setBusy(null);
+          return;
+        }
         const subscribeTask = firstOpenTask(campaignTasks);
         if (!subscribeTask) {
           toast.error("No open subscribe task right now — refresh and try again.");
@@ -339,7 +353,7 @@ export function EarnCredits() {
       ) : null}
       {hasTelegram && hasMtprotoSession === false ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Like requires Telegram user session connection. Go to{" "}
+          Subscribe, Like, and Comment require Telegram user session connection. Go to{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
             Settings
           </Link>{" "}
@@ -429,14 +443,20 @@ export function EarnCredits() {
                     size="sm"
                     className="rounded-full pr-3"
                     onClick={() => void handleAction(cid, campaignTasks, et, "subscribe")}
-                    disabled={subscribed || busy !== null || hasTelegram === false}
+                    disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
                   >
-                    {busy === `${cid}-subscribe` ? (
+                    {busy === `${cid}-subscribe` || busy === `${cid}-unsubscribe` ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <BellPlus className="mr-2 h-4 w-4" />
                     )}
-                    {subscribed ? "Subscribed" : busy === `${cid}-subscribe` ? "Subscribing..." : "Subscribe (Auto)"}
+                    {busy === `${cid}-subscribe`
+                      ? "Subscribing..."
+                      : busy === `${cid}-unsubscribe`
+                        ? "Unsubscribing..."
+                        : subscribed
+                          ? "Unsubscribe"
+                          : "Subscribe (Auto)"}
                     <Badge className="ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15">
                       +{reward}
                     </Badge>
