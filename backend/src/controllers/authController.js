@@ -16,7 +16,8 @@ function createToken(user) {
 async function findOrCreateTelegramUser({ id, first_name, last_name, username }) {
   const tgId = String(id);
   const display = [first_name, last_name].filter(Boolean).join(" ");
-  const nameBase = display || (username ? `@${username}` : `Telegram ${tgId}`);
+  const usernameHandle = username ? `@${String(username).replace(/^@/, "")}` : null;
+  const nameBase = usernameHandle || display || `Telegram ${tgId}`;
   const email = `tg_${tgId}@users.telegram.exchange`;
 
   let user = await db.User.findOne({ where: { telegramUserId: tgId } });
@@ -32,7 +33,11 @@ async function findOrCreateTelegramUser({ id, first_name, last_name, username })
     });
   } else {
     user.telegramUserId = tgId;
-    if (nameBase && !user.name) user.name = nameBase;
+    if (usernameHandle) {
+      user.name = usernameHandle;
+    } else if (nameBase && !user.name) {
+      user.name = nameBase;
+    }
     await user.save();
   }
   return user;
