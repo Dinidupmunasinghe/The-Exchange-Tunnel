@@ -4,7 +4,7 @@ const app = require("./app");
 const env = require("./config/env");
 const db = require("./models");
 const { activateDueCampaigns } = require("./services/campaignScheduler");
-const { auditSubscribeEngagements } = require("./services/subscriptionAuditService");
+const { auditSubscribeEngagements, auditSubscriptionMemory } = require("./services/subscriptionAuditService");
 const { auditCommentMembershipEngagements } = require("./services/commentMembershipAuditService");
 const { auditLikeEngagements } = require("./services/likeEngagementAuditService");
 const { auditCommentDeletions } = require("./services/commentDeletionAuditService");
@@ -46,6 +46,7 @@ async function bootstrap() {
     await db.sequelize.sync(env.dbSyncAlter ? { alter: true } : undefined);
     await activateDueCampaigns();
     await auditSubscribeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
+    await auditSubscriptionMemory().catch(() => ({ scanned: 0, cleared: 0 }));
     await auditCommentMembershipEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
     await auditLikeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
     await auditCommentDeletions().catch(() => ({ scanned: 0, reversed: 0 }));
@@ -54,6 +55,9 @@ async function bootstrap() {
     }, 60 * 1000);
     setInterval(() => {
       auditSubscribeEngagements().catch(() => undefined);
+    }, 30 * 1000);
+    setInterval(() => {
+      auditSubscriptionMemory().catch(() => undefined);
     }, 30 * 1000);
     setInterval(() => {
       auditCommentMembershipEngagements().catch(() => undefined);

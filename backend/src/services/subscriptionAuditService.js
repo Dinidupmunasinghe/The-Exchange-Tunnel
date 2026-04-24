@@ -18,6 +18,12 @@ function parseTmeChannelUsername(url) {
   }
 }
 
+function parseChannelIdFromSubscriptionKey(channelKey) {
+  const raw = String(channelKey || "");
+  const m = /^sub_(-?\d+)$/.exec(raw);
+  return m ? String(m[1]) : null;
+}
+
 /**
  * Periodically checks verified subscribe engagements.
  * If a worker unsubscribed, reverse earned credits and refund campaign owner, then reopen task.
@@ -139,5 +145,39 @@ async function auditSubscribeEngagements() {
   return { scanned: rows.length, reversed };
 }
 
-module.exports = { auditSubscribeEngagements };
+/**
+ * Keeps cross-campaign subscription memory accurate.
+ * If user unsubscribed, remove stale memory so UI no longer shows "Subscribed".
+ */
+async function auditSubscriptionMemory() {
+  if (!tg.isConfigured()) return { scanned: 0, cleared: 0 };
+
+  const rows = await db.UserSubscriptionMemory.findAll({
+    include: [{ model: db.User, as: "user", required: true, attributes: ["id", "telegramUserId"] }],
+    order: [["id", "DESC"]],
+    limit: 1000
+  });
+
+  let cleared = 0;
+  for (const row of rows) {
+    const workerTelegramId = row.user?.telegramUserId ? String(row.user.telegramUserId) : null;
+    if (!workerTelegramId) continue;
+    const channelId = parseChannelIdFromSubscriptionKey(row.channelKey);
+    if (!channelId) continue;
+
+    const detail = await tg.getUserChatMemberStatus(channelId, workerTelegramId);
+    if (detail.ok) continue;
+
+    try {
+      await db.UserSubscriptionMemory.destroy({ where: { id: row.id } });
+      cleared += 1;
+    } catch {
+      // continue scanning remaining rows
+    }
+  }
+
+  return { scanned: rows.length, cleared };
+}
+
+module.exports = { auditSubscribeEngagements, auditSubscriptionMemory };
 
