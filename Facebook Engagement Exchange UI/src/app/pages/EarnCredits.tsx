@@ -547,7 +547,7 @@ export function EarnCredits() {
                         ? "Unsubscribing..."
                         : subscribed
                           ? "Unsubscribe"
-                          : "Subscribe (Auto)"}
+                          : "Subscribe"}
                     <Badge className="ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15">
                       +{reward}
                     </Badge>
