@@ -561,11 +561,28 @@ async function getAvailableTasks(req, res) {
       ["id", "DESC"]
     ]
   });
+  const avatarByTelegramId = new Map();
+  const ownerTelegramIds = [
+    ...new Set(
+      tasks
+        .map((t) => t?.campaign?.owner?.telegramUserId)
+        .filter((v) => v != null)
+        .map((v) => String(v))
+    )
+  ];
+  for (const tid of ownerTelegramIds) {
+    const avatarUrl = await tg.getUserProfilePhotoUrl(tid).catch(() => null);
+    if (avatarUrl) avatarByTelegramId.set(tid, avatarUrl);
+  }
   const serialized = tasks.map((t) => {
     const o = t.toJSON();
     if (o.campaign) {
       o.campaign.soundcloudPostUrl = o.campaign.messageUrl;
       o.campaign.soundcloudPostId = o.campaign.messageKey;
+      if (o.campaign.owner?.telegramUserId) {
+        o.campaign.owner.avatarUrl =
+          avatarByTelegramId.get(String(o.campaign.owner.telegramUserId)) || null;
+      }
     }
     return o;
   });

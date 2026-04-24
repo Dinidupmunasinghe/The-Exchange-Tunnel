@@ -211,6 +211,43 @@ async function isUserChannelAdminOrCreator(channelChatId, userTelegramId) {
 }
 
 /**
+ * Returns Telegram user object from getChatMember when available.
+ * Useful for resolving username without requiring re-login.
+ */
+async function getChatMemberUser(channelChatId, userTelegramId) {
+  if (!isConfigured() || !channelChatId || userTelegramId == null) return null;
+  try {
+    const data = await botRequest("getChatMember", {
+      chat_id: String(channelChatId),
+      user_id: String(userTelegramId)
+    });
+    return data?.result?.user || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getUserProfilePhotoUrl(userTelegramId) {
+  if (!isConfigured() || userTelegramId == null) return null;
+  try {
+    const photos = await botRequest("getUserProfilePhotos", {
+      user_id: String(userTelegramId),
+      limit: 1
+    });
+    const firstSet = photos?.result?.photos?.[0];
+    const lastSize = Array.isArray(firstSet) && firstSet.length > 0 ? firstSet[firstSet.length - 1] : null;
+    const fileId = lastSize?.file_id;
+    if (!fileId) return null;
+    const fileInfo = await botRequest("getFile", { file_id: String(fileId) });
+    const filePath = fileInfo?.result?.file_path;
+    if (!filePath) return null;
+    return `${TG_API}/file/bot${env.telegram.botToken}/${filePath}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {string|number} chatId
  * @param {string} username
  */
@@ -278,6 +315,8 @@ module.exports = {
   isUserMemberOrAdminOfChat,
   getUserChatMemberStatus,
   isUserChannelAdminOrCreator,
+  getChatMemberUser,
+  getUserProfilePhotoUrl,
   chatMatchesIdOrUsername,
   fetchTmePagePreview
 };

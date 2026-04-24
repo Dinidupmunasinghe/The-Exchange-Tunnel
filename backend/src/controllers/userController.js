@@ -1,5 +1,6 @@
 const db = require("../models");
 const { getDashboardStats } = require("../services/creditService");
+const tg = require("../services/telegramService");
 
 async function getProfile(req, res) {
   const user = await db.User.findByPk(req.user.id, {
@@ -18,6 +19,21 @@ async function getProfile(req, res) {
     ]
   });
   if (!user) return res.status(404).json({ message: "User not found" });
+  // One-time lazy backfill: resolve @username from connected channel membership.
+  const currentName = String(user.name || "").trim();
+  const needsUsernameBackfill = Boolean(
+    user.telegramUserId &&
+      user.telegramActingChannelId &&
+      (!currentName || !currentName.startsWith("@"))
+  );
+  if (needsUsernameBackfill) {
+    const member = await tg.getChatMemberUser(user.telegramActingChannelId, user.telegramUserId);
+    const username = member?.username ? `@${String(member.username).replace(/^@/, "")}` : null;
+    if (username) {
+      user.name = username;
+      await user.save();
+    }
+  }
   const data = user.toJSON();
   const hasMtprotoSession = Boolean(data.userActingTokenEncrypted);
   delete data.userActingTokenEncrypted;

@@ -34,6 +34,7 @@ type TaskRow = {
       id?: number;
       name?: string | null;
       telegramUserId?: string | null;
+      avatarUrl?: string | null;
     };
   };
   campaignId?: number;
@@ -448,7 +449,9 @@ export function EarnCredits() {
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
           const ownerUsername = usernameFromOwnerName(ownerName);
           const avatarUrl =
-            telegramUserpicUrlFromUsername(ownerUsername || avatarUsername) || fallbackAvatarUrl(ownerName || initials);
+            campaign.owner?.avatarUrl ||
+            telegramUserpicUrlFromUsername(ownerUsername || avatarUsername) ||
+            fallbackAvatarUrl(ownerName || initials);
           const ownerDisplay = ownerDisplayHandle(ownerName);
           const ownerLink = telegramProfileLink(campaign.owner);
 
