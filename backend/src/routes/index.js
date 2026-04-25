@@ -17,12 +17,12 @@ router.get("/health", (req, res) => {
 
 router.use("/auth", authRoutes);
 router.use("/admin-auth", adminAuthRoutes);
+router.use("/admin", adminRoutes);
 router.use(authMiddleware);
 router.use("/users", userRoutes);
 router.use("/telegram", telegramRoutes);
 router.use("/campaigns", campaignRoutes);
 router.use("/tasks", taskRoutes);
 router.use("/transactions", transactionRoutes);
-router.use("/admin", adminRoutes);
 
 module.exports = router;

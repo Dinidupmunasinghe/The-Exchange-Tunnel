@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const db = require("../models");
 const sequelize = require("../config/database");
 const tg = require("../services/telegramService");
-const { spendCredits, refundCredits } = require("../services/creditService");
+const { spendCredits, refundCredits, getRewardByType } = require("../services/creditService");
 const { ENGAGEMENT_TYPES } = require("../constants/engagement");
 
 function normalizeCampaignName(raw) {
@@ -112,7 +112,17 @@ async function createCampaign(req, res) {
     return res.status(403).json({ message: "You must be an admin of the connected channel" });
   }
 
-  const totalBudget = creditsPerEngagement * maxEngagements;
+  const rewardTypeForCampaign =
+    engagementType === "subscribe"
+      ? "subscribe"
+      : engagementType === "like"
+        ? "like"
+        : "comment";
+  const effectiveCreditsPerEngagement =
+    Number(await getRewardByType(rewardTypeForCampaign)) ||
+    Number(creditsPerEngagement) ||
+    1;
+  const totalBudget = effectiveCreditsPerEngagement * maxEngagements;
   const campaignName = normalizeCampaignName(name);
   const scheduledLaunchAt = parseOptionalSchedule(scheduleRaw);
   const now = new Date();
@@ -121,7 +131,7 @@ async function createCampaign(req, res) {
 
   if (owner.credits < totalBudget) {
     return res.status(400).json({
-      message: `Insufficient credits — this campaign needs ${totalBudget} upfront (${creditsPerEngagement} × ${maxEngagements} slots) but you have ${owner.credits}.`,
+      message: `Insufficient credits — this campaign needs ${totalBudget} upfront (${effectiveCreditsPerEngagement} × ${maxEngagements} slots) but you have ${owner.credits}.`,
       required: totalBudget,
       balance: owner.credits
     });
@@ -135,7 +145,7 @@ async function createCampaign(req, res) {
         messageKey: key,
         messageUrl: finalMessageUrl,
         engagementType,
-        creditsPerEngagement,
+        creditsPerEngagement: effectiveCreditsPerEngagement,
         maxEngagements,
         scheduledLaunchAt: launchesLater ? scheduledLaunchAt : null,
         status
@@ -155,7 +165,7 @@ async function createCampaign(req, res) {
     const taskPayload = Array.from({ length: maxEngagements }).map(() => ({
       campaignId: campaign.id,
       engagementType,
-      rewardCredits: creditsPerEngagement,
+      rewardCredits: effectiveCreditsPerEngagement,
       status: "open"
     }));
     await db.Task.bulkCreate(taskPayload, { transaction });
