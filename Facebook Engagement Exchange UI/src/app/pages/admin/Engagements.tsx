@@ -125,9 +125,9 @@ export function AdminEngagements() {
           </Toolbar>
           <FormError error={error} />
           <FormMessage message={message} />
-          <div className="overflow-x-auto rounded-md border border-border">
+          <div className="max-h-[65vh] overflow-auto rounded-md border border-border">
             <table className="w-full text-sm">
-              <thead className="bg-secondary/50 text-muted-foreground">
+              <thead className="sticky top-0 z-10 bg-card text-muted-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border">
                 <tr>
                   <th className="px-3 py-2 text-left">ID</th>
                   <th className="px-3 py-2 text-left">When</th>
