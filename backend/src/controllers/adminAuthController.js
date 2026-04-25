@@ -10,11 +10,15 @@ async function adminLogin(req, res) {
     .trim()
     .toLowerCase();
   const password = String(req.body.password || "");
+  const configuredPassword = String(env.adminLoginPassword || "");
 
   if (!env.adminLoginEmail || !env.adminLoginPassword) {
-    return res.status(503).json({ message: "Admin login is not configured" });
+    return res.status(503).json({
+      message: "Admin login is not configured. Set ADMIN_LOGIN_EMAIL and ADMIN_LOGIN_PASSWORD on backend."
+    });
   }
-  if (email !== env.adminLoginEmail || password !== env.adminLoginPassword) {
+  const passwordMatches = password === configuredPassword || password.trim() === configuredPassword.trim();
+  if (email !== env.adminLoginEmail || !passwordMatches) {
     return res.status(401).json({ message: "Invalid admin credentials" });
   }
 
