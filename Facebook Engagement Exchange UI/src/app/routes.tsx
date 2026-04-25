@@ -8,6 +8,7 @@ import { Campaigns } from "./pages/Campaigns";
 import { Analytics } from "./pages/Analytics";
 import { Wallet } from "./pages/Wallet";
 import { Settings } from "./pages/Settings";
+import { Admin } from "./pages/Admin";
 import { NotFound } from "./pages/NotFound";
 import { Login } from "./pages/Login";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
           { path: "analytics", Component: Analytics },
           { path: "wallet", Component: Wallet },
           { path: "settings", Component: Settings },
+          { path: "admin", Component: Admin },
           { path: "*", Component: NotFound },
         ],
       },

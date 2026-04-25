@@ -230,6 +230,51 @@ async function listTransactionsForUser(userId, limit = 50) {
   });
 }
 
+async function adjustCreditsByAdmin({
+  userId,
+  amount,
+  reason,
+  adminUserId = null,
+  adminEmail = "",
+  transaction
+}) {
+  const n = Math.trunc(Number(amount));
+  if (!Number.isFinite(n) || n === 0) {
+    const err = new Error("Amount must be a non-zero integer");
+    err.status = 400;
+    throw err;
+  }
+  const cleanReason = String(reason || "").trim();
+  if (!cleanReason) {
+    const err = new Error("Reason is required");
+    err.status = 400;
+    throw err;
+  }
+
+  const actor = adminEmail ? `${adminEmail}` : adminUserId ? `user#${adminUserId}` : "unknown_admin";
+  const taggedReason = `Admin adjustment by ${actor}: ${cleanReason}`;
+
+  if (n > 0) {
+    return refundCredits({
+      userId,
+      amount: n,
+      reason: taggedReason,
+      referenceType: "admin_adjustment",
+      referenceId: adminUserId || null,
+      transaction
+    });
+  }
+
+  return spendCredits({
+    userId,
+    amount: Math.abs(n),
+    reason: taggedReason,
+    referenceType: "admin_adjustment",
+    referenceId: adminUserId || null,
+    transaction
+  });
+}
+
 async function getDashboardStats(userId) {
   const campaigns = await db.Campaign.findAll({ where: { userId } });
   const tx = await db.Transaction.findAll({
@@ -260,6 +305,7 @@ module.exports = {
   reverseEarnCredits,
   settlePendingRefundDebts,
   refundCredits,
+  adjustCreditsByAdmin,
   getRewardByType,
   listTransactionsForUser,
   getDashboardStats

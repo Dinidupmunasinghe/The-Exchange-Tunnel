@@ -19,6 +19,9 @@ const env = {
     secret: process.env.JWT_SECRET || "dev-secret-change-me",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d"
   },
+  adminEmail: String(process.env.ADMIN_EMAIL || "")
+    .trim()
+    .toLowerCase(),
   encryptionSecret: process.env.ENCRYPTION_SECRET || "12345678901234567890123456789012",
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
   /** Telegram: bot token = Login Widget HMAC key + getChat / getChatMember. */

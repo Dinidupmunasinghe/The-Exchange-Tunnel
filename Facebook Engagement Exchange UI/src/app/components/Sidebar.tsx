@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router";
+import { useEffect, useMemo, useState } from "react";
 import { 
   LayoutDashboard, 
   Sparkles, 
@@ -11,6 +12,7 @@ import {
   X
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { api } from "../services/api";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -22,12 +24,38 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
+const adminEmail = String(import.meta.env.VITE_ADMIN_EMAIL || "")
+  .trim()
+  .toLowerCase();
+
 interface SidebarProps {
   onClose?: () => void;
 }
 
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
+  const [profileEmail, setProfileEmail] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    api
+      .getProfile()
+      .then((res) => {
+        if (!mounted) return;
+        setProfileEmail(String(res?.user?.email || "").trim().toLowerCase());
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const navItems = useMemo(() => {
+    if (adminEmail && profileEmail === adminEmail) {
+      return [...navigation, { name: "Admin", href: "/admin", icon: Settings }];
+    }
+    return navigation;
+  }, [profileEmail]);
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-border bg-card">
@@ -58,7 +86,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-4">
-        {navigation.map((item) => {
+        {navItems.map((item) => {
           const current = `${location.pathname}${location.hash}`;
           const isActive = item.href.includes("#") ? current === item.href : location.pathname === item.href;
           const Icon = item.icon;

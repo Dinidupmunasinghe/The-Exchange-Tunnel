@@ -310,4 +310,31 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }) as Promise<{ ok: boolean; sessionSaved?: boolean }>,
+  adminListUsers: (params?: { query?: string; page?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.query) qs.set("query", params.query);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return authRequest(`/admin/users${suffix}`) as Promise<{
+      users: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>;
+  },
+  adminAdjustCredits: (payload: { userId: number; amount: number; reason: string }) =>
+    authRequest("/admin/credits/adjust", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as Promise<{ message: string; user: any; balance: number }>,
+  adminListTransactions: (params?: { userId?: number; page?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.userId) qs.set("userId", String(params.userId));
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return authRequest(`/admin/transactions${suffix}`) as Promise<{
+      transactions: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>;
+  },
 };

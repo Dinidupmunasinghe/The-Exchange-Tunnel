@@ -6,6 +6,7 @@ const telegramRoutes = require("./telegramRoutes");
 const campaignRoutes = require("./campaignRoutes");
 const taskRoutes = require("./taskRoutes");
 const transactionRoutes = require("./transactionRoutes");
+const adminRoutes = require("./adminRoutes");
 
 const router = express.Router();
 
@@ -20,5 +21,6 @@ router.use("/telegram", telegramRoutes);
 router.use("/campaigns", campaignRoutes);
 router.use("/tasks", taskRoutes);
 router.use("/transactions", transactionRoutes);
+router.use("/admin", adminRoutes);
 
 module.exports = router;
