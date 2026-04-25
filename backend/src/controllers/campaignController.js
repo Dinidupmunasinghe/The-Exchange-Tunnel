@@ -298,4 +298,22 @@ async function deleteCampaign(req, res) {
   return res.json({ message: "Campaign deleted" });
 }
 
-module.exports = { createCampaign, listMyCampaigns, patchCampaign, deleteCampaign };
+async function getCampaignRewards(req, res) {
+  const [likeReward, commentReward, subscribeReward] = await Promise.all([
+    getRewardByType("like"),
+    getRewardByType("comment"),
+    getRewardByType("subscribe")
+  ]);
+  return res.json({
+    rewards: {
+      like: Number(likeReward) || 0,
+      comment: Number(commentReward) || 0,
+      // like_comment bundles like + comment as a single engagement; charged at the comment rate
+      // to match how the backend resolves the campaign reward (rewardTypeForCampaign falls through to "comment").
+      like_comment: Number(commentReward) || 0,
+      subscribe: Number(subscribeReward) || 0
+    }
+  });
+}
+
+module.exports = { createCampaign, listMyCampaigns, patchCampaign, deleteCampaign, getCampaignRewards };

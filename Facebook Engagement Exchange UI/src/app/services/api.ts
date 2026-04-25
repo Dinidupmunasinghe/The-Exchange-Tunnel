@@ -256,6 +256,10 @@ export const api = {
       posts: { id: string; message: string; permalinkUrl: string }[];
     }>,
   getCampaigns: () => authRequest("/campaigns") as Promise<{ campaigns: any[] }>,
+  getCampaignRewards: () =>
+    authRequest("/campaigns/rewards") as Promise<{
+      rewards: { like: number; comment: number; like_comment: number; subscribe: number };
+    }>,
   updateCampaign: (id: number, payload: { action: "pause" | "resume" }) =>
     authRequest(`/campaigns/${id}`, {
       method: "PATCH",
@@ -359,9 +363,10 @@ export const api = {
     adminRequestJson("/admin-auth/logout", { method: "POST" }).finally(() => {
       clearAdminToken();
     }),
-  adminListUsers: (params?: { query?: string; page?: number; limit?: number }) => {
+  adminListUsers: (params?: { query?: string; status?: string; page?: number; limit?: number }) => {
     const qs = new URLSearchParams();
     if (params?.query) qs.set("query", params.query);
+    if (params?.status) qs.set("status", params.status);
     if (params?.page) qs.set("page", String(params.page));
     if (params?.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
@@ -375,9 +380,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }) as Promise<{ message: string; user: any; balance: number }>,
-  adminListTransactions: (params?: { userId?: number; page?: number; limit?: number }) => {
+  adminListTransactions: (params?: {
+    userId?: number;
+    type?: "earn" | "spend" | "";
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }) => {
     const qs = new URLSearchParams();
     if (params?.userId) qs.set("userId", String(params.userId));
+    if (params?.type) qs.set("type", params.type);
+    if (params?.from) qs.set("from", params.from);
+    if (params?.to) qs.set("to", params.to);
     if (params?.page) qs.set("page", String(params.page));
     if (params?.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
@@ -419,4 +434,168 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload)
     }) as Promise<{ message: string; package: any }>,
+  adminDeletePackage: (id: number) =>
+    adminRequestJson(`/admin/packages/${id}`, { method: "DELETE" }) as Promise<{ message: string }>,
+  adminGetOverview: () =>
+    adminRequestJson("/admin/overview") as Promise<{ overview: any; recentAuditLogs: any[] }>,
+  adminGetUserDetails: (id: number) =>
+    adminRequestJson(`/admin/users/${id}`) as Promise<{
+      user: any;
+      campaigns: any[];
+      transactions: any[];
+      engagements: any[];
+      pendingRefundDebt: number;
+    }>,
+  adminUpdateUser: (
+    id: number,
+    payload: { name?: string; email?: string; isActive?: boolean }
+  ) =>
+    adminRequestJson(`/admin/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; user: any }>,
+  adminBlockUser: (id: number) =>
+    adminRequestJson(`/admin/users/${id}/block`, { method: "POST" }) as Promise<{
+      message: string;
+      user: { id: number; isActive: boolean };
+    }>,
+  adminUnblockUser: (id: number) =>
+    adminRequestJson(`/admin/users/${id}/unblock`, { method: "POST" }) as Promise<{
+      message: string;
+      user: { id: number; isActive: boolean };
+    }>,
+  adminClearMtprotoSession: (id: number) =>
+    adminRequestJson(`/admin/users/${id}/clear-mtproto-session`, { method: "POST" }) as Promise<{
+      message: string;
+    }>,
+  adminListPendingRefunds: (params?: { status?: string; page?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return adminRequestJson(`/admin/pending-refunds${suffix}`) as Promise<{
+      refunds: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>;
+  },
+  adminCancelPendingRefund: (id: number) =>
+    adminRequestJson(`/admin/pending-refunds/${id}/cancel`, { method: "POST" }) as Promise<{
+      message: string;
+      refund: any;
+    }>,
+  adminListCampaigns: (params?: {
+    query?: string;
+    status?: string;
+    ownerId?: number;
+    page?: number;
+    limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.query) qs.set("query", params.query);
+    if (params?.status) qs.set("status", params.status);
+    if (params?.ownerId) qs.set("ownerId", String(params.ownerId));
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return adminRequestJson(`/admin/campaigns${suffix}`) as Promise<{
+      campaigns: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>;
+  },
+  adminGetCampaignDetails: (id: number) =>
+    adminRequestJson(`/admin/campaigns/${id}`) as Promise<{ campaign: any; engagements: any[] }>,
+  adminUpdateCampaign: (id: number, payload: { action: "pause" | "resume" | "cancel" }) =>
+    adminRequestJson(`/admin/campaigns/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; campaign: any }>,
+  adminDeleteCampaign: (id: number) =>
+    adminRequestJson(`/admin/campaigns/${id}`, { method: "DELETE" }) as Promise<{
+      message: string;
+      refundedCredits: number;
+    }>,
+  adminListTasks: (params?: {
+    status?: string;
+    campaignId?: number;
+    assignedUserId?: number;
+    page?: number;
+    limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.campaignId) qs.set("campaignId", String(params.campaignId));
+    if (params?.assignedUserId) qs.set("assignedUserId", String(params.assignedUserId));
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return adminRequestJson(`/admin/tasks${suffix}`) as Promise<{
+      tasks: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>;
+  },
+  adminCancelTask: (id: number) =>
+    adminRequestJson(`/admin/tasks/${id}/cancel`, { method: "POST" }) as Promise<{
+      message: string;
+      refundedCredits: number;
+    }>,
+  adminListEngagements: (params?: {
+    campaignId?: number;
+    userId?: number;
+    actionKind?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.campaignId) qs.set("campaignId", String(params.campaignId));
+    if (params?.userId) qs.set("userId", String(params.userId));
+    if (params?.actionKind) qs.set("actionKind", params.actionKind);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return adminRequestJson(`/admin/engagements${suffix}`) as Promise<{
+      engagements: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>;
+  },
+  adminReverseEngagement: (id: number) =>
+    adminRequestJson(`/admin/engagements/${id}/reverse`, { method: "POST" }) as Promise<{
+      message: string;
+      collectedCredits: number;
+    }>,
+  adminGetTelegramHealth: () =>
+    adminRequestJson("/admin/telegram/health") as Promise<{
+      botConfigured: boolean;
+      botName: string | null;
+      mtprotoConfigured: boolean;
+      mtprotoApiIdConfigured: boolean;
+      mtprotoApiHashConfigured: boolean;
+      pythonBinary: string;
+      webhookSecretConfigured: boolean;
+      lastAuditRuns: Record<string, { ranAt: string; result: any } | null>;
+    }>,
+  adminRunTelegramAudits: (
+    kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership" = "all"
+  ) =>
+    adminRequestJson("/admin/telegram/audits/run", {
+      method: "POST",
+      body: JSON.stringify({ kind })
+    }) as Promise<{ message: string; results: Record<string, any> }>,
+  adminListAuditLogs: (params?: {
+    adminEmail?: string;
+    action?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.adminEmail) qs.set("adminEmail", params.adminEmail);
+    if (params?.action) qs.set("action", params.action);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return adminRequestJson(`/admin/audit-logs${suffix}`) as Promise<{
+      logs: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>;
+  },
 };

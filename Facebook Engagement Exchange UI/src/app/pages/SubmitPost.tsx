@@ -52,6 +52,12 @@ export function SubmitPost() {
   const [hasTelegramLogin, setHasTelegramLogin] = useState<boolean>(false);
   const [setupCheckMessage, setSetupCheckMessage] = useState<string | null>(null);
   const [messageUrl, setMessageUrl] = useState("");
+  const [adminRewards, setAdminRewards] = useState<{
+    like: number;
+    comment: number;
+    like_comment: number;
+    subscribe: number;
+  } | null>(null);
 
   const refreshSetupState = async () => {
     const res = await api.getProfile();
@@ -68,6 +74,10 @@ export function SubmitPost() {
 
   useEffect(() => {
     void refreshSetupState().catch(() => setBalance(null));
+    void api
+      .getCampaignRewards()
+      .then((res) => setAdminRewards(res.rewards))
+      .catch(() => setAdminRewards(null));
   }, []);
 
   useEffect(() => {
@@ -89,7 +99,16 @@ export function SubmitPost() {
   const effectiveType = campaignMode === "subscribe" ? "subscribe" : derivedType;
   const selectedEngagement = derivedType ? ENGAGEMENT_OPTIONS.find((t) => t.id === derivedType) : undefined;
   const subscribeOption = ENGAGEMENT_OPTIONS.find((t) => t.id === "subscribe");
-  const cost = campaignMode === "subscribe" ? (subscribeOption?.cost ?? 5) : (selectedEngagement?.cost ?? 1);
+  const fallbackCost =
+    campaignMode === "subscribe" ? (subscribeOption?.cost ?? 5) : (selectedEngagement?.cost ?? 1);
+  const adminCost = adminRewards
+    ? campaignMode === "subscribe"
+      ? adminRewards.subscribe
+      : derivedType
+        ? adminRewards[derivedType as keyof typeof adminRewards]
+        : null
+    : null;
+  const cost = adminCost && adminCost > 0 ? adminCost : fallbackCost;
   const estimatedEngagements = effectiveType ? Math.floor(creditBudget[0] / cost) : 0;
   const totalCharge = effectiveType ? cost * estimatedEngagements : 0;
 
@@ -542,6 +561,22 @@ export function SubmitPost() {
                     <strong className="text-foreground">Subscribe</strong> in the earn feed.
                   </div>
                 )}
+                <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div className="text-xs text-muted-foreground">
+                      <p>
+                        <span className="font-medium text-foreground">Credits per engagement:</span>{" "}
+                        <span className="font-semibold text-primary">{cost}</span> cr (set by platform admin
+                        {adminRewards ? "" : ", admin value loading…"})
+                      </p>
+                      <p className="mt-1">
+                        Campaign creators can&apos;t change this rate. Adjust your budget to control how many
+                        slots you fund.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label>Budget (credits)</Label>

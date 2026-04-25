@@ -1,33 +1,65 @@
 const express = require("express");
-const { body, query } = require("express-validator");
+const { body, param, query } = require("express-validator");
 const adminAuth = require("../middleware/adminAuth");
 const validateRequest = require("../middleware/validateRequest");
-const {
-  listUsers,
-  adjustCredits,
-  listTransactions,
-  getPlatformSettings,
-  updatePlatformSettings,
-  listCreditPackages,
-  createCreditPackage,
-  updateCreditPackage
-} = require("../controllers/adminController");
+const ctrl = require("../controllers/adminController");
 
 const router = express.Router();
 
 router.use(adminAuth);
 
+/* Overview */
+router.get("/overview", ctrl.getOverview);
+
+/* Users */
 router.get(
   "/users",
   [
     query("query").optional().isString().isLength({ max: 120 }),
+    query("status").optional().isIn(["active", "blocked", ""]),
     query("page").optional().isInt({ min: 1 }),
     query("limit").optional().isInt({ min: 1, max: 100 })
   ],
   validateRequest,
-  listUsers
+  ctrl.listUsers
+);
+router.get(
+  "/users/:id",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.getUserDetails
+);
+router.patch(
+  "/users/:id",
+  [
+    param("id").isInt({ min: 1 }),
+    body("name").optional().isString().isLength({ max: 120 }),
+    body("email").optional().isString().isEmail().isLength({ max: 160 }),
+    body("isActive").optional().isBoolean()
+  ],
+  validateRequest,
+  ctrl.updateUser
+);
+router.post(
+  "/users/:id/block",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.blockUser
+);
+router.post(
+  "/users/:id/unblock",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.unblockUser
+);
+router.post(
+  "/users/:id/clear-mtproto-session",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.clearMtprotoSession
 );
 
+/* Credits adjustments */
 router.post(
   "/credits/adjust",
   [
@@ -36,21 +68,44 @@ router.post(
     body("reason").isString().trim().isLength({ min: 1, max: 255 })
   ],
   validateRequest,
-  adjustCredits
+  ctrl.adjustCredits
 );
 
+/* Transactions */
 router.get(
   "/transactions",
   [
     query("userId").optional().isInt({ min: 1 }),
+    query("type").optional().isIn(["earn", "spend", ""]),
+    query("from").optional().isISO8601(),
+    query("to").optional().isISO8601(),
     query("page").optional().isInt({ min: 1 }),
     query("limit").optional().isInt({ min: 1, max: 200 })
   ],
   validateRequest,
-  listTransactions
+  ctrl.listTransactions
 );
 
-router.get("/settings", getPlatformSettings);
+/* Pending refunds */
+router.get(
+  "/pending-refunds",
+  [
+    query("status").optional().isIn(["pending", "settled", ""]),
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 200 })
+  ],
+  validateRequest,
+  ctrl.listPendingRefunds
+);
+router.post(
+  "/pending-refunds/:id/cancel",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.cancelPendingRefund
+);
+
+/* Settings */
+router.get("/settings", ctrl.getPlatformSettings);
 router.put(
   "/settings",
   [
@@ -60,10 +115,11 @@ router.put(
     body("subscribeReward").isInt({ min: 0 })
   ],
   validateRequest,
-  updatePlatformSettings
+  ctrl.updatePlatformSettings
 );
 
-router.get("/packages", listCreditPackages);
+/* Packages */
+router.get("/packages", ctrl.listCreditPackages);
 router.post(
   "/packages",
   [
@@ -73,18 +129,126 @@ router.post(
     body("isActive").optional().isBoolean()
   ],
   validateRequest,
-  createCreditPackage
+  ctrl.createCreditPackage
 );
 router.patch(
   "/packages/:id",
   [
+    param("id").isInt({ min: 1 }),
     body("name").optional().isString().trim().isLength({ min: 1, max: 120 }),
     body("credits").optional().isInt({ min: 1 }),
     body("priceLkr").optional().isFloat({ min: 0 }),
     body("isActive").optional().isBoolean()
   ],
   validateRequest,
-  updateCreditPackage
+  ctrl.updateCreditPackage
+);
+router.delete(
+  "/packages/:id",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.deleteCreditPackage
+);
+
+/* Campaigns */
+router.get(
+  "/campaigns",
+  [
+    query("query").optional().isString().isLength({ max: 160 }),
+    query("status").optional().isIn(["pending", "active", "paused", "completed", ""]),
+    query("ownerId").optional().isInt({ min: 1 }),
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 })
+  ],
+  validateRequest,
+  ctrl.listCampaigns
+);
+router.get(
+  "/campaigns/:id",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.getCampaignDetails
+);
+router.patch(
+  "/campaigns/:id",
+  [
+    param("id").isInt({ min: 1 }),
+    body("action").isIn(["pause", "resume", "cancel"])
+  ],
+  validateRequest,
+  ctrl.updateCampaign
+);
+router.delete(
+  "/campaigns/:id",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.deleteCampaign
+);
+
+/* Tasks */
+router.get(
+  "/tasks",
+  [
+    query("status").optional().isIn(["open", "assigned", "completed", "cancelled", ""]),
+    query("campaignId").optional().isInt({ min: 1 }),
+    query("assignedUserId").optional().isInt({ min: 1 }),
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 200 })
+  ],
+  validateRequest,
+  ctrl.listTasks
+);
+router.post(
+  "/tasks/:id/cancel",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.cancelTask
+);
+
+/* Engagements */
+router.get(
+  "/engagements",
+  [
+    query("campaignId").optional().isInt({ min: 1 }),
+    query("userId").optional().isInt({ min: 1 }),
+    query("actionKind").optional().isIn(["like", "comment", "share", "subscribe", ""]),
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 200 })
+  ],
+  validateRequest,
+  ctrl.listEngagements
+);
+router.post(
+  "/engagements/:id/reverse",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.reverseEngagement
+);
+
+/* Telegram health and audits */
+router.get("/telegram/health", ctrl.getTelegramHealth);
+router.post(
+  "/telegram/audits/run",
+  [
+    body("kind")
+      .optional()
+      .isIn(["all", "subscribe", "subscribeMemory", "like", "comment", "commentMembership"])
+  ],
+  validateRequest,
+  ctrl.runTelegramAudits
+);
+
+/* Audit logs */
+router.get(
+  "/audit-logs",
+  [
+    query("adminEmail").optional().isString().isLength({ max: 160 }),
+    query("action").optional().isString().isLength({ max: 120 }),
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 200 })
+  ],
+  validateRequest,
+  ctrl.listAuditLogs
 );
 
 module.exports = router;

@@ -4,12 +4,16 @@ const {
   createCampaign,
   listMyCampaigns,
   patchCampaign,
-  deleteCampaign
+  deleteCampaign,
+  getCampaignRewards
 } = require("../controllers/campaignController");
 const validateRequest = require("../middleware/validateRequest");
 const { ENGAGEMENT_TYPES } = require("../constants/engagement");
 
 const router = express.Router();
+
+// Read-only: current admin-defined per-action credit costs used when creating campaigns.
+router.get("/rewards", getCampaignRewards);
 
 // Supports both post-engagement and subscribe campaign creation payloads.
 router.post(

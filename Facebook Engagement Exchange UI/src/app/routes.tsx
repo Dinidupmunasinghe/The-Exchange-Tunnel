@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { Navigate, createBrowserRouter } from "react-router";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
@@ -10,12 +10,25 @@ import { Campaigns } from "./pages/Campaigns";
 import { Analytics } from "./pages/Analytics";
 import { Wallet } from "./pages/Wallet";
 import { Settings } from "./pages/Settings";
-import { Admin } from "./pages/Admin";
 import { AdminLogin } from "./pages/AdminLogin";
 import { NotFound } from "./pages/NotFound";
 import { Login } from "./pages/Login";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
 import { DataDeletion } from "./pages/DataDeletion";
+import { AdminOverview } from "./pages/admin/Overview";
+import { AdminUsers } from "./pages/admin/Users";
+import { AdminUserDetails } from "./pages/admin/UserDetails";
+import { AdminCredits } from "./pages/admin/Credits";
+import { AdminTransactions } from "./pages/admin/Transactions";
+import { AdminPendingRefunds } from "./pages/admin/PendingRefunds";
+import { AdminRewards } from "./pages/admin/Rewards";
+import { AdminPackages } from "./pages/admin/Packages";
+import { AdminCampaigns } from "./pages/admin/Campaigns";
+import { AdminCampaignDetails } from "./pages/admin/CampaignDetails";
+import { AdminTasks } from "./pages/admin/Tasks";
+import { AdminEngagements } from "./pages/admin/Engagements";
+import { AdminTelegram } from "./pages/admin/Telegram";
+import { AdminAuditLogs } from "./pages/admin/AuditLogs";
 
 export const router = createBrowserRouter([
   { path: "/login", Component: Login },
@@ -26,7 +39,28 @@ export const router = createBrowserRouter([
     children: [
       {
         Component: AdminLayout,
-        children: [{ path: "dashboard", Component: Admin }]
+        children: [
+          {
+            path: "dashboard",
+            children: [
+              { index: true, element: <Navigate to="overview" replace /> },
+              { path: "overview", Component: AdminOverview },
+              { path: "users", Component: AdminUsers },
+              { path: "users/:id", Component: AdminUserDetails },
+              { path: "credits", Component: AdminCredits },
+              { path: "transactions", Component: AdminTransactions },
+              { path: "pending-refunds", Component: AdminPendingRefunds },
+              { path: "rewards", Component: AdminRewards },
+              { path: "packages", Component: AdminPackages },
+              { path: "campaigns", Component: AdminCampaigns },
+              { path: "campaigns/:id", Component: AdminCampaignDetails },
+              { path: "tasks", Component: AdminTasks },
+              { path: "engagements", Component: AdminEngagements },
+              { path: "telegram", Component: AdminTelegram },
+              { path: "audit-logs", Component: AdminAuditLogs }
+            ]
+          }
+        ]
       }
     ]
   },

@@ -11,6 +11,7 @@ const PendingRefund = require("./pendingRefund")(sequelize, DataTypes);
 const UserSubscriptionMemory = require("./userSubscriptionMemory")(sequelize, DataTypes);
 const AppSetting = require("./appSetting")(sequelize, DataTypes);
 const CreditPackage = require("./creditPackage")(sequelize, DataTypes);
+const AdminAuditLog = require("./adminAuditLog")(sequelize, DataTypes);
 
 User.hasMany(Campaign, { foreignKey: "userId", as: "campaigns" });
 Campaign.belongsTo(User, { foreignKey: "userId", as: "owner" });
@@ -56,7 +57,8 @@ const db = {
   UserSubscriptionMemory
   ,
   AppSetting,
-  CreditPackage
+  CreditPackage,
+  AdminAuditLog
 };
 
 module.exports = db;
