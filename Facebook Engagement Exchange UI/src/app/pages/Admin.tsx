@@ -23,15 +23,45 @@ type AdminTx = {
   user?: { id: number; email: string; name?: string | null };
 };
 
+type PlatformSettings = {
+  dailyEarnLimit: number;
+  likeReward: number;
+  commentReward: number;
+  subscribeReward: number;
+};
+
+type CreditPackage = {
+  id: number;
+  name: string;
+  credits: number;
+  priceLkr: string | number;
+  isActive: boolean;
+};
+
 export function Admin() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [transactions, setTransactions] = useState<AdminTx[]>([]);
+  const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [search, setSearch] = useState("");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [settingsForm, setSettingsForm] = useState<PlatformSettings>({
+    dailyEarnLimit: 500,
+    likeReward: 5,
+    commentReward: 10,
+    subscribeReward: 10
+  });
+  const [packageForm, setPackageForm] = useState({
+    name: "",
+    credits: "",
+    priceLkr: "",
+    isActive: true
+  });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [savingPackage, setSavingPackage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -39,12 +69,16 @@ export function Admin() {
     setLoading(true);
     setError(null);
     try {
-      const [userRes, txRes] = await Promise.all([
+      const [userRes, txRes, settingsRes, packagesRes] = await Promise.all([
         api.adminListUsers({ query: search || undefined, limit: 25 }),
-        api.adminListTransactions({ limit: 50 })
+        api.adminListTransactions({ limit: 50 }),
+        api.adminGetSettings(),
+        api.adminListPackages()
       ]);
       setUsers(userRes.users || []);
       setTransactions(txRes.transactions || []);
+      setPackages(packagesRes.packages || []);
+      setSettingsForm(settingsRes.settings || settingsForm);
       if (!selectedUser && (userRes.users || []).length > 0) {
         setSelectedUser(userRes.users[0]);
       }
@@ -94,14 +128,182 @@ export function Admin() {
     }
   }
 
+  async function handleSaveSettings(e: FormEvent) {
+    e.preventDefault();
+    setSavingSettings(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await api.adminUpdateSettings({
+        dailyEarnLimit: Number(settingsForm.dailyEarnLimit),
+        likeReward: Number(settingsForm.likeReward),
+        commentReward: Number(settingsForm.commentReward),
+        subscribeReward: Number(settingsForm.subscribeReward)
+      });
+      setMessage("Platform reward settings saved");
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save settings");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleCreatePackage(e: FormEvent) {
+    e.preventDefault();
+    setSavingPackage(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await api.adminCreatePackage({
+        name: packageForm.name.trim(),
+        credits: Number(packageForm.credits),
+        priceLkr: Number(packageForm.priceLkr),
+        isActive: packageForm.isActive
+      });
+      setPackageForm({ name: "", credits: "", priceLkr: "", isActive: true });
+      setMessage("Package created");
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create package");
+    } finally {
+      setSavingPackage(false);
+    }
+  }
+
+  async function handleTogglePackage(pkg: CreditPackage) {
+    setError(null);
+    setMessage(null);
+    try {
+      await api.adminUpdatePackage(pkg.id, { isActive: !pkg.isActive });
+      setMessage(`Package ${!pkg.isActive ? "enabled" : "disabled"}`);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update package");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">Control user credits and audit all adjustments.</p>
+        <p className="mt-1 text-muted-foreground">
+          Control user credits, reward settings, free-plan limits, and package offerings.
+        </p>
       </div>
 
-      <Card className="border-slate-200 bg-white">
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle>Platform Reward Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSaveSettings}>
+            <Input
+              type="number"
+              min={0}
+              value={settingsForm.dailyEarnLimit}
+              onChange={(e) => setSettingsForm((s) => ({ ...s, dailyEarnLimit: Number(e.target.value) }))}
+              placeholder="Free plan daily limit"
+            />
+            <Input
+              type="number"
+              min={0}
+              value={settingsForm.likeReward}
+              onChange={(e) => setSettingsForm((s) => ({ ...s, likeReward: Number(e.target.value) }))}
+              placeholder="Like reward"
+            />
+            <Input
+              type="number"
+              min={0}
+              value={settingsForm.commentReward}
+              onChange={(e) => setSettingsForm((s) => ({ ...s, commentReward: Number(e.target.value) }))}
+              placeholder="Comment reward"
+            />
+            <Input
+              type="number"
+              min={0}
+              value={settingsForm.subscribeReward}
+              onChange={(e) => setSettingsForm((s) => ({ ...s, subscribeReward: Number(e.target.value) }))}
+              placeholder="Subscribe reward"
+            />
+            <div className="md:col-span-4">
+              <Button type="submit" disabled={savingSettings}>
+                {savingSettings ? "Saving..." : "Save Reward Settings"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle>Credit Packages</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form className="grid gap-3 md:grid-cols-4" onSubmit={handleCreatePackage}>
+            <Input
+              value={packageForm.name}
+              onChange={(e) => setPackageForm((s) => ({ ...s, name: e.target.value }))}
+              placeholder="Package name"
+            />
+            <Input
+              type="number"
+              min={1}
+              value={packageForm.credits}
+              onChange={(e) => setPackageForm((s) => ({ ...s, credits: e.target.value }))}
+              placeholder="Credits"
+            />
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={packageForm.priceLkr}
+              onChange={(e) => setPackageForm((s) => ({ ...s, priceLkr: e.target.value }))}
+              placeholder="Price (LKR)"
+            />
+            <Button type="submit" disabled={savingPackage}>
+              {savingPackage ? "Creating..." : "Add Package"}
+            </Button>
+          </form>
+          <div className="max-h-56 overflow-auto rounded-md border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="px-3 py-2 text-left">Name</th>
+                  <th className="px-3 py-2 text-left">Credits</th>
+                  <th className="px-3 py-2 text-left">Price</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {packages.map((pkg) => (
+                  <tr key={pkg.id} className="border-t border-border">
+                    <td className="px-3 py-2">{pkg.name}</td>
+                    <td className="px-3 py-2">{pkg.credits}</td>
+                    <td className="px-3 py-2">{pkg.priceLkr}</td>
+                    <td className="px-3 py-2">{pkg.isActive ? "Active" : "Inactive"}</td>
+                    <td className="px-3 py-2">
+                      <Button variant="outline" size="sm" onClick={() => void handleTogglePackage(pkg)}>
+                        {pkg.isActive ? "Disable" : "Enable"}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {packages.length === 0 && (
+                  <tr>
+                    <td className="px-3 py-4 text-muted-foreground" colSpan={5}>
+                      No packages yet
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle>User Search</CardTitle>
         </CardHeader>
@@ -155,7 +357,7 @@ export function Admin() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white">
+      <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle>Adjust Credits</CardTitle>
         </CardHeader>
@@ -179,7 +381,7 @@ export function Admin() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white">
+      <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle>Recent Transactions</CardTitle>
         </CardHeader>

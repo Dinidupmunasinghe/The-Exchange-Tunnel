@@ -2,6 +2,31 @@ const { Op } = require("sequelize");
 const env = require("../config/env");
 const db = require("../models");
 
+let limitsCache = null;
+let limitsCacheAt = 0;
+const LIMITS_CACHE_TTL_MS = 30 * 1000;
+
+async function loadDynamicLimits(transaction) {
+  const now = Date.now();
+  if (!transaction && limitsCache && now - limitsCacheAt < LIMITS_CACHE_TTL_MS) return limitsCache;
+  const rows = await db.AppSetting.findAll({
+    where: { key: { [Op.in]: ["dailyEarnLimit", "likeReward", "commentReward", "subscribeReward"] } },
+    transaction
+  }).catch(() => []);
+  const map = new Map(rows.map((r) => [String(r.key), String(r.value)]));
+  const out = {
+    dailyEarnLimit: Number(map.get("dailyEarnLimit") || env.limits.dailyEarnLimit || 500),
+    likeReward: Number(map.get("likeReward") || env.limits.likeReward || 5),
+    commentReward: Number(map.get("commentReward") || env.limits.commentReward || 10),
+    subscribeReward: Number(map.get("subscribeReward") || env.limits.commentReward || 10)
+  };
+  if (!transaction) {
+    limitsCache = out;
+    limitsCacheAt = now;
+  }
+  return out;
+}
+
 function getTodayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -127,12 +152,13 @@ async function settlePendingRefundDebts({ workerUserId, transaction }) {
 async function canEarnCreditsToday({ userId, amount, transaction }) {
   const user = await db.User.findByPk(userId, { transaction, lock: true });
   if (!user) throw new Error("User not found");
+  const limits = await loadDynamicLimits(transaction);
   const today = getTodayDateString();
   if (user.dailyEarnedAt !== today) {
     user.dailyEarnedAt = today;
     user.dailyEarnedCredits = 0;
   }
-  const allowed = user.dailyEarnedCredits + amount <= env.limits.dailyEarnLimit;
+  const allowed = user.dailyEarnedCredits + amount <= limits.dailyEarnLimit;
   return { user, allowed };
 }
 
@@ -216,9 +242,11 @@ async function earnCredits({ userId, amount, reason, referenceType, referenceId,
   return user.credits;
 }
 
-function getRewardByType(type) {
-  if (type === "like") return env.limits.likeReward;
-  if (type === "comment") return env.limits.commentReward;
+async function getRewardByType(type, transaction) {
+  const limits = await loadDynamicLimits(transaction);
+  if (type === "like") return limits.likeReward;
+  if (type === "comment") return limits.commentReward;
+  if (type === "subscribe") return limits.subscribeReward;
   return env.limits.shareReward;
 }
 

@@ -18,14 +18,14 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
-      <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
+    <aside className="flex h-full w-64 flex-col border-r border-border bg-card">
+      <div className="flex h-16 items-center gap-3 border-b border-border px-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-brand-foreground">
           <ShieldCheck className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-slate-900">Exchange Admin</h1>
-          <p className="text-xs text-slate-500">Control Center</p>
+          <h1 className="text-lg font-bold text-foreground">Exchange Admin</h1>
+          <p className="text-xs text-muted-foreground">Control Center</p>
         </div>
       </div>
       <nav className="flex-1 space-y-1 p-4">
@@ -37,7 +37,7 @@ export function AdminSidebar() {
               key={item.name}
               to={item.href}
               className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition ${
-                active ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-100"
+                active ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-brand/10 hover:text-brand"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -46,11 +46,11 @@ export function AdminSidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-slate-200 p-4">
+      <div className="border-t border-border p-4">
         <Button
           type="button"
           variant="outline"
-          className="w-full justify-start border-slate-300 text-slate-700 hover:bg-slate-100"
+          className="w-full justify-start"
           onClick={() => void handleLogout()}
         >
           <LogOut className="mr-2 h-4 w-4" />

@@ -32,11 +32,11 @@ export function AdminLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 text-slate-900">
-      <Card className="w-full max-w-md border-slate-200 bg-white shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
+      <Card className="w-full max-w-md border-border bg-card shadow-sm">
         <CardHeader>
-          <CardTitle className="text-2xl text-slate-900">Admin Login</CardTitle>
-          <p className="text-sm text-slate-500">Sign in with your admin credentials.</p>
+          <CardTitle className="text-2xl text-foreground">Admin Login</CardTitle>
+          <p className="text-sm text-muted-foreground">Sign in with your admin credentials.</p>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -46,7 +46,7 @@ export function AdminLogin() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Admin email"
               required
-              className="border-slate-300 bg-white text-slate-900"
+              className="bg-background"
             />
             <Input
               type="password"
@@ -54,13 +54,13 @@ export function AdminLogin() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Admin password"
               required
-              className="border-slate-300 bg-white text-slate-900"
+              className="bg-background"
             />
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white hover:bg-blue-700"
+              className="w-full"
             >
               {loading ? "Signing in..." : "Sign in"}
             </Button>

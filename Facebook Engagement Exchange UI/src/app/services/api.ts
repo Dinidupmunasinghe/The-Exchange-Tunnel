@@ -386,4 +386,37 @@ export const api = {
       pagination: { page: number; limit: number; total: number; totalPages: number };
     }>;
   },
+  adminGetSettings: () =>
+    adminRequestJson("/admin/settings") as Promise<{
+      settings: {
+        dailyEarnLimit: number;
+        likeReward: number;
+        commentReward: number;
+        subscribeReward: number;
+      };
+    }>,
+  adminUpdateSettings: (payload: {
+    dailyEarnLimit: number;
+    likeReward: number;
+    commentReward: number;
+    subscribeReward: number;
+  }) =>
+    adminRequestJson("/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; settings: any }>,
+  adminListPackages: () => adminRequestJson("/admin/packages") as Promise<{ packages: any[] }>,
+  adminCreatePackage: (payload: { name: string; credits: number; priceLkr: number; isActive?: boolean }) =>
+    adminRequestJson("/admin/packages", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; package: any }>,
+  adminUpdatePackage: (
+    id: number,
+    payload: { name?: string; credits?: number; priceLkr?: number; isActive?: boolean }
+  ) =>
+    adminRequestJson(`/admin/packages/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; package: any }>,
 };

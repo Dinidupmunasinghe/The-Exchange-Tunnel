@@ -9,6 +9,8 @@ const Engagement = require("./engagement")(sequelize, DataTypes);
 const UserPostAction = require("./userPostAction")(sequelize, DataTypes);
 const PendingRefund = require("./pendingRefund")(sequelize, DataTypes);
 const UserSubscriptionMemory = require("./userSubscriptionMemory")(sequelize, DataTypes);
+const AppSetting = require("./appSetting")(sequelize, DataTypes);
+const CreditPackage = require("./creditPackage")(sequelize, DataTypes);
 
 User.hasMany(Campaign, { foreignKey: "userId", as: "campaigns" });
 Campaign.belongsTo(User, { foreignKey: "userId", as: "owner" });
@@ -52,6 +54,9 @@ const db = {
   UserPostAction,
   PendingRefund,
   UserSubscriptionMemory
+  ,
+  AppSetting,
+  CreditPackage
 };
 
 module.exports = db;

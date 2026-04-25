@@ -121,4 +121,97 @@ async function listTransactions(req, res) {
   });
 }
 
-module.exports = { listUsers, adjustCredits, listTransactions };
+async function getPlatformSettings(req, res) {
+  const rows = await db.AppSetting.findAll({
+    where: { key: { [Op.in]: ["dailyEarnLimit", "likeReward", "commentReward", "subscribeReward"] } },
+    order: [["key", "ASC"]]
+  });
+  const map = new Map(rows.map((r) => [String(r.key), String(r.value)]));
+  return res.json({
+    settings: {
+      dailyEarnLimit: Number(map.get("dailyEarnLimit") || 500),
+      likeReward: Number(map.get("likeReward") || 5),
+      commentReward: Number(map.get("commentReward") || 10),
+      subscribeReward: Number(map.get("subscribeReward") || 10)
+    }
+  });
+}
+
+async function updatePlatformSettings(req, res) {
+  const payload = {
+    dailyEarnLimit: Number(req.body.dailyEarnLimit),
+    likeReward: Number(req.body.likeReward),
+    commentReward: Number(req.body.commentReward),
+    subscribeReward: Number(req.body.subscribeReward)
+  };
+  const keys = Object.keys(payload);
+  for (const key of keys) {
+    const value = payload[key];
+    if (!Number.isInteger(value) || value < 0) {
+      return res.status(400).json({ message: `${key} must be an integer >= 0` });
+    }
+  }
+  await db.sequelize.transaction(async (transaction) => {
+    for (const key of keys) {
+      await db.AppSetting.upsert({ key, value: String(payload[key]) }, { transaction });
+    }
+  });
+  return res.json({ message: "Settings updated", settings: payload });
+}
+
+async function listCreditPackages(req, res) {
+  const packages = await db.CreditPackage.findAll({ order: [["id", "DESC"]] });
+  return res.json({ packages });
+}
+
+async function createCreditPackage(req, res) {
+  const name = String(req.body.name || "").trim();
+  const credits = Number(req.body.credits);
+  const priceLkr = Number(req.body.priceLkr);
+  const isActive = req.body.isActive !== false;
+  if (!name) return res.status(400).json({ message: "Package name is required" });
+  if (!Number.isInteger(credits) || credits < 1) {
+    return res.status(400).json({ message: "Credits must be a positive integer" });
+  }
+  if (!Number.isFinite(priceLkr) || priceLkr < 0) {
+    return res.status(400).json({ message: "Price must be a valid non-negative number" });
+  }
+  const created = await db.CreditPackage.create({ name, credits, priceLkr, isActive });
+  return res.status(201).json({ message: "Package created", package: created });
+}
+
+async function updateCreditPackage(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid package id" });
+  const pkg = await db.CreditPackage.findByPk(id);
+  if (!pkg) return res.status(404).json({ message: "Package not found" });
+  if (req.body.name != null) pkg.name = String(req.body.name || "").trim();
+  if (req.body.credits != null) {
+    const credits = Number(req.body.credits);
+    if (!Number.isInteger(credits) || credits < 1) {
+      return res.status(400).json({ message: "Credits must be a positive integer" });
+    }
+    pkg.credits = credits;
+  }
+  if (req.body.priceLkr != null) {
+    const priceLkr = Number(req.body.priceLkr);
+    if (!Number.isFinite(priceLkr) || priceLkr < 0) {
+      return res.status(400).json({ message: "Price must be a valid non-negative number" });
+    }
+    pkg.priceLkr = priceLkr;
+  }
+  if (req.body.isActive != null) pkg.isActive = Boolean(req.body.isActive);
+  await pkg.save();
+  return res.json({ message: "Package updated", package: pkg });
+}
+
+module.exports = {
+  listUsers,
+  adjustCredits,
+  listTransactions,
+  getPlatformSettings,
+  updatePlatformSettings,
+  listCreditPackages,
+  createCreditPackage,
+  updateCreditPackage
+};
