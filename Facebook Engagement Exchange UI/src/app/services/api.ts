@@ -311,7 +311,12 @@ export const api = {
     authRequest("/tasks/revert", {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
+    }) as Promise<{
+      message: string;
+      fallback?: boolean;
+      actionKind?: "subscribe" | "comment" | "like";
+      telegramCleared?: boolean;
+    }>,
   startCommentDetect: (payload: { taskId: number }) =>
     authRequest("/tasks/comment-detect/start", {
       method: "POST",

@@ -722,6 +722,7 @@ async function revertEngagement(req, res) {
   if (!["subscribe", "comment", "like"].includes(actionKind)) {
     return res.status(400).json({ message: "Invalid action kind" });
   }
+  let fallbackResult = null;
   try {
     await sequelize.transaction(async (transaction) => {
       const engagementWhere =
@@ -738,9 +739,18 @@ async function revertEngagement(req, res) {
         ]
       });
       if (!engagement) {
-        const error = new Error("No engagement to undo");
-        error.status = 404;
-        throw error;
+        // Fallback: no Engagement row for this campaign, but the user may carry
+        // inherited memory from a previous campaign on the same Telegram post
+        // (UserPostAction / UserSubscriptionMemory survive campaign deletion and
+        // are keyed by messageKey, not campaignId). Best-effort undo on Telegram
+        // and clear the stale memory so the card returns to the actionable state.
+        fallbackResult = await revertOrphanedMemory({
+          userId: req.user.id,
+          campaignId,
+          actionKind,
+          transaction
+        });
+        return;
       }
       const campaign = engagement.campaign;
       const task = engagement.task;
@@ -923,6 +933,14 @@ async function revertEngagement(req, res) {
         }
       }
     });
+    if (fallbackResult) {
+      return res.json({
+        message: fallbackResult.message,
+        fallback: true,
+        actionKind,
+        telegramCleared: fallbackResult.telegramCleared
+      });
+    }
     return res.json({
       message:
         "Engagement reverted in the app; remove your Telegram comment if needed. Credits were returned to the poster."
@@ -931,6 +949,125 @@ async function revertEngagement(req, res) {
     const status = err.status || 500;
     return res.status(status).json({ message: err.message || "Could not revert engagement" });
   }
+}
+
+async function revertOrphanedMemory({ userId, campaignId, actionKind, transaction }) {
+  const campaign = await db.Campaign.findByPk(campaignId, { transaction });
+  if (!campaign) {
+    const error = new Error("Campaign not found");
+    error.status = 404;
+    throw error;
+  }
+  const worker = await db.User.findByPk(userId, { transaction, lock: true });
+  const creds = parseStoredMtprotoCredentials(worker);
+  const sessionString = parseStoredSessionString(worker);
+  const messageUrl = String(campaign.messageUrl || "");
+
+  if (actionKind === "subscribe") {
+    const channelKey = String(campaign.messageKey || `sub_${campaignId}`);
+    const memory = await db.UserSubscriptionMemory.findOne({
+      where: { userId, channelKey },
+      transaction
+    });
+    if (!memory) {
+      const error = new Error("No engagement to undo");
+      error.status = 404;
+      throw error;
+    }
+    let telegramCleared = false;
+    if (creds && sessionString) {
+      const username = parseTmeChannelUsername(messageUrl);
+      if (username) {
+        try {
+          await runBridge("leave_channel", {
+            apiId: creds.apiId,
+            apiHash: creds.apiHash,
+            proxy: creds.proxy || null,
+            sessionString,
+            channel: `@${username}`
+          });
+          telegramCleared = true;
+        } catch {
+          telegramCleared = false;
+        }
+      }
+    }
+    await memory.destroy({ transaction });
+    return {
+      telegramCleared,
+      message: telegramCleared
+        ? "Left the channel and cleared your saved subscription. No credits were involved (this slot was inherited from a prior campaign)."
+        : "Cleared your saved subscription on this account. If you're still subscribed on Telegram, leave the channel manually."
+    };
+  }
+
+  const postKey = String(campaign.messageKey || "");
+  if (!postKey) {
+    const error = new Error("No engagement to undo");
+    error.status = 404;
+    throw error;
+  }
+  const memory = await db.UserPostAction.findOne({
+    where: { userId, postKey, actionKind },
+    transaction
+  });
+  if (!memory) {
+    const error = new Error("No engagement to undo");
+    error.status = 404;
+    throw error;
+  }
+
+  let telegramCleared = false;
+  if (actionKind === "like" && creds && sessionString) {
+    const parsedMessage = tg.parseTmeMessageUrl(messageUrl);
+    if (parsedMessage?.messageId) {
+      const chatCandidates = [];
+      if (parsedMessage.kind === "public" && parsedMessage.username) {
+        chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
+      }
+      try {
+        const resolved = await tg.resolveChannelChatIdFromTme(messageUrl);
+        if (resolved?.chatId) chatCandidates.push(String(resolved.chatId));
+      } catch {
+        // ignore — we still have the username candidate
+      }
+      for (const chatRef of chatCandidates) {
+        try {
+          await runBridge("clear_reaction", {
+            apiId: creds.apiId,
+            apiHash: creds.apiHash,
+            proxy: creds.proxy || null,
+            sessionString,
+            chat: chatRef,
+            msgId: Number(parsedMessage.messageId)
+          });
+          telegramCleared = true;
+          break;
+        } catch {
+          // try next candidate
+        }
+      }
+    }
+  }
+
+  await memory.destroy({ transaction });
+
+  if (actionKind === "like") {
+    return {
+      telegramCleared,
+      message: telegramCleared
+        ? "Removed your reaction on Telegram and cleared the saved like. No credits were involved (this slot was inherited from a prior campaign)."
+        : "Cleared the saved like on your account. If your reaction is still on Telegram, remove it there."
+    };
+  }
+  // comment fallback: we don't have the discussion-group message id (the
+  // original Engagement that stored it was destroyed), so we cannot
+  // programmatically delete the comment. Just clear local memory.
+  return {
+    telegramCleared: false,
+    message:
+      "Cleared the saved comment on your account. If your comment is still in the Telegram discussion, please delete it there."
+  };
 }
 
 module.exports = {

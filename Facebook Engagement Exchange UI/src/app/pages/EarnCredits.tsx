@@ -238,8 +238,12 @@ export function EarnCredits() {
         if (subscribedAlready) {
           const key = `${campaignId}-unsubscribe`;
           setBusy(key);
-          await api.revertEngagement({ campaignId, actionKind: "subscribe" });
-          toast.success("Unsubscribed and credits refunded.");
+          const res = await api.revertEngagement({ campaignId, actionKind: "subscribe" });
+          if (res.fallback) {
+            toast.success(res.message || "Saved subscription cleared.");
+          } else {
+            toast.success("Unsubscribed and credits refunded.");
+          }
           const refreshed = await api.getTasks();
           setTasks(refreshed.tasks as TaskRow[]);
           setMyEngagements(refreshed.myEngagements ?? []);
@@ -317,11 +321,15 @@ export function EarnCredits() {
         if (likedAlready) {
           const key = `${campaignId}-unlike`;
           setBusy(key);
-          await api.revertEngagement({
+          const res = await api.revertEngagement({
             campaignId,
             actionKind: "like",
           });
-          toast.success("Like removed and credits refunded.");
+          if (res.fallback) {
+            toast.success(res.message || "Saved like cleared.");
+          } else {
+            toast.success("Like removed and credits refunded.");
+          }
           const refreshed = await api.getTasks();
           setTasks(refreshed.tasks as TaskRow[]);
           setMyEngagements(refreshed.myEngagements ?? []);
@@ -369,8 +377,12 @@ export function EarnCredits() {
     try {
       const key = `${campaignId}-comment-delete`;
       setBusy(key);
-      await api.revertEngagement({ campaignId, actionKind: "comment" });
-      toast.success("Comment removed and credits refunded.");
+      const res = await api.revertEngagement({ campaignId, actionKind: "comment" });
+      if (res.fallback) {
+        toast.success(res.message || "Saved comment cleared.");
+      } else {
+        toast.success("Comment removed and credits refunded.");
+      }
       const refreshed = await api.getTasks();
       setTasks(refreshed.tasks as TaskRow[]);
       setMyEngagements(refreshed.myEngagements ?? []);
