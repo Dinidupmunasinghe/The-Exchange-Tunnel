@@ -19,6 +19,10 @@ const env = {
     secret: process.env.JWT_SECRET || "dev-secret-change-me",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d"
   },
+  adminLoginEmail: String(process.env.ADMIN_LOGIN_EMAIL || "")
+    .trim()
+    .toLowerCase(),
+  adminLoginPassword: String(process.env.ADMIN_LOGIN_PASSWORD || ""),
   adminEmail: String(process.env.ADMIN_EMAIL || "")
     .trim()
     .toLowerCase(),

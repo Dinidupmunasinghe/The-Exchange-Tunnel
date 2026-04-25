@@ -73,8 +73,8 @@ async function adjustCredits(req, res) {
       userId,
       amount,
       reason,
-      adminUserId: req.user.id,
-      adminEmail: req.user.email || "",
+      adminUserId: null,
+      adminEmail: req.admin?.email || "admin",
       transaction
     });
     const updatedUser = await db.User.findByPk(userId, {

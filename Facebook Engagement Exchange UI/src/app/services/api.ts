@@ -1,5 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const TOKEN_KEY = "exchange_token";
+const ADMIN_TOKEN_KEY = "exchange_admin_token";
 
 type Json = Record<string, unknown>;
 
@@ -34,6 +35,18 @@ export function setToken(token: string) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getAdminToken() {
+  return localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function setAdminToken(token: string) {
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
+
+export function clearAdminToken() {
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
 function mapNetworkError(e: unknown): Error {
@@ -125,6 +138,29 @@ async function authRequest<T>(path: string, options: RequestInit = {}): Promise<
     throw new Error("Not authenticated");
   }
   return request<T>(path, options);
+}
+
+async function adminRequestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAdminToken();
+  if (!token) throw new Error("Admin not authenticated");
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {})
+      }
+    });
+  } catch (e) {
+    throw mapNetworkError(e);
+  }
+  const { payload, rawText } = await readJsonBody(response);
+  if (!response.ok) {
+    throw new Error(extractApiErrorMessage(response, payload, rawText));
+  }
+  return payload as T;
 }
 
 /** @see https://core.telegram.org/widgets/login */
@@ -310,19 +346,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }) as Promise<{ ok: boolean; sessionSaved?: boolean }>,
+  adminLogin: (payload: { email: string; password: string }) =>
+    requestWithoutAuth<{ message: string; token: string; admin: { email: string } }>("/admin-auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }).then((res) => {
+      setAdminToken(res.token);
+      return res;
+    }),
+  adminMe: () => adminRequestJson("/admin-auth/me") as Promise<{ admin: { email: string } }>,
+  adminLogout: () =>
+    adminRequestJson("/admin-auth/logout", { method: "POST" }).finally(() => {
+      clearAdminToken();
+    }),
   adminListUsers: (params?: { query?: string; page?: number; limit?: number }) => {
     const qs = new URLSearchParams();
     if (params?.query) qs.set("query", params.query);
     if (params?.page) qs.set("page", String(params.page));
     if (params?.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return authRequest(`/admin/users${suffix}`) as Promise<{
+    return adminRequestJson(`/admin/users${suffix}`) as Promise<{
       users: any[];
       pagination: { page: number; limit: number; total: number; totalPages: number };
     }>;
   },
   adminAdjustCredits: (payload: { userId: number; amount: number; reason: string }) =>
-    authRequest("/admin/credits/adjust", {
+    adminRequestJson("/admin/credits/adjust", {
       method: "POST",
       body: JSON.stringify(payload),
     }) as Promise<{ message: string; user: any; balance: number }>,
@@ -332,7 +381,7 @@ export const api = {
     if (params?.page) qs.set("page", String(params.page));
     if (params?.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return authRequest(`/admin/transactions${suffix}`) as Promise<{
+    return adminRequestJson(`/admin/transactions${suffix}`) as Promise<{
       transactions: any[];
       pagination: { page: number; limit: number; total: number; totalPages: number };
     }>;

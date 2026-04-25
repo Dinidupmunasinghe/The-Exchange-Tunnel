@@ -1,5 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -24,12 +23,7 @@ type AdminTx = {
   user?: { id: number; email: string; name?: string | null };
 };
 
-const ADMIN_EMAIL = String(import.meta.env.VITE_ADMIN_EMAIL || "")
-  .trim()
-  .toLowerCase();
-
 export function Admin() {
-  const [me, setMe] = useState<{ email?: string } | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [transactions, setTransactions] = useState<AdminTx[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -41,23 +35,14 @@ export function Admin() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const isAdmin = useMemo(() => {
-    if (!ADMIN_EMAIL) return false;
-    return String(me?.email || "")
-      .trim()
-      .toLowerCase() === ADMIN_EMAIL;
-  }, [me]);
-
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [profile, userRes, txRes] = await Promise.all([
-        api.getProfile(),
+      const [userRes, txRes] = await Promise.all([
         api.adminListUsers({ query: search || undefined, limit: 25 }),
         api.adminListTransactions({ limit: 50 })
       ]);
-      setMe(profile.user || null);
       setUsers(userRes.users || []);
       setTransactions(txRes.transactions || []);
       if (!selectedUser && (userRes.users || []).length > 0) {
@@ -109,10 +94,6 @@ export function Admin() {
     }
   }
 
-  if (me && !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -120,7 +101,7 @@ export function Admin() {
         <p className="mt-1 text-muted-foreground">Control user credits and audit all adjustments.</p>
       </div>
 
-      <Card className="border-border bg-card">
+      <Card className="border-slate-200 bg-white">
         <CardHeader>
           <CardTitle>User Search</CardTitle>
         </CardHeader>
@@ -174,7 +155,7 @@ export function Admin() {
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-card">
+      <Card className="border-slate-200 bg-white">
         <CardHeader>
           <CardTitle>Adjust Credits</CardTitle>
         </CardHeader>
@@ -198,7 +179,7 @@ export function Admin() {
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-card">
+      <Card className="border-slate-200 bg-white">
         <CardHeader>
           <CardTitle>Recent Transactions</CardTitle>
         </CardHeader>

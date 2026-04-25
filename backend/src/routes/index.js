@@ -7,6 +7,7 @@ const campaignRoutes = require("./campaignRoutes");
 const taskRoutes = require("./taskRoutes");
 const transactionRoutes = require("./transactionRoutes");
 const adminRoutes = require("./adminRoutes");
+const adminAuthRoutes = require("./adminAuthRoutes");
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.get("/health", (req, res) => {
 });
 
 router.use("/auth", authRoutes);
+router.use("/admin-auth", adminAuthRoutes);
 router.use(authMiddleware);
 router.use("/users", userRoutes);
 router.use("/telegram", telegramRoutes);

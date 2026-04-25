@@ -1,12 +1,12 @@
 const express = require("express");
 const { body, query } = require("express-validator");
-const requireAdmin = require("../middleware/admin");
+const adminAuth = require("../middleware/adminAuth");
 const validateRequest = require("../middleware/validateRequest");
 const { listUsers, adjustCredits, listTransactions } = require("../controllers/adminController");
 
 const router = express.Router();
 
-router.use(requireAdmin);
+router.use(adminAuth);
 
 router.get(
   "/users",
