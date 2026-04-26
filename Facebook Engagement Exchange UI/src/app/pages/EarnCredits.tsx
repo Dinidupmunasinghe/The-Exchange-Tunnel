@@ -409,8 +409,10 @@ export function EarnCredits() {
       <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
         <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p className="text-sm leading-relaxed text-muted-foreground">
-          <span className="font-medium text-foreground">Log in with Telegram</span> so we can verify your subscription to
-          the target channel. Post campaigns can include like and/or comment actions.
+          <span className="font-medium text-foreground">Log in with Telegram</span> and connect a user session in Settings
+          so we can act on your behalf. For post campaigns, Telegram usually requires you to join the channel before you
+          can like or comment; if you are not a member yet, the app will try to join the channel automatically when you
+          tap Like or Comment (same as subscribe campaigns).
         </p>
       </div>
       {hasTelegram === false ? (

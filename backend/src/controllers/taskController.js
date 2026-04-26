@@ -97,6 +97,70 @@ function parseCommentMeta(metaEngagementId) {
   return null;
 }
 
+/**
+ * Telegram often requires the user to be a channel member before they can
+ * react to a post or thread a reply. Subscribe campaigns already join
+ * before verifying; for like/comment we do the same when the user is not
+ * a member (Bot API can see that via getChatMember, MTProto can join the channel).
+ */
+async function ensureUserJoinedPostChannelForActions({ worker, tUid, channelId, parsedMessage }) {
+  const creds = parseStoredMtprotoCredentials(worker);
+  const sessionString = parseStoredSessionString(worker);
+  if (!creds || !sessionString) {
+    const error = new Error(
+      "This action requires Telegram user session auth first. Open Settings and complete Telegram user auth."
+    );
+    error.status = 400;
+    throw error;
+  }
+  let memberCheck = await tg.getUserChatMemberStatus(String(channelId), tUid);
+  if (memberCheck.ok) return;
+
+  const joinRef =
+    parsedMessage && parsedMessage.kind === "public" && parsedMessage.username
+      ? `@${String(parsedMessage.username).replace(/^@/, "")}`
+      : String(channelId);
+
+  try {
+    await runBridge("join_channel", {
+      apiId: creds.apiId,
+      apiHash: creds.apiHash,
+      proxy: creds.proxy || null,
+      sessionString,
+      channel: joinRef
+    });
+  } catch (e) {
+    const msg = e && e.message ? String(e.message) : "Could not join the channel from your Telegram session";
+    const error = new Error(
+      `${msg} Open the t.me post in the Telegram app, join the channel, then return here and try again.`
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  for (let i = 0; i < 4; i += 1) {
+    if (i > 0) await sleep(1200);
+    memberCheck = await tg.getUserChatMemberStatus(String(channelId), tUid);
+    if (memberCheck.ok) return;
+  }
+  const raw = String(memberCheck.error || "").toLowerCase();
+  let hint =
+    "Open the t.me post in Telegram, join the channel, then try again. The platform bot must be a member of the channel with permission to add members, or the channel must be joinable by link.";
+  if (raw.includes("bot is not a member")) {
+    hint = "The bot is not in that channel. Add the bot to the target channel, then try again.";
+  } else if (raw.includes("user not found")) {
+    hint =
+      "We could not see your Telegram account in the channel yet. If you just joined, wait a few seconds and try again.";
+  } else if (raw.includes("chat not found")) {
+    hint = "Telegram could not find this channel. Check that the post link is still valid.";
+  } else if (memberCheck.status === "left" || memberCheck.status === "kicked") {
+    hint = "Telegram still reports you are not a member of the channel. Join from the t.me post, then try again.";
+  }
+  const error = new Error(`You must be a member of the channel to like or comment. ${hint}`);
+  error.status = 400;
+  throw error;
+}
+
 async function submitTaskCompletion(req, res) {
   const { taskId, engagementType, proofText: proofRaw, actionKind, commentVerifyToken, reaction } = req.body;
   const proofText = typeof proofRaw === "string" ? proofRaw : "";
@@ -287,15 +351,9 @@ async function submitTaskCompletion(req, res) {
           error.status = 400;
           throw error;
         }
+        await ensureUserJoinedPostChannelForActions({ worker, tUid, channelId, parsedMessage });
         const creds = parseStoredMtprotoCredentials(worker);
         const sessionString = parseStoredSessionString(worker);
-        if (!creds || !sessionString) {
-          const error = new Error(
-            "Comment requires Telegram user session auth first. Open Settings and complete Telegram user auth."
-          );
-          error.status = 400;
-          throw error;
-        }
         if (!parsedMessage || !parsedMessage.messageId) {
           const error = new Error("Could not resolve Telegram message id for comment action");
           error.status = 400;
@@ -348,15 +406,9 @@ async function submitTaskCompletion(req, res) {
         req._commentText = commentText;
       }
       if (actionKind === "like") {
+        await ensureUserJoinedPostChannelForActions({ worker, tUid, channelId, parsedMessage });
         const creds = parseStoredMtprotoCredentials(worker);
         const sessionString = parseStoredSessionString(worker);
-        if (!creds || !sessionString) {
-          const error = new Error(
-            "Like requires Telegram user session auth first. Open Settings and complete Telegram user auth."
-          );
-          error.status = 400;
-          throw error;
-        }
         if (!parsedMessage || !parsedMessage.messageId) {
           const error = new Error("Could not resolve Telegram message id for like action");
           error.status = 400;
