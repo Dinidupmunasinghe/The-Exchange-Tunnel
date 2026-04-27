@@ -70,7 +70,7 @@ export function RepostRequests() {
 
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle>Source post</CardTitle>
+          <CardTitle>Connect a post</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input
@@ -82,9 +82,7 @@ export function RepostRequests() {
             <Button type="button" variant="outline" onClick={() => void loadChannels()} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh channels"}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Your post must be from your channel connected in Settings.
-            </p>
+            <p className="text-xs text-muted-foreground">Paste any valid Telegram post link to request repost.</p>
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}

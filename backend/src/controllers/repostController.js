@@ -30,9 +30,7 @@ async function listRepostChannels(req, res) {
     where: {
       isActive: true,
       id: { [Op.ne]: req.user.id },
-      telegramActingChannelId: { [Op.ne]: null },
-      userOAuthTokenEncrypted: { [Op.ne]: null },
-      userActingTokenEncrypted: { [Op.ne]: null }
+      telegramActingChannelId: { [Op.ne]: null }
     },
     attributes: ["id", "telegramActingChannelId", "telegramActingChannelTitle"],
     order: [["id", "DESC"]],
@@ -84,17 +82,11 @@ async function requestRepost(req, res) {
 
   const owner = await db.User.findByPk(req.user.id);
   if (!owner) return res.status(404).json({ message: "User not found" });
-  if (!owner.telegramActingChannelId) {
-    return res.status(400).json({ message: "Connect your channel in Settings first" });
-  }
   const parsed = tg.parseTmeMessageUrl(messageUrl);
   if (!parsed) return res.status(400).json({ message: "Could not parse t.me message URL" });
-  const resolved = await tg.resolveChannelChatIdFromTme(parsed, String(owner.telegramActingChannelId)).catch(() => null);
+  const resolved = await tg.resolveChannelChatIdFromTme(parsed, null).catch(() => null);
   if (!resolved || resolved.error || !resolved.chatId) {
     return res.status(400).json({ message: resolved?.error || "Could not resolve source channel for this post" });
-  }
-  if (String(resolved.chatId) !== String(owner.telegramActingChannelId)) {
-    return res.status(400).json({ message: "The source post must belong to your connected channel" });
   }
 
   const target = await db.User.findByPk(targetUserId, {
