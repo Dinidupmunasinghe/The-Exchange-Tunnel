@@ -10,6 +10,7 @@ type Settings = {
   likeReward: number;
   commentReward: number;
   subscribeReward: number;
+  shareReward: number;
 };
 
 export function AdminRewards() {
@@ -17,7 +18,8 @@ export function AdminRewards() {
     dailyEarnLimit: 500,
     likeReward: 5,
     commentReward: 10,
-    subscribeReward: 10
+    subscribeReward: 10,
+    shareReward: 15
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -28,8 +30,8 @@ export function AdminRewards() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.adminGetSettings();
-      if (res.settings) setSettings(res.settings);
+      const settingsRes = await api.adminGetSettings();
+      if (settingsRes.settings) setSettings(settingsRes.settings);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load settings");
     } finally {
@@ -51,7 +53,8 @@ export function AdminRewards() {
         dailyEarnLimit: Number(settings.dailyEarnLimit),
         likeReward: Number(settings.likeReward),
         commentReward: Number(settings.commentReward),
-        subscribeReward: Number(settings.subscribeReward)
+        subscribeReward: Number(settings.subscribeReward),
+        shareReward: Number(settings.shareReward)
       });
       setMessage("Reward settings saved");
     } catch (err) {
@@ -99,6 +102,15 @@ export function AdminRewards() {
               />
             </div>
             <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Share reward (credits)</label>
+              <Input
+                type="number"
+                min={0}
+                value={settings.shareReward}
+                onChange={(e) => setSettings((s) => ({ ...s, shareReward: Number(e.target.value) }))}
+              />
+            </div>
+            <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Like reward (credits)</label>
               <Input
                 type="number"
@@ -128,6 +140,7 @@ export function AdminRewards() {
           </p>
         </CardContent>
       </Card>
+
     </div>
   );
 }

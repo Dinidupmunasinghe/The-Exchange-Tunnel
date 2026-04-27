@@ -6,6 +6,7 @@ const telegramRoutes = require("./telegramRoutes");
 const campaignRoutes = require("./campaignRoutes");
 const taskRoutes = require("./taskRoutes");
 const transactionRoutes = require("./transactionRoutes");
+const repostRoutes = require("./repostRoutes");
 const adminRoutes = require("./adminRoutes");
 const adminAuthRoutes = require("./adminAuthRoutes");
 
@@ -24,5 +25,6 @@ router.use("/telegram", telegramRoutes);
 router.use("/campaigns", campaignRoutes);
 router.use("/tasks", taskRoutes);
 router.use("/transactions", transactionRoutes);
+router.use("/repost", repostRoutes);
 
 module.exports = router;

@@ -45,7 +45,7 @@ router.post(
   taskSubmitLimiter,
   [
     body("campaignId").isInt({ min: 1 }),
-    body("actionKind").isIn(["subscribe", "comment", "like"])
+    body("actionKind").isIn(["subscribe", "comment", "like", "share"])
   ],
   validateRequest,
   revertEngagement

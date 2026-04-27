@@ -151,6 +151,26 @@ async function getChat(chatId) {
   return data.result;
 }
 
+async function getChatMemberCount(chatId) {
+  const data = await botRequest("getChatMemberCount", { chat_id: String(chatId) });
+  return Number(data.result || 0);
+}
+
+async function getChatPhotoUrl(chatId) {
+  if (!isConfigured() || chatId == null) return null;
+  try {
+    const chat = await getChat(chatId);
+    const fileId = chat?.photo?.big_file_id || chat?.photo?.small_file_id || null;
+    if (!fileId) return null;
+    const fileInfo = await botRequest("getFile", { file_id: String(fileId) });
+    const filePath = fileInfo?.result?.file_path;
+    if (!filePath) return null;
+    return `${TG_API}/file/bot${env.telegram.botToken}/${filePath}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * @param {string|number} channelChatId
  * @param {string|number} userTelegramId
@@ -312,6 +332,8 @@ module.exports = {
   cSegmentToLikelyChatId,
   resolveChannelChatIdFromTme,
   getChat,
+  getChatMemberCount,
+  getChatPhotoUrl,
   isUserMemberOrAdminOfChat,
   getUserChatMemberStatus,
   isUserChannelAdminOrCreator,

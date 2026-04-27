@@ -2,7 +2,8 @@ export type EngagementTypeId =
   | "subscribe"
   | "like"
   | "comment"
-  | "like_comment";
+  | "like_comment"
+  | "share";
 
 export type BaseEngagementKind = "like" | "comment";
 
@@ -34,7 +35,8 @@ export const ENGAGEMENT_OPTIONS: {
   { id: "subscribe", name: "Subscribers", cost: 5, icon: "🔔" },
   { id: "like", name: "Likes", cost: 5, icon: "👍" },
   { id: "like_comment", name: "Like + Comment", cost: 15, icon: "👍💬" },
-  { id: "comment", name: "Comments", cost: 10, icon: "💬" }
+  { id: "comment", name: "Comments", cost: 10, icon: "💬" },
+  { id: "share", name: "Reposts", cost: 15, icon: "🔁" }
 ];
 
 export function getEngagementLabel(type: string): string {
@@ -53,6 +55,8 @@ export function getBundleActionHint(engagementType: string): string | null {
       return "This campaign only pays for comments.";
     case "like_comment":
       return "This campaign pays for both like and comment actions.";
+    case "share":
+      return "This campaign pays for reposting to your connected channel.";
     default:
       return null;
   }
@@ -60,7 +64,7 @@ export function getBundleActionHint(engagementType: string): string | null {
 
 export function bundleAllowsAction(
   engagementType: string,
-  action: "subscribe" | "like" | "comment"
+  action: "subscribe" | "like" | "comment" | "share"
 ): boolean {
   switch (engagementType) {
     case "subscribe":
@@ -71,6 +75,8 @@ export function bundleAllowsAction(
       return action === "comment";
     case "like_comment":
       return action === "like" || action === "comment";
+    case "share":
+      return action === "share";
     default:
       return false;
   }

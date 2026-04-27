@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
       id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
       userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       postKey: { type: DataTypes.STRING(255), allowNull: false },
-      actionKind: { type: DataTypes.ENUM("like", "comment"), allowNull: false },
+      actionKind: { type: DataTypes.STRING(16), allowNull: false },
       lastEngagementId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       details: { type: DataTypes.TEXT, allowNull: true }
     },

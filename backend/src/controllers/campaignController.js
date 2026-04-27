@@ -117,6 +117,8 @@ async function createCampaign(req, res) {
       ? "subscribe"
       : engagementType === "like"
         ? "like"
+        : engagementType === "share"
+          ? "share"
         : "comment";
   const effectiveCreditsPerEngagement =
     Number(await getRewardByType(rewardTypeForCampaign)) ||
@@ -299,10 +301,11 @@ async function deleteCampaign(req, res) {
 }
 
 async function getCampaignRewards(req, res) {
-  const [likeReward, commentReward, subscribeReward] = await Promise.all([
+  const [likeReward, commentReward, subscribeReward, shareReward] = await Promise.all([
     getRewardByType("like"),
     getRewardByType("comment"),
-    getRewardByType("subscribe")
+    getRewardByType("subscribe"),
+    getRewardByType("share")
   ]);
   return res.json({
     rewards: {
@@ -311,7 +314,8 @@ async function getCampaignRewards(req, res) {
       // like_comment bundles like + comment as a single engagement; charged at the comment rate
       // to match how the backend resolves the campaign reward (rewardTypeForCampaign falls through to "comment").
       like_comment: Number(commentReward) || 0,
-      subscribe: Number(subscribeReward) || 0
+      subscribe: Number(subscribeReward) || 0,
+      share: Number(shareReward) || 0
     }
   });
 }

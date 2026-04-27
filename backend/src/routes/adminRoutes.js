@@ -112,10 +112,43 @@ router.put(
     body("dailyEarnLimit").isInt({ min: 0 }),
     body("likeReward").isInt({ min: 0 }),
     body("commentReward").isInt({ min: 0 }),
-    body("subscribeReward").isInt({ min: 0 })
+    body("subscribeReward").isInt({ min: 0 }),
+    body("shareReward").isInt({ min: 0 })
   ],
   validateRequest,
   ctrl.updatePlatformSettings
+);
+
+/* Repost pricing tiers */
+router.get("/repost-pricing-rules", ctrl.listRepostPricingRules);
+router.post(
+  "/repost-pricing-rules",
+  [
+    body("minSubscribers").isInt({ min: 0 }),
+    body("maxSubscribers").optional({ nullable: true }).isInt({ min: 0 }),
+    body("credits").isInt({ min: 1 }),
+    body("isActive").optional().isBoolean()
+  ],
+  validateRequest,
+  ctrl.createRepostPricingRule
+);
+router.patch(
+  "/repost-pricing-rules/:id",
+  [
+    param("id").isInt({ min: 1 }),
+    body("minSubscribers").optional().isInt({ min: 0 }),
+    body("maxSubscribers").optional({ nullable: true }).isInt({ min: 0 }),
+    body("credits").optional().isInt({ min: 1 }),
+    body("isActive").optional().isBoolean()
+  ],
+  validateRequest,
+  ctrl.updateRepostPricingRule
+);
+router.delete(
+  "/repost-pricing-rules/:id",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.deleteRepostPricingRule
 );
 
 /* Packages */

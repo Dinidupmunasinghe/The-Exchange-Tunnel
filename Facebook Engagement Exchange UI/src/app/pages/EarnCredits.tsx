@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus, Loader2, SendHorizontal, Trash2 } from "lucide-react";
+import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus, Loader2, SendHorizontal, Trash2, Repeat2 } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../components/ui/card";
@@ -13,8 +13,7 @@ import { toast } from "sonner";
 import { api } from "../services/api";
 import {
   bundleAllowsAction,
-  getEngagementLabel,
-  type BaseEngagementKind
+  getEngagementLabel
 } from "../lib/engagement";
 
 type TaskRow = {
@@ -67,7 +66,7 @@ function relativeCampaignTime(iso: string | undefined): string {
   }
 }
 
-function hasEngagement(rows: MyEngagementRow[], campaignId: number, kind: BaseEngagementKind): boolean {
+function hasEngagement(rows: MyEngagementRow[], campaignId: number, kind: string): boolean {
   return rows.some((e) => e.campaignId === campaignId && e.actionKind === kind);
 }
 
@@ -227,7 +226,7 @@ export function EarnCredits() {
     campaignId: number,
     campaignTasks: TaskRow[],
     engagementType: string,
-    action: "subscribe" | BaseEngagementKind
+    action: "subscribe" | "like" | "comment" | "share"
   ) => {
     if (!bundleAllowsAction(engagementType, action)) return;
     try {
@@ -362,6 +361,50 @@ export function EarnCredits() {
         setBusy(null);
         return;
       }
+      if (action === "share") {
+        const sharedAlready = hasEngagement(myEngagements, campaignId, "share");
+        if (sharedAlready) {
+          const key = `${campaignId}-share-delete`;
+          setBusy(key);
+          const res = await api.revertEngagement({
+            campaignId,
+            actionKind: "share"
+          });
+          if (res.fallback) {
+            toast.success(res.message || "Saved repost cleared.");
+          } else {
+            toast.success("Repost removed and credits refunded.");
+          }
+          const refreshed = await api.getTasks();
+          setTasks(refreshed.tasks as TaskRow[]);
+          setMyEngagements(refreshed.myEngagements ?? []);
+          setBusy(null);
+          return;
+        }
+        const key = `${campaignId}-share`;
+        setBusy(key);
+        if (hasMtprotoSession !== true) {
+          toast.error("Share requires Telegram user session auth first.", {
+            description: "Opening Settings now. Complete User Session setup and try again."
+          });
+          setBusy(null);
+          window.location.href = "/settings#user-session";
+          return;
+        }
+        await api.completeTask({
+          taskId: task.id,
+          engagementType,
+          actionKind: "share"
+        });
+        toast.success(`Earned ${task.rewardCredits} credits`, {
+          description: `Recorded · repost · task #${task.id}`
+        });
+        const refreshed = await api.getTasks();
+        setTasks(refreshed.tasks as TaskRow[]);
+        setMyEngagements(refreshed.myEngagements ?? []);
+        setBusy(null);
+        return;
+      }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Could not update engagement";
       toast.error(msg);
@@ -455,6 +498,7 @@ export function EarnCredits() {
           const cid = campaign.id;
           const liked = hasEngagement(myEngagements, cid, "like");
           const commented = hasEngagement(myEngagements, cid, "comment");
+          const shared = hasEngagement(myEngagements, cid, "share");
           const subscribed =
             hasCompletedTask(campaignTasks) ||
             myEngagements.some((e) => e.campaignId === cid && e.actionKind === "subscribe");
@@ -628,6 +672,32 @@ export function EarnCredits() {
                   </Badge>
                 </Button>
                 </div>
+                ) : null}
+                {!isSubscribeCampaign && bundleAllowsAction(et, "share") ? (
+                  <Button
+                    type="button"
+                    variant={shared ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-full border-violet-500/25 bg-background/80 pr-3 hover:bg-violet-500/10"
+                    onClick={() => void handleAction(cid, campaignTasks, et, "share")}
+                    disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                  >
+                    {busy === `${cid}-share` || busy === `${cid}-share-delete` ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Repeat2 className="mr-2 h-4 w-4" />
+                    )}
+                    {busy === `${cid}-share`
+                      ? "Reposting..."
+                      : busy === `${cid}-share-delete`
+                        ? "Removing..."
+                        : shared
+                          ? "Remove repost"
+                          : "Repost"}
+                    <Badge className="ml-2 rounded-full bg-violet-500/15 px-2 text-violet-600 dark:text-violet-400 hover:bg-violet-500/15">
+                      +{reward}
+                    </Badge>
+                  </Button>
                 ) : null}
                 {!isSubscribeCampaign && bundleAllowsAction(et, "comment") ? (
                   commented ? (

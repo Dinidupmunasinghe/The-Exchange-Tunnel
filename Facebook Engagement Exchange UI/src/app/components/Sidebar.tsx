@@ -8,7 +8,8 @@ import {
   Wallet, 
   Settings,
   Waypoints,
-  X
+  X,
+  Repeat2
 } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -17,6 +18,7 @@ const navigation = [
   { name: "Earn Credits", href: "/earn", icon: Sparkles },
   { name: "Launch Campaigns", href: "/submit", icon: Upload },
   { name: "My Campaigns", href: "/campaigns", icon: FolderOpen },
+  { name: "Request Repost", href: "/repost", icon: Repeat2 },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Wallet", href: "/wallet", icon: Wallet },
   { name: "Settings", href: "/settings", icon: Settings },

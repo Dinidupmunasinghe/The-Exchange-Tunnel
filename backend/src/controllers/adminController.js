@@ -465,7 +465,9 @@ async function cancelPendingRefund(req, res) {
 
 async function getPlatformSettings(req, res) {
   const rows = await db.AppSetting.findAll({
-    where: { key: { [Op.in]: ["dailyEarnLimit", "likeReward", "commentReward", "subscribeReward"] } },
+    where: {
+      key: { [Op.in]: ["dailyEarnLimit", "likeReward", "commentReward", "subscribeReward", "shareReward"] }
+    },
     order: [["key", "ASC"]]
   });
   const map = new Map(rows.map((r) => [String(r.key), String(r.value)]));
@@ -474,7 +476,8 @@ async function getPlatformSettings(req, res) {
       dailyEarnLimit: Number(map.get("dailyEarnLimit") || 500),
       likeReward: Number(map.get("likeReward") || 5),
       commentReward: Number(map.get("commentReward") || 10),
-      subscribeReward: Number(map.get("subscribeReward") || 10)
+      subscribeReward: Number(map.get("subscribeReward") || 10),
+      shareReward: Number(map.get("shareReward") || 15)
     }
   });
 }
@@ -484,7 +487,8 @@ async function updatePlatformSettings(req, res) {
     dailyEarnLimit: Number(req.body.dailyEarnLimit),
     likeReward: Number(req.body.likeReward),
     commentReward: Number(req.body.commentReward),
-    subscribeReward: Number(req.body.subscribeReward)
+    subscribeReward: Number(req.body.subscribeReward),
+    shareReward: Number(req.body.shareReward)
   };
   const keys = Object.keys(payload);
   for (const key of keys) {
@@ -506,6 +510,118 @@ async function updatePlatformSettings(req, res) {
     payload
   });
   return res.json({ message: "Settings updated", settings: payload });
+}
+
+/* =========================================================================
+ * Repost pricing tiers
+ * ========================================================================= */
+
+async function listRepostPricingRules(req, res) {
+  const rules = await db.RepostPricingRule.findAll({
+    order: [
+      ["minSubscribers", "ASC"],
+      ["id", "ASC"]
+    ]
+  });
+  return res.json({ rules });
+}
+
+async function createRepostPricingRule(req, res) {
+  const minSubscribers = Number(req.body.minSubscribers);
+  const maxSubscribers =
+    req.body.maxSubscribers == null || req.body.maxSubscribers === ""
+      ? null
+      : Number(req.body.maxSubscribers);
+  const credits = Number(req.body.credits);
+  const isActive = req.body.isActive !== false;
+
+  if (!Number.isInteger(minSubscribers) || minSubscribers < 0) {
+    return res.status(400).json({ message: "minSubscribers must be an integer >= 0" });
+  }
+  if (maxSubscribers != null && (!Number.isInteger(maxSubscribers) || maxSubscribers < minSubscribers)) {
+    return res.status(400).json({ message: "maxSubscribers must be null or an integer >= minSubscribers" });
+  }
+  if (!Number.isInteger(credits) || credits < 1) {
+    return res.status(400).json({ message: "credits must be an integer >= 1" });
+  }
+
+  const rule = await db.RepostPricingRule.create({
+    minSubscribers,
+    maxSubscribers,
+    credits,
+    isActive
+  });
+  await logAdminAction({
+    req,
+    action: "create_repost_pricing_rule",
+    targetType: "repost_pricing_rule",
+    targetId: rule.id,
+    payload: { minSubscribers, maxSubscribers, credits, isActive }
+  });
+  return res.status(201).json({ message: "Repost pricing rule created", rule });
+}
+
+async function updateRepostPricingRule(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid rule id" });
+  const rule = await db.RepostPricingRule.findByPk(id);
+  if (!rule) return res.status(404).json({ message: "Rule not found" });
+
+  const updates = {};
+  if (req.body.minSubscribers != null) {
+    const v = Number(req.body.minSubscribers);
+    if (!Number.isInteger(v) || v < 0) {
+      return res.status(400).json({ message: "minSubscribers must be an integer >= 0" });
+    }
+    updates.minSubscribers = v;
+  }
+  if (req.body.maxSubscribers !== undefined) {
+    const v = req.body.maxSubscribers == null || req.body.maxSubscribers === "" ? null : Number(req.body.maxSubscribers);
+    if (v != null && (!Number.isInteger(v) || v < 0)) {
+      return res.status(400).json({ message: "maxSubscribers must be null or an integer >= 0" });
+    }
+    updates.maxSubscribers = v;
+  }
+  if (req.body.credits != null) {
+    const v = Number(req.body.credits);
+    if (!Number.isInteger(v) || v < 1) {
+      return res.status(400).json({ message: "credits must be an integer >= 1" });
+    }
+    updates.credits = v;
+  }
+  if (req.body.isActive != null) updates.isActive = Boolean(req.body.isActive);
+
+  const nextMin = updates.minSubscribers != null ? updates.minSubscribers : rule.minSubscribers;
+  const nextMax = updates.maxSubscribers !== undefined ? updates.maxSubscribers : rule.maxSubscribers;
+  if (nextMax != null && nextMax < nextMin) {
+    return res.status(400).json({ message: "maxSubscribers must be >= minSubscribers" });
+  }
+
+  Object.assign(rule, updates);
+  await rule.save();
+  await logAdminAction({
+    req,
+    action: "update_repost_pricing_rule",
+    targetType: "repost_pricing_rule",
+    targetId: id,
+    payload: updates
+  });
+  return res.json({ message: "Repost pricing rule updated", rule });
+}
+
+async function deleteRepostPricingRule(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid rule id" });
+  const rule = await db.RepostPricingRule.findByPk(id);
+  if (!rule) return res.status(404).json({ message: "Rule not found" });
+  await rule.destroy();
+  await logAdminAction({
+    req,
+    action: "delete_repost_pricing_rule",
+    targetType: "repost_pricing_rule",
+    targetId: id
+  });
+  return res.json({ message: "Repost pricing rule deleted" });
 }
 
 /* =========================================================================
@@ -1110,6 +1226,10 @@ module.exports = {
   cancelPendingRefund,
   getPlatformSettings,
   updatePlatformSettings,
+  listRepostPricingRules,
+  createRepostPricingRule,
+  updateRepostPricingRule,
+  deleteRepostPricingRule,
   listCreditPackages,
   createCreditPackage,
   updateCreditPackage,

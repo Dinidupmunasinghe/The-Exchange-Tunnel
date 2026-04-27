@@ -97,6 +97,18 @@ function parseCommentMeta(metaEngagementId) {
   return null;
 }
 
+function parseShareMeta(metaEngagementId) {
+  const raw = String(metaEngagementId || "");
+  const m = /^tg-share-\d+--(.+)--(\d+)--(.+)--(\d+)$/.exec(raw);
+  if (!m) return null;
+  return {
+    sourceChat: decodeURIComponent(m[1]),
+    sourceMessageId: Number(m[2]),
+    destinationChat: decodeURIComponent(m[3]),
+    forwardedMessageId: Number(m[4])
+  };
+}
+
 /**
  * Telegram often requires the user to be a channel member before they can
  * react to a post or thread a reply. Subscribe campaigns already join
@@ -460,6 +472,65 @@ async function submitTaskCompletion(req, res) {
           throw error;
         }
       }
+      if (actionKind === "share") {
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error(
+            "Share requires Telegram user session auth first. Open Settings and complete Telegram user auth."
+          );
+          error.status = 400;
+          throw error;
+        }
+        if (!parsedMessage || !parsedMessage.messageId) {
+          const error = new Error("Could not resolve Telegram message id for share action");
+          error.status = 400;
+          throw error;
+        }
+        if (!worker.telegramActingChannelId) {
+          const error = new Error("Connect your target repost channel in Settings before sharing");
+          error.status = 400;
+          throw error;
+        }
+        const sourceCandidates = [];
+        if (parsedMessage.kind === "public" && parsedMessage.username) {
+          sourceCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
+        }
+        sourceCandidates.push(String(channelId));
+        let forwarded = null;
+        let lastErr = null;
+        for (const sourceChat of sourceCandidates) {
+          try {
+            const out = await runBridge("forward_message", {
+              apiId: creds.apiId,
+              apiHash: creds.apiHash,
+              proxy: creds.proxy || null,
+              sessionString,
+              fromChat: sourceChat,
+              msgId: Number(parsedMessage.messageId),
+              toChat: String(worker.telegramActingChannelId)
+            });
+            forwarded = {
+              sourceChat: String(sourceChat),
+              sourceMessageId: Number(parsedMessage.messageId),
+              destinationChat: String(worker.telegramActingChannelId),
+              forwardedMessageId: Number(out?.messageId || 0)
+            };
+            break;
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        if (!forwarded || !forwarded.forwardedMessageId) {
+          const error = new Error(
+            (lastErr && lastErr.message) ||
+              "Could not repost this message to your connected channel. Ensure you can post there and try again."
+          );
+          error.status = 400;
+          throw error;
+        }
+        req._shareForwarded = forwarded;
+      }
       const verifiedViaProvider = true;
       const verification = await verifyEngagement({
         campaign: task.campaign,
@@ -489,6 +560,12 @@ async function submitTaskCompletion(req, res) {
               ? `tg-com-${tUid}--${encodeURIComponent(String(req._commentChatId || channelId))}--${Number(
                 req._commentMessageId
               )}--${encodeURIComponent(String(req._commentChatAccessHash || ""))}`
+              : actionKind === "share" && req._shareForwarded
+                ? `tg-share-${tUid}--${encodeURIComponent(String(req._shareForwarded.sourceChat))}--${Number(
+                  req._shareForwarded.sourceMessageId
+                )}--${encodeURIComponent(String(req._shareForwarded.destinationChat))}--${Number(
+                  req._shareForwarded.forwardedMessageId
+                )}`
             : `tg-mem-${tUid}-${channelId}`;
 
       const createdEngagement = await db.Engagement.create(
@@ -505,6 +582,10 @@ async function submitTaskCompletion(req, res) {
               ? "Telegram: channel membership verified for subscribe campaign"
               : actionKind === "comment"
                 ? `Telegram: mtproto comment sent :: ${String(req._commentText || "").slice(0, 160)}`
+                : actionKind === "share"
+                  ? `Telegram: reposted to ${String(req._shareForwarded?.destinationChat || "")} as message #${String(
+                    req._shareForwarded?.forwardedMessageId || ""
+                  )}`
                 : "Telegram: like action recorded after channel check"
         },
         { transaction }
@@ -771,7 +852,7 @@ async function pollCommentDetection(req, res) {
 
 async function revertEngagement(req, res) {
   const { campaignId, actionKind } = req.body;
-  if (!["subscribe", "comment", "like"].includes(actionKind)) {
+  if (!["subscribe", "comment", "like", "share"].includes(actionKind)) {
     return res.status(400).json({ message: "Invalid action kind" });
   }
   let fallbackResult = null;
@@ -930,6 +1011,30 @@ async function revertEngagement(req, res) {
           error.status = 400;
           throw error;
         }
+      }
+      if (actionKind === "share") {
+        const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
+        const creds = parseStoredMtprotoCredentials(worker);
+        const sessionString = parseStoredSessionString(worker);
+        if (!creds || !sessionString) {
+          const error = new Error("Telegram user session is required to remove repost");
+          error.status = 400;
+          throw error;
+        }
+        const parsed = parseShareMeta(engagement.metaEngagementId);
+        if (!parsed) {
+          const error = new Error("Could not resolve repost message for delete");
+          error.status = 400;
+          throw error;
+        }
+        await runBridge("delete_message", {
+          apiId: creds.apiId,
+          apiHash: creds.apiHash,
+          proxy: creds.proxy || null,
+          sessionString,
+          chat: parsed.destinationChat,
+          msgId: Number(parsed.forwardedMessageId)
+        });
       }
       const amount = task.rewardCredits;
       const reversal = await reverseEarnCredits({
@@ -1110,6 +1215,13 @@ async function revertOrphanedMemory({ userId, campaignId, actionKind, transactio
       message: telegramCleared
         ? "Removed your reaction on Telegram and cleared the saved like. No credits were involved (this slot was inherited from a prior campaign)."
         : "Cleared the saved like on your account. If your reaction is still on Telegram, remove it there."
+    };
+  }
+  if (actionKind === "share") {
+    return {
+      telegramCleared: false,
+      message:
+        "Cleared the saved repost on your account. If the repost is still in your channel, delete it there manually."
     };
   }
   // comment fallback: we don't have the discussion-group message id (the

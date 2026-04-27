@@ -12,6 +12,7 @@ const UserSubscriptionMemory = require("./userSubscriptionMemory")(sequelize, Da
 const AppSetting = require("./appSetting")(sequelize, DataTypes);
 const CreditPackage = require("./creditPackage")(sequelize, DataTypes);
 const AdminAuditLog = require("./adminAuditLog")(sequelize, DataTypes);
+const RepostPricingRule = require("./repostPricingRule")(sequelize, DataTypes);
 
 User.hasMany(Campaign, { foreignKey: "userId", as: "campaigns" });
 Campaign.belongsTo(User, { foreignKey: "userId", as: "owner" });
@@ -58,7 +59,8 @@ const db = {
   ,
   AppSetting,
   CreditPackage,
-  AdminAuditLog
+  AdminAuditLog,
+  RepostPricingRule
 };
 
 module.exports = db;

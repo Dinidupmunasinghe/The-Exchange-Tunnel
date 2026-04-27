@@ -405,6 +405,36 @@ class TelegramClientManager:
             raise TelegramClientManagerError("Unexpected send_message response type.")
         return message
 
+    async def forward_message(
+        self,
+        from_chat: str | int | types.TypeInputPeer,
+        msg_id: int,
+        to_chat: str | int | types.TypeInputPeer,
+    ) -> types.Message:
+        await self.connect()
+        await self._enforce_write_delay()
+        try:
+            source_peer = await self._resolve_input_entity(from_chat)
+            target_peer = await self._resolve_input_entity(to_chat)
+            forwarded = await self._client.forward_messages(
+                entity=target_peer,
+                messages=[msg_id],
+                from_peer=source_peer,
+            )
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError as exc:
+            raise TelegramClientManagerError(f"forward_message failed: {exc}") from exc
+        if isinstance(forwarded, list):
+            message = forwarded[0] if forwarded else None
+        else:
+            message = forwarded
+        if not isinstance(message, types.Message):
+            raise TelegramClientManagerError("Unexpected forward_message response type.")
+        return message
+
     async def delete_message(
         self,
         chat: str | int | types.TypeInputPeer,

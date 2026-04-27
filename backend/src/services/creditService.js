@@ -10,7 +10,9 @@ async function loadDynamicLimits(transaction) {
   const now = Date.now();
   if (!transaction && limitsCache && now - limitsCacheAt < LIMITS_CACHE_TTL_MS) return limitsCache;
   const rows = await db.AppSetting.findAll({
-    where: { key: { [Op.in]: ["dailyEarnLimit", "likeReward", "commentReward", "subscribeReward"] } },
+    where: {
+      key: { [Op.in]: ["dailyEarnLimit", "likeReward", "commentReward", "subscribeReward", "shareReward"] }
+    },
     transaction
   }).catch(() => []);
   const map = new Map(rows.map((r) => [String(r.key), String(r.value)]));
@@ -18,7 +20,8 @@ async function loadDynamicLimits(transaction) {
     dailyEarnLimit: Number(map.get("dailyEarnLimit") || env.limits.dailyEarnLimit || 500),
     likeReward: Number(map.get("likeReward") || env.limits.likeReward || 5),
     commentReward: Number(map.get("commentReward") || env.limits.commentReward || 10),
-    subscribeReward: Number(map.get("subscribeReward") || env.limits.commentReward || 10)
+    subscribeReward: Number(map.get("subscribeReward") || env.limits.commentReward || 10),
+    shareReward: Number(map.get("shareReward") || env.limits.shareReward || 15)
   };
   if (!transaction) {
     limitsCache = out;
@@ -247,6 +250,7 @@ async function getRewardByType(type, transaction) {
   if (type === "like") return limits.likeReward;
   if (type === "comment") return limits.commentReward;
   if (type === "subscribe") return limits.subscribeReward;
+  if (type === "share") return limits.shareReward;
   return env.limits.shareReward;
 }
 

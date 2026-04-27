@@ -13,7 +13,8 @@ import {
   ListChecks,
   Activity,
   Send,
-  History
+  History,
+  Repeat2
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { api } from "../services/api";
@@ -38,6 +39,7 @@ const navGroups: NavGroup[] = [
       { name: "Transactions", href: "/admin/dashboard/transactions", icon: Receipt },
       { name: "Pending Refunds", href: "/admin/dashboard/pending-refunds", icon: Undo2 },
       { name: "Rewards", href: "/admin/dashboard/rewards", icon: Sparkles },
+      { name: "Repost Pricing", href: "/admin/dashboard/repost-pricing", icon: Repeat2 },
       { name: "Packages", href: "/admin/dashboard/packages", icon: Package }
     ]
   },

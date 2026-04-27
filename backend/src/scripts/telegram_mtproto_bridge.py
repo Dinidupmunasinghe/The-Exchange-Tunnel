@@ -133,6 +133,14 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
                 chat_id = str(peer.user_id)
             return {"ok": True, "messageId": message.id, "chatId": chat_id, "chatAccessHash": chat_access_hash}
 
+        if operation == "forward_message":
+            message = await manager.forward_message(
+                from_chat=payload["fromChat"],
+                msg_id=int(payload["msgId"]),
+                to_chat=payload["toChat"],
+            )
+            return {"ok": True, "messageId": message.id}
+
         if operation == "delete_message":
             deleted = await manager.delete_message(
                 chat=payload["chat"],

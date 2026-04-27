@@ -258,7 +258,7 @@ export const api = {
   getCampaigns: () => authRequest("/campaigns") as Promise<{ campaigns: any[] }>,
   getCampaignRewards: () =>
     authRequest("/campaigns/rewards") as Promise<{
-      rewards: { like: number; comment: number; like_comment: number; subscribe: number };
+      rewards: { like: number; comment: number; like_comment: number; subscribe: number; share: number };
     }>,
   updateCampaign: (id: number, payload: { action: "pause" | "resume" }) =>
     authRequest(`/campaigns/${id}`, {
@@ -298,7 +298,7 @@ export const api = {
   completeTask: (payload: {
     taskId: number;
     engagementType: string;
-    actionKind: "subscribe" | "like" | "comment";
+    actionKind: "subscribe" | "like" | "comment" | "share";
     reaction?: string;
     commentVerifyToken?: string;
     proofText?: string;
@@ -307,16 +307,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  revertEngagement: (payload: { campaignId: number; actionKind: "subscribe" | "comment" | "like" }) =>
+  revertEngagement: (payload: { campaignId: number; actionKind: "subscribe" | "comment" | "like" | "share" }) =>
     authRequest("/tasks/revert", {
       method: "POST",
       body: JSON.stringify(payload),
     }) as Promise<{
       message: string;
       fallback?: boolean;
-      actionKind?: "subscribe" | "comment" | "like";
+      actionKind?: "subscribe" | "comment" | "like" | "share";
       telegramCleared?: boolean;
     }>,
+  listRepostChannels: () =>
+    authRequest("/repost/channels") as Promise<{
+      channels: {
+        userId: number;
+        channelId: string;
+        channelName: string;
+        subscribers: number;
+        imageUrl: string | null;
+        credits: number | null;
+      }[];
+    }>,
+  requestRepost: (payload: { targetUserId: number; messageUrl: string }) =>
+    authRequest("/repost/requests", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; campaign: any; task: any; chargedCredits: number }>,
   startCommentDetect: (payload: { taskId: number }) =>
     authRequest("/tasks/comment-detect/start", {
       method: "POST",
@@ -413,6 +429,7 @@ export const api = {
         likeReward: number;
         commentReward: number;
         subscribeReward: number;
+        shareReward: number;
       };
     }>,
   adminUpdateSettings: (payload: {
@@ -420,11 +437,36 @@ export const api = {
     likeReward: number;
     commentReward: number;
     subscribeReward: number;
+    shareReward: number;
   }) =>
     adminRequestJson("/admin/settings", {
       method: "PUT",
       body: JSON.stringify(payload)
     }) as Promise<{ message: string; settings: any }>,
+  adminListRepostPricingRules: () =>
+    adminRequestJson("/admin/repost-pricing-rules") as Promise<{ rules: any[] }>,
+  adminCreateRepostPricingRule: (payload: {
+    minSubscribers: number;
+    maxSubscribers?: number | null;
+    credits: number;
+    isActive?: boolean;
+  }) =>
+    adminRequestJson("/admin/repost-pricing-rules", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; rule: any }>,
+  adminUpdateRepostPricingRule: (
+    id: number,
+    payload: { minSubscribers?: number; maxSubscribers?: number | null; credits?: number; isActive?: boolean }
+  ) =>
+    adminRequestJson(`/admin/repost-pricing-rules/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }) as Promise<{ message: string; rule: any }>,
+  adminDeleteRepostPricingRule: (id: number) =>
+    adminRequestJson(`/admin/repost-pricing-rules/${id}`, { method: "DELETE" }) as Promise<{
+      message: string;
+    }>,
   adminListPackages: () => adminRequestJson("/admin/packages") as Promise<{ packages: any[] }>,
   adminCreatePackage: (payload: { name: string; credits: number; priceLkr: number; isActive?: boolean }) =>
     adminRequestJson("/admin/packages", {

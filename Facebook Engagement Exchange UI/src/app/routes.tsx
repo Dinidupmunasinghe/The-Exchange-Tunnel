@@ -7,6 +7,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { EarnCredits } from "./pages/EarnCredits";
 import { SubmitPost } from "./pages/SubmitPost";
 import { Campaigns } from "./pages/Campaigns";
+import { RepostRequests } from "./pages/RepostRequests";
 import { Analytics } from "./pages/Analytics";
 import { Wallet } from "./pages/Wallet";
 import { Settings } from "./pages/Settings";
@@ -22,6 +23,7 @@ import { AdminCredits } from "./pages/admin/Credits";
 import { AdminTransactions } from "./pages/admin/Transactions";
 import { AdminPendingRefunds } from "./pages/admin/PendingRefunds";
 import { AdminRewards } from "./pages/admin/Rewards";
+import { AdminRepostPricing } from "./pages/admin/RepostPricing";
 import { AdminPackages } from "./pages/admin/Packages";
 import { AdminCampaigns } from "./pages/admin/Campaigns";
 import { AdminCampaignDetails } from "./pages/admin/CampaignDetails";
@@ -51,6 +53,7 @@ export const router = createBrowserRouter([
               { path: "transactions", Component: AdminTransactions },
               { path: "pending-refunds", Component: AdminPendingRefunds },
               { path: "rewards", Component: AdminRewards },
+              { path: "repost-pricing", Component: AdminRepostPricing },
               { path: "packages", Component: AdminPackages },
               { path: "campaigns", Component: AdminCampaigns },
               { path: "campaigns/:id", Component: AdminCampaignDetails },
@@ -77,6 +80,7 @@ export const router = createBrowserRouter([
           { path: "earn", Component: EarnCredits },
           { path: "submit", Component: SubmitPost },
           { path: "campaigns", Component: Campaigns },
+          { path: "repost", Component: RepostRequests },
           { path: "analytics", Component: Analytics },
           { path: "wallet", Component: Wallet },
           { path: "settings", Component: Settings },
