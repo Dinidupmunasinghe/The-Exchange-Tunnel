@@ -80,12 +80,35 @@ async function connectChannelToUser(req, res) {
   let chatRef = raw;
   if (raw.startsWith("http")) {
     try {
-      const p = new URL(raw).pathname.split("/").filter(Boolean);
-      if (p[0] && p[0] !== "c") {
-        chatRef = `@${p[0]}`;
+      const u = new URL(raw);
+      const host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+      if (host !== "t.me" && host !== "telegram.me") {
+        return res.status(400).json({ message: "Use a Telegram link only (t.me/...)" });
+      }
+      const p = u.pathname.split("/").filter(Boolean);
+      if (p[0] && p[0] === "c" && /^\d+$/.test(String(p[1] || ""))) {
+        // Private channel post links are usually t.me/c/<internalId>/<msgId>.
+        // Bot API chat id format is often -100<internalId>.
+        chatRef = `-100${String(p[1])}`;
+      } else if (p[0] && String(p[0]).startsWith("+")) {
+        return res.status(400).json({
+          message:
+            "Invite links (t.me/+...) cannot be used for channel connect. Use @username, channel URL, or channel id."
+        });
+      } else if (p[0]) {
+        chatRef = `@${String(p[0]).replace(/^@/, "")}`;
       }
     } catch {
       return res.status(400).json({ message: "Invalid channel URL" });
+    }
+  } else {
+    const plain = String(raw || "").trim();
+    if (/^-?\d+$/.test(plain)) {
+      chatRef = plain;
+    } else if (plain.startsWith("@")) {
+      chatRef = plain;
+    } else {
+      chatRef = `@${plain}`;
     }
   }
 
@@ -95,7 +118,8 @@ async function connectChannelToUser(req, res) {
   } catch (e) {
     return res.status(400).json({
       message:
-        e.message || "Could not load this Telegram channel. Use @username (with the bot added to the channel)."
+        e.message ||
+        "Could not load this Telegram channel. Use @username, t.me/<channel>, t.me/c/<id>/<msg>, or -100... id."
     });
   }
   if (!chat || !chat.id) {
