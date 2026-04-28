@@ -49,16 +49,16 @@ export function Sidebar({ onClose }: SidebarProps) {
   return (
     <aside className="flex h-full w-64 flex-col overflow-hidden border-r border-border bg-card">
       {/* Logo */}
-      <div className="mx-3 mt-3 flex items-center justify-between rounded-xl border border-border bg-background/60 px-4 py-3">
+      <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-border bg-background/60 px-4 py-3">
         <div className="group/logo flex cursor-default items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand shadow-md shadow-brand/25 transition-transform group-hover/logo:scale-105">
             <Waypoints className="h-6 w-6 text-brand-foreground" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground transition-colors group-hover/logo:text-brand">
+          <div className="min-w-0">
+            <h1 className="truncate whitespace-nowrap text-base font-semibold tracking-tight text-foreground transition-colors group-hover/logo:text-brand">
               Exchange Tunnel
             </h1>
-            <p className="text-xs text-muted-foreground">Connect. Exchange. Grow.</p>
+            <p className="truncate text-[11px] font-medium text-muted-foreground">Connect. Exchange. Grow.</p>
           </div>
         </div>
         {onClose && (
@@ -74,7 +74,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3 [scrollbar-color:#52525b_#09090b] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-thumb:hover]:bg-zinc-500 [&::-webkit-scrollbar-track]:bg-zinc-950/80 [&::-webkit-scrollbar]:w-2">
         {navigation.map((item) => {
           const isActive = isLinkActive(item.href);
           const Icon = item.icon;
