@@ -333,6 +333,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     }) as Promise<{ message: string; campaign: any; task: any; chargedCredits: number }>,
+  listRepostRequests: (type: "received" | "sent") =>
+    authRequest(`/repost/requests?type=${encodeURIComponent(type)}`) as Promise<{
+      type: "received" | "sent";
+      requests: any[];
+    }>,
   startCommentDetect: (payload: { taskId: number }) =>
     authRequest("/tasks/comment-detect/start", {
       method: "POST",

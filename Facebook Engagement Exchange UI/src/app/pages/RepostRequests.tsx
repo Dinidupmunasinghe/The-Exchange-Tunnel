@@ -14,11 +14,34 @@ type RepostChannel = {
   credits: number | null;
 };
 
+type RepostRequest = {
+  id: number;
+  campaignId: number;
+  status: string;
+  rewardCredits: number;
+  createdAt?: string;
+  campaign?: {
+    id: number;
+    name?: string;
+    messageUrl?: string;
+    status?: string;
+  };
+  assignee?: {
+    id: number;
+    name?: string | null;
+    email?: string;
+    telegramActingChannelTitle?: string | null;
+  } | null;
+  taskStatus?: string | null;
+};
+
 export function RepostRequests() {
   const [messageUrl, setMessageUrl] = useState("");
   const [channels, setChannels] = useState<RepostChannel[]>([]);
   const [loading, setLoading] = useState(false);
   const [requestingUserId, setRequestingUserId] = useState<number | null>(null);
+  const [tab, setTab] = useState<"received" | "sent">("sent");
+  const [requests, setRequests] = useState<RepostRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -35,9 +58,26 @@ export function RepostRequests() {
     }
   }
 
+  async function loadRequests(which: "received" | "sent") {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.listRepostRequests(which);
+      setRequests((res.requests || []) as RepostRequest[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load repost requests");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadChannels();
   }, []);
+
+  useEffect(() => {
+    void loadRequests(tab);
+  }, [tab]);
 
   const readyUrl = useMemo(() => String(messageUrl || "").trim(), [messageUrl]);
 
@@ -68,6 +108,28 @@ export function RepostRequests() {
         </p>
       </div>
 
+      <div className="inline-flex rounded-lg border border-border bg-card p-1">
+        <Button
+          type="button"
+          size="sm"
+          variant={tab === "sent" ? "default" : "ghost"}
+          onClick={() => setTab("sent")}
+          className="rounded-md"
+        >
+          Send Request
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={tab === "received" ? "default" : "ghost"}
+          onClick={() => setTab("received")}
+          className="rounded-md"
+        >
+          Received Requests
+        </Button>
+      </div>
+
+      {tab === "sent" ? (
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle>Connect a post</CardTitle>
@@ -88,7 +150,9 @@ export function RepostRequests() {
           {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
         </CardContent>
       </Card>
+      ) : null}
 
+      {tab === "sent" ? (
       <div className="grid gap-4 md:grid-cols-2">
         {channels.map((ch) => (
           <Card key={ch.userId} className="border-border bg-card">
@@ -125,9 +189,41 @@ export function RepostRequests() {
           </Card>
         ))}
       </div>
+      ) : null}
 
-      {!loading && channels.length === 0 ? (
+      {tab === "sent" && !loading && channels.length === 0 ? (
         <p className="text-sm text-muted-foreground">No connected channels are available yet.</p>
+      ) : null}
+
+      {tab === "received" ? (
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle>Received repost requests</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {requests.map((row) => (
+              <div key={row.id} className="rounded-md border border-border p-3">
+                <p className="text-sm font-semibold text-foreground">{row.campaign?.name || `Request #${row.id}`}</p>
+                <p className="text-xs text-muted-foreground">
+                  Reward: {row.rewardCredits} credits • Status: {row.taskStatus || row.status}
+                </p>
+                {row.campaign?.messageUrl ? (
+                  <a
+                    className="mt-1 inline-block text-xs text-primary hover:underline"
+                    href={row.campaign.messageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open source post
+                  </a>
+                ) : null}
+              </div>
+            ))}
+            {!loading && requests.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No received repost requests yet.</p>
+            ) : null}
+          </CardContent>
+        </Card>
       ) : null}
     </div>
   );

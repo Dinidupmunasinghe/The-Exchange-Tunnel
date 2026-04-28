@@ -32,9 +32,9 @@ export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-border bg-card">
+    <aside className="flex h-full w-64 flex-col overflow-hidden border-r border-border bg-card">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between border-b border-border px-6">
+      <div className="mx-3 mt-3 flex items-center justify-between rounded-xl border border-border bg-background/60 px-4 py-3">
         <div className="group/logo flex cursor-default items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand shadow-md shadow-brand/25 transition-transform group-hover/logo:scale-105">
             <Waypoints className="h-6 w-6 text-brand-foreground" />
@@ -59,7 +59,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
         {navigation.map((item) => {
           const current = `${location.pathname}${location.hash}`;
           const isActive = item.href.includes("#") ? current === item.href : location.pathname === item.href;

@@ -160,7 +160,75 @@ async function requestRepost(req, res) {
   });
 }
 
+async function listRepostRequests(req, res) {
+  const type = String(req.query.type || "received").trim().toLowerCase();
+  if (!["received", "sent"].includes(type)) {
+    return res.status(400).json({ message: "type must be received or sent" });
+  }
+
+  if (type === "received") {
+    const tasks = await db.Task.findAll({
+      where: { engagementType: "share", assignedUserId: req.user.id },
+      include: [
+        {
+          model: db.Campaign,
+          as: "campaign",
+          required: true,
+          attributes: ["id", "name", "messageUrl", "creditsPerEngagement", "status", "createdAt", "userId"],
+          include: [{ model: db.User, as: "owner", attributes: ["id", "name", "email"] }]
+        }
+      ],
+      order: [["id", "DESC"]],
+      limit: 200
+    });
+    const requests = tasks.map((t) => ({
+      id: t.id,
+      campaignId: t.campaignId,
+      status: t.status,
+      rewardCredits: Number(t.rewardCredits || 0),
+      createdAt: t.createdAt,
+      campaign: t.campaign
+    }));
+    return res.json({ requests, type });
+  }
+
+  const campaigns = await db.Campaign.findAll({
+    where: { userId: req.user.id, engagementType: "share" },
+    include: [
+      {
+        model: db.Task,
+        as: "tasks",
+        required: false,
+        include: [{ model: db.User, as: "assignee", attributes: ["id", "name", "email", "telegramActingChannelTitle"] }]
+      }
+    ],
+    order: [["id", "DESC"]],
+    limit: 200
+  });
+  const requests = campaigns.map((c) => {
+    const task = Array.isArray(c.tasks) && c.tasks.length > 0 ? c.tasks[0] : null;
+    return {
+      id: c.id,
+      campaignId: c.id,
+      status: c.status,
+      rewardCredits: Number(c.creditsPerEngagement || 0),
+      createdAt: c.createdAt,
+      campaign: {
+        id: c.id,
+        name: c.name,
+        messageUrl: c.messageUrl,
+        creditsPerEngagement: c.creditsPerEngagement,
+        status: c.status
+      },
+      assignee: task?.assignee || null,
+      taskStatus: task?.status || null
+    };
+  });
+  return res.json({ requests, type });
+}
+
 module.exports = {
   listRepostChannels,
-  requestRepost
+  requestRepost,
+  listRepostRequests
 };
