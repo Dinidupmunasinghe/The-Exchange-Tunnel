@@ -18,7 +18,16 @@ const navigation = [
   { name: "Earn Credits", href: "/earn", icon: Sparkles },
   { name: "Launch Campaigns", href: "/submit", icon: Upload },
   { name: "My Campaigns", href: "/campaigns", icon: FolderOpen },
-  { name: "Request Repost", href: "/repost", icon: Repeat2 },
+  {
+    name: "Request Repost",
+    href: "/repost",
+    icon: Repeat2,
+    children: [
+      { name: "Send Request", href: "/repost?tab=send" },
+      { name: "Received Requests", href: "/repost?tab=received" },
+      { name: "Sent Requests", href: "/repost?tab=sent" }
+    ]
+  },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Wallet", href: "/wallet", icon: Wallet },
   { name: "Settings", href: "/settings", icon: Settings },
@@ -30,6 +39,12 @@ interface SidebarProps {
 
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
+  const current = `${location.pathname}${location.search}${location.hash}`;
+
+  function isLinkActive(href: string): boolean {
+    if (href.includes("?")) return current === href;
+    return location.pathname === href;
+  }
 
   return (
     <aside className="flex h-full w-64 flex-col overflow-hidden border-r border-border bg-card">
@@ -61,28 +76,49 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
         {navigation.map((item) => {
-          const current = `${location.pathname}${location.hash}`;
-          const isActive = item.href.includes("#") ? current === item.href : location.pathname === item.href;
+          const isActive = isLinkActive(item.href);
           const Icon = item.icon;
 
           return (
-            <Link
-              key={item.name}
-              to={item.href}
-              onClick={onClose}
-              className={`
-                group/nav flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all
-                ${isActive 
-                  ? 'bg-brand text-brand-foreground shadow-lg shadow-brand/25' 
-                  : 'text-muted-foreground hover:bg-brand/10 hover:text-brand'
-                }
-              `}
-            >
-              <Icon
-                className={`h-5 w-5 transition-colors ${isActive ? "text-brand-foreground" : "group-hover/nav:text-brand"}`}
-              />
-              <span className="font-medium">{item.name}</span>
-            </Link>
+            <div key={item.name}>
+              <Link
+                to={item.href}
+                onClick={onClose}
+                className={`
+                  group/nav flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all
+                  ${isActive
+                    ? "bg-brand text-brand-foreground shadow-lg shadow-brand/25"
+                    : "text-muted-foreground hover:bg-brand/10 hover:text-brand"
+                  }
+                `}
+              >
+                <Icon
+                  className={`h-5 w-5 transition-colors ${isActive ? "text-brand-foreground" : "group-hover/nav:text-brand"}`}
+                />
+                <span className="font-medium">{item.name}</span>
+              </Link>
+              {item.children && location.pathname === "/repost" ? (
+                <div className="mt-1 space-y-1 pl-10">
+                  {item.children.map((child) => {
+                    const childActive = isLinkActive(child.href);
+                    return (
+                      <Link
+                        key={child.name}
+                        to={child.href}
+                        onClick={onClose}
+                        className={`block rounded-md px-2 py-1.5 text-xs transition ${
+                          childActive
+                            ? "bg-brand/20 text-brand"
+                            : "text-muted-foreground hover:bg-brand/10 hover:text-brand"
+                        }`}
+                      >
+                        {child.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </nav>
