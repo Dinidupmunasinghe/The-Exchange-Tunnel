@@ -104,29 +104,47 @@ export function AdminRepostPricing() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form className="grid gap-3 md:grid-cols-4" onSubmit={handleCreateRule}>
-            <Input
-              type="number"
-              min={0}
-              value={newRule.minSubscribers}
-              onChange={(e) => setNewRule((s) => ({ ...s, minSubscribers: e.target.value }))}
-              placeholder="Min subscribers"
-            />
-            <Input
-              type="number"
-              min={0}
-              value={newRule.maxSubscribers}
-              onChange={(e) => setNewRule((s) => ({ ...s, maxSubscribers: e.target.value }))}
-              placeholder="Max subscribers (empty = no max)"
-            />
-            <Input
-              type="number"
-              min={1}
-              value={newRule.credits}
-              onChange={(e) => setNewRule((s) => ({ ...s, credits: e.target.value }))}
-              placeholder="Credits"
-            />
-            <Button type="submit">Add rule</Button>
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-muted-foreground">Min subscribers</label>
+              <Input
+                type="number"
+                min={0}
+                value={newRule.minSubscribers}
+                onChange={(e) => setNewRule((s) => ({ ...s, minSubscribers: e.target.value }))}
+                placeholder="e.g. 0"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-muted-foreground">
+                Max subscribers (optional)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={newRule.maxSubscribers}
+                onChange={(e) => setNewRule((s) => ({ ...s, maxSubscribers: e.target.value }))}
+                placeholder="Leave empty = no upper limit"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-muted-foreground">Credits to charge</label>
+              <Input
+                type="number"
+                min={1}
+                value={newRule.credits}
+                onChange={(e) => setNewRule((s) => ({ ...s, credits: e.target.value }))}
+                placeholder="e.g. 15"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" className="w-full">
+                Add rule
+              </Button>
+            </div>
           </form>
+          <p className="text-xs text-muted-foreground">
+            Example: Min 0, Max 1,000, Credits 15 means channels with 0-1,000 subscribers cost 15 credits.
+          </p>
 
           <div className="max-h-[50vh] overflow-auto rounded-md border border-border">
             <table className="w-full text-sm">
