@@ -492,6 +492,16 @@ async function submitTaskCompletion(req, res) {
           error.status = 400;
           throw error;
         }
+        const canPostToDestination = await tg
+          .isUserChannelAdminOrCreator(String(worker.telegramActingChannelId), tUid)
+          .catch(() => false);
+        if (!canPostToDestination) {
+          const error = new Error(
+            "Your Telegram user session account is not an admin of your connected repost channel. Reconnect the correct Telegram account in Settings or pick the channel managed by this account."
+          );
+          error.status = 400;
+          throw error;
+        }
         const sourceCandidates = [];
         if (parsedMessage.kind === "public" && parsedMessage.username) {
           sourceCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
