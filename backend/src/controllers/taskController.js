@@ -497,31 +497,56 @@ async function submitTaskCompletion(req, res) {
           sourceCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
         }
         sourceCandidates.push(String(channelId));
+        const destinationCandidates = [];
+        try {
+          const destChat = await tg.getChat(String(worker.telegramActingChannelId));
+          const destUsername = String(destChat?.username || "").replace(/^@/, "").trim();
+          if (destUsername) destinationCandidates.push(`@${destUsername}`);
+        } catch {
+          // ignore; we'll still try numeric channel id
+        }
+        destinationCandidates.push(String(worker.telegramActingChannelId));
         let forwarded = null;
         let lastErr = null;
         for (const sourceChat of sourceCandidates) {
-          try {
-            const out = await runBridge("forward_message", {
-              apiId: creds.apiId,
-              apiHash: creds.apiHash,
-              proxy: creds.proxy || null,
-              sessionString,
-              fromChat: sourceChat,
-              msgId: Number(parsedMessage.messageId),
-              toChat: String(worker.telegramActingChannelId)
-            });
-            forwarded = {
-              sourceChat: String(sourceChat),
-              sourceMessageId: Number(parsedMessage.messageId),
-              destinationChat: String(worker.telegramActingChannelId),
-              forwardedMessageId: Number(out?.messageId || 0)
-            };
-            break;
-          } catch (err) {
-            lastErr = err;
+          for (const destinationChat of destinationCandidates) {
+            try {
+              const out = await runBridge("forward_message", {
+                apiId: creds.apiId,
+                apiHash: creds.apiHash,
+                proxy: creds.proxy || null,
+                sessionString,
+                fromChat: sourceChat,
+                msgId: Number(parsedMessage.messageId),
+                toChat: destinationChat
+              });
+              forwarded = {
+                sourceChat: String(sourceChat),
+                sourceMessageId: Number(parsedMessage.messageId),
+                destinationChat: String(destinationChat),
+                forwardedMessageId: Number(out?.messageId || 0)
+              };
+              break;
+            } catch (err) {
+              lastErr = err;
+            }
           }
+          if (forwarded) break;
         }
         if (!forwarded || !forwarded.forwardedMessageId) {
+          const raw = String(lastErr?.message || "");
+          const lowered = raw.toLowerCase();
+          if (
+            lowered.includes("key is not registered in the system") ||
+            lowered.includes("auth key") ||
+            lowered.includes("unauthorized")
+          ) {
+            const error = new Error(
+              "Your Telegram user session appears expired. Open Settings and reconnect Telegram User Session, then try repost again."
+            );
+            error.status = 400;
+            throw error;
+          }
           const error = new Error(
             (lastErr && lastErr.message) ||
               "Could not repost this message to your connected channel. Ensure you can post there and try again."
