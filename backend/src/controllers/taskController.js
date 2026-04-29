@@ -713,6 +713,14 @@ async function submitTaskCompletion(req, res) {
 }
 
 async function getAvailableTasks(req, res) {
+  const campaignVisibilityWhere = {
+    userId: { [Op.ne]: req.user.id },
+    [Op.or]: [
+      { status: "active" },
+      { status: "pending", scheduledLaunchAt: { [Op.lte]: new Date() } },
+      { status: "completed", engagementType: "share" }
+    ]
+  };
   const tasks = await db.Task.findAll({
     where: {
       [Op.or]: [
@@ -728,7 +736,7 @@ async function getAvailableTasks(req, res) {
         model: db.Campaign,
         as: "campaign",
         required: true,
-        where: { userId: { [Op.ne]: req.user.id }, ...runnableCampaignWhere() },
+        where: campaignVisibilityWhere,
         attributes: [
           "id",
           "name",
