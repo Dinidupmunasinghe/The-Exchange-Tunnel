@@ -509,6 +509,23 @@ async function submitTaskCompletion(req, res) {
         let forwarded = null;
         let lastErr = null;
         for (const sourceChat of sourceCandidates) {
+          let sourceHasMessage = false;
+          try {
+            const existsOut = await runBridge("message_exists", {
+              apiId: creds.apiId,
+              apiHash: creds.apiHash,
+              proxy: creds.proxy || null,
+              sessionString,
+              chat: sourceChat,
+              msgId: Number(parsedMessage.messageId)
+            });
+            sourceHasMessage = Boolean(existsOut?.exists);
+          } catch (err) {
+            lastErr = err;
+          }
+          if (!sourceHasMessage) {
+            continue;
+          }
           for (const destinationChat of destinationCandidates) {
             try {
               const out = await runBridge("forward_message", {
@@ -543,6 +560,19 @@ async function submitTaskCompletion(req, res) {
           ) {
             const error = new Error(
               "Your Telegram user session appears expired. Open Settings and reconnect Telegram User Session, then try repost again."
+            );
+            error.status = 400;
+            throw error;
+          }
+          if (
+            lowered.includes("forward_message failed") ||
+            lowered.includes("forwardmessagesrequest") ||
+            lowered.includes("message id is invalid") ||
+            lowered.includes("chat_forwards_restricted") ||
+            lowered.includes("can't do that operation")
+          ) {
+            const error = new Error(
+              "Telegram blocked forwarding this post. The source message may be deleted, protected from forwards, or not accessible to your account."
             );
             error.status = 400;
             throw error;
