@@ -81,7 +81,13 @@ export function TopBar() {
         </div>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          onClick={() => navigate("/repost?tab=received&pane=notifications")}
+          aria-label="Open notifications"
+        >
           <Bell className="h-5 w-5" />
           <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span>
         </Button>

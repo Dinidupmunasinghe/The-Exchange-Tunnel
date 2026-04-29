@@ -44,6 +44,8 @@ export function RepostRequests() {
   const [loading, setLoading] = useState(false);
   const [requestingUserId, setRequestingUserId] = useState<number | null>(null);
   const tabParam = String(searchParams.get("tab") || "send").toLowerCase();
+  const paneParam = String(searchParams.get("pane") || "").toLowerCase();
+  const showNotificationPane = paneParam === "notifications";
   const tab: "send" | "received" | "sent" =
     tabParam === "received" ? "received" : tabParam === "sent" ? "sent" : "send";
   const [receivedRequests, setReceivedRequests] = useState<RepostRequest[]>([]);
@@ -94,7 +96,16 @@ export function RepostRequests() {
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setTab(next: "send" | "received" | "sent") {
-    setSearchParams(next === "send" ? {} : { tab: next });
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === "send") nextParams.delete("tab");
+    else nextParams.set("tab", next);
+    setSearchParams(nextParams);
+  }
+
+  function closeNotificationPane() {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("pane");
+    setSearchParams(nextParams);
   }
 
   const readyUrl = useMemo(() => String(messageUrl || "").trim(), [messageUrl]);
@@ -370,12 +381,18 @@ export function RepostRequests() {
         </Card>
       ) : null}
 
+      {showNotificationPane ? (
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notification Pane
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notification Pane
+            </CardTitle>
+            <Button type="button" size="sm" variant="outline" onClick={closeNotificationPane}>
+              Close
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {notifications.slice(0, 20).map((n) => (
@@ -428,6 +445,7 @@ export function RepostRequests() {
           ) : null}
         </CardContent>
       </Card>
+      ) : null}
     </div>
   );
 }
