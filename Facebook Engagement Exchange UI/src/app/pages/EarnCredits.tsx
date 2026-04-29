@@ -498,7 +498,7 @@ export function EarnCredits() {
           const cid = campaign.id;
           const liked = hasEngagement(myEngagements, cid, "like");
           const commented = hasEngagement(myEngagements, cid, "comment");
-          const shared = hasEngagement(myEngagements, cid, "share");
+          const shared = hasEngagement(myEngagements, cid, "share") || (et === "share" && hasCompletedTask(campaignTasks));
           const subscribed =
             hasCompletedTask(campaignTasks) ||
             myEngagements.some((e) => e.campaignId === cid && e.actionKind === "subscribe");
