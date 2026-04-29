@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       taskId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, unique: true },
       engagementType: { type: DataTypes.STRING(32), allowNull: false },
       /** Which button: like / comment / share (one per user per campaign per kind). */
-      actionKind: { type: DataTypes.ENUM("like", "comment", "share"), allowNull: true },
+      actionKind: { type: DataTypes.STRING(16), allowNull: true },
       metaEngagementId: { type: DataTypes.STRING(120), allowNull: true },
       verificationStatus: {
         type: DataTypes.ENUM("pending", "verified", "rejected"),

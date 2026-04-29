@@ -34,15 +34,39 @@ async function ensureDevSchema() {
     allowNull: true
   });
   await addColumnIfMissing(qi, "engagements", "actionKind", {
-    type: db.sequelize.Sequelize.ENUM("like", "comment", "share"),
+    type: db.sequelize.Sequelize.STRING(16),
     allowNull: true
   });
+}
+
+async function ensureActionKindColumnCompatibility() {
+  const qi = db.sequelize.getQueryInterface();
+  const tables = [
+    { tableName: "engagements", columnName: "actionKind", allowNull: true },
+    { tableName: "user_post_actions", columnName: "actionKind", allowNull: false }
+  ];
+  for (const t of tables) {
+    try {
+      const columns = await qi.describeTable(t.tableName);
+      const col = columns?.[t.columnName];
+      if (!col) continue;
+      const typeText = String(col.type || "").toLowerCase();
+      if (typeText.includes("varchar") || typeText.includes("char")) continue;
+      await qi.changeColumn(t.tableName, t.columnName, {
+        type: db.sequelize.Sequelize.STRING(16),
+        allowNull: t.allowNull
+      });
+    } catch {
+      // best effort: startup should continue even when DB denies schema changes.
+    }
+  }
 }
 
 async function bootstrap() {
   try {
     await db.sequelize.authenticate();
     await ensureDevSchema();
+    await ensureActionKindColumnCompatibility();
     await db.sequelize.sync(env.dbSyncAlter ? { alter: true } : undefined);
     await activateDueCampaigns();
     await auditSubscribeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
