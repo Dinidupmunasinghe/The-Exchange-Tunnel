@@ -9,11 +9,13 @@ const { auditSubscribeEngagements, auditSubscriptionMemory } = require("../servi
 const { auditLikeEngagements } = require("../services/likeEngagementAuditService");
 const { auditCommentDeletions } = require("../services/commentDeletionAuditService");
 const { auditCommentMembershipEngagements } = require("../services/commentMembershipAuditService");
+const { auditShareDeletions } = require("../services/shareDeletionAuditService");
 
 const lastAuditRuns = {
   subscribe: null,
   like: null,
   comment: null,
+  share: null,
   commentMembership: null,
   subscribeMemory: null
 };
@@ -1169,6 +1171,13 @@ async function runTelegramAudits(req, res) {
       lastAuditRuns.commentMembership = {
         ranAt: startedAt.toISOString(),
         result: results.commentMembership
+      };
+    }
+    if (kind === "all" || kind === "share") {
+      results.share = await auditShareDeletions();
+      lastAuditRuns.share = {
+        ranAt: startedAt.toISOString(),
+        result: results.share
       };
     }
   } catch (err) {

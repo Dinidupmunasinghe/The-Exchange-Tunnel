@@ -265,7 +265,7 @@ router.post(
   [
     body("kind")
       .optional()
-      .isIn(["all", "subscribe", "subscribeMemory", "like", "comment", "commentMembership"])
+      .isIn(["all", "subscribe", "subscribeMemory", "like", "comment", "commentMembership", "share"])
   ],
   validateRequest,
   ctrl.runTelegramAudits

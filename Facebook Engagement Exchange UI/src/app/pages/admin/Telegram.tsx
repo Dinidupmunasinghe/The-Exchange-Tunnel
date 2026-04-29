@@ -15,13 +15,17 @@ type Health = {
   lastAuditRuns: Record<string, { ranAt: string; result: any } | null>;
 };
 
-const AUDIT_KINDS: { kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership"; label: string }[] = [
+const AUDIT_KINDS: {
+  kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership" | "share";
+  label: string;
+}[] = [
   { kind: "all", label: "Run all audits" },
   { kind: "subscribe", label: "Subscribe audit" },
   { kind: "subscribeMemory", label: "Subscription memory cleanup" },
   { kind: "like", label: "Like audit" },
   { kind: "comment", label: "Comment deletion audit" },
-  { kind: "commentMembership", label: "Comment membership audit" }
+  { kind: "commentMembership", label: "Comment membership audit" },
+  { kind: "share", label: "Repost deletion audit" }
 ];
 
 function YesNo({ value }: { value: boolean }) {
@@ -56,7 +60,9 @@ export function AdminTelegram() {
     void load();
   }, [load]);
 
-  async function run(kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership") {
+  async function run(
+    kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership" | "share"
+  ) {
     setRunning(kind);
     setError(null);
     setMessage(null);
