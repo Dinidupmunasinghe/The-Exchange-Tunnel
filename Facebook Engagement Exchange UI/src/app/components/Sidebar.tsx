@@ -106,10 +106,10 @@ export function Sidebar({ onClose }: SidebarProps) {
                         key={child.name}
                         to={child.href}
                         onClick={onClose}
-                        className={`block rounded-md px-2 py-1.5 text-xs transition ${
+                        className={`block rounded-lg px-3 py-2 text-sm font-medium transition ${
                           childActive
-                            ? "bg-brand/20 text-brand"
-                            : "text-muted-foreground hover:bg-brand/10 hover:text-brand"
+                            ? "bg-secondary text-foreground"
+                            : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
                         }`}
                       >
                         {child.name}
