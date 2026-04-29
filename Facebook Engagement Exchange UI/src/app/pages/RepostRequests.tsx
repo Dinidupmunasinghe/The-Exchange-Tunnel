@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { api } from "../services/api";
 
 type RepostChannel = {
@@ -381,71 +382,69 @@ export function RepostRequests() {
         </Card>
       ) : null}
 
-      {showNotificationPane ? (
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2">
+      <Dialog open={showNotificationPane} onOpenChange={(open) => (open ? undefined : closeNotificationPane())}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-hidden border-border bg-card p-0">
+          <DialogHeader className="border-b border-border px-5 py-4">
+            <DialogTitle className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
-              Notification Pane
-            </CardTitle>
-            <Button type="button" size="sm" variant="outline" onClick={closeNotificationPane}>
-              Close
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {notifications.slice(0, 20).map((n) => (
-            <div key={n.id} className="rounded-md border border-border p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{n.title}</p>
-                  <p className="text-xs text-muted-foreground">{n.body}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</p>
+              Notifications
+            </DialogTitle>
+            <DialogDescription>
+              Recent received and sent repost updates with quick actions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[62vh] space-y-2 overflow-y-auto px-5 py-4">
+            {notifications.slice(0, 20).map((n) => (
+              <div key={n.id} className="rounded-md border border-border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{n.title}</p>
+                    <p className="text-xs text-muted-foreground">{n.body}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</p>
+                  </div>
+                  {n.request.taskStatus === "completed" || n.request.status === "completed" ? (
+                    <CircleCheck className="h-4 w-4 text-emerald-400" />
+                  ) : n.request.taskStatus === "cancelled" || n.request.status === "cancelled" ? (
+                    <XCircle className="h-4 w-4 text-rose-400" />
+                  ) : (
+                    <CircleDashed className="h-4 w-4 text-amber-400" />
+                  )}
                 </div>
-                {n.request.taskStatus === "completed" || n.request.status === "completed" ? (
-                  <CircleCheck className="h-4 w-4 text-emerald-400" />
-                ) : n.request.taskStatus === "cancelled" || n.request.status === "cancelled" ? (
-                  <XCircle className="h-4 w-4 text-rose-400" />
-                ) : (
-                  <CircleDashed className="h-4 w-4 text-amber-400" />
-                )}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {n.request.campaign?.messageUrl ? (
+                    <Button type="button" size="sm" variant="outline" asChild>
+                      <a href={n.request.campaign.messageUrl} target="_blank" rel="noreferrer">
+                        <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                        Open Source Post
+                      </a>
+                    </Button>
+                  ) : null}
+                  {n.type === "received" ? (
+                    <Button type="button" size="sm" asChild>
+                      <Link to="/earn">Go to Earn Credits</Link>
+                    </Button>
+                  ) : null}
+                  {n.type === "sent" &&
+                  (n.request.status === "active" || n.request.taskStatus === "assigned" || n.request.taskStatus === "open") ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={cancellingCampaignId === n.request.campaignId}
+                      onClick={() => void handleCancelRequest(n.request.campaignId)}
+                    >
+                      {cancellingCampaignId === n.request.campaignId ? "Cancelling..." : "Cancel Request"}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {n.request.campaign?.messageUrl ? (
-                  <Button type="button" size="sm" variant="outline" asChild>
-                    <a href={n.request.campaign.messageUrl} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1 h-3.5 w-3.5" />
-                      Open
-                    </a>
-                  </Button>
-                ) : null}
-                {n.type === "received" ? (
-                  <Button type="button" size="sm" asChild>
-                    <Link to="/earn">Go to Earn Credits</Link>
-                  </Button>
-                ) : null}
-                {n.type === "sent" &&
-                (n.request.status === "active" || n.request.taskStatus === "assigned" || n.request.taskStatus === "open") ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    disabled={cancellingCampaignId === n.request.campaignId}
-                    onClick={() => void handleCancelRequest(n.request.campaignId)}
-                  >
-                    {cancellingCampaignId === n.request.campaignId ? "Cancelling..." : "Cancel"}
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ))}
-          {notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notifications yet.</p>
-          ) : null}
-        </CardContent>
-      </Card>
-      ) : null}
+            ))}
+            {notifications.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No notifications yet.</p>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
