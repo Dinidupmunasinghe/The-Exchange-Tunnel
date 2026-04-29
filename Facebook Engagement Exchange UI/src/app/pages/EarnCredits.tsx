@@ -674,30 +674,46 @@ export function EarnCredits() {
                 </div>
                 ) : null}
                 {!isSubscribeCampaign && bundleAllowsAction(et, "share") ? (
-                  <Button
-                    type="button"
-                    variant={shared ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-full border-violet-500/25 bg-background/80 pr-3 hover:bg-violet-500/10"
-                    onClick={() => void handleAction(cid, campaignTasks, et, "share")}
-                    disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
-                  >
-                    {busy === `${cid}-share` || busy === `${cid}-share-delete` ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Repeat2 className="mr-2 h-4 w-4" />
-                    )}
-                    {busy === `${cid}-share`
-                      ? "Reposting..."
-                      : busy === `${cid}-share-delete`
-                        ? "Removing..."
-                        : shared
-                          ? "Remove repost"
-                          : "Repost"}
-                    <Badge className="ml-2 rounded-full bg-violet-500/15 px-2 text-violet-600 dark:text-violet-400 hover:bg-violet-500/15">
-                      +{reward}
-                    </Badge>
-                  </Button>
+                  shared ? (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-background/80 px-3 py-1.5">
+                      <Repeat2 className="h-4 w-4 text-violet-400" />
+                      <span className="text-sm font-medium text-foreground">Reposted</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full"
+                        onClick={() => void handleAction(cid, campaignTasks, et, "share")}
+                        disabled={busy !== null}
+                        aria-label="Delete repost action"
+                      >
+                        {busy === `${cid}-share-delete` ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full border-violet-500/25 bg-background/80 pr-3 hover:bg-violet-500/10"
+                      onClick={() => void handleAction(cid, campaignTasks, et, "share")}
+                      disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                    >
+                      {busy === `${cid}-share` ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Repeat2 className="mr-2 h-4 w-4" />
+                      )}
+                      {busy === `${cid}-share` ? "Reposting..." : "Repost"}
+                      <Badge className="ml-2 rounded-full bg-violet-500/15 px-2 text-violet-600 dark:text-violet-400 hover:bg-violet-500/15">
+                        +{reward}
+                      </Badge>
+                    </Button>
+                  )
                 ) : null}
                 {!isSubscribeCampaign && bundleAllowsAction(et, "comment") ? (
                   commented ? (
