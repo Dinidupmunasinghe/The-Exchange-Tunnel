@@ -46,11 +46,36 @@ function TelegramDeeplinkLogin() {
 
   const startLogin = async () => {
     setState("waiting");
+    // Open a tab synchronously on click; `window.open` after `await` is usually blocked as a popup.
+    let popup: Window | null = null;
+    try {
+      popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+    } catch {
+      popup = null;
+    }
+
     try {
       const { token, expiresInMs } = await startTelegramDeeplinkLogin();
       const url = `https://t.me/${BOT}?start=login_${token}`;
       setDeeplinkUrl(url);
-      window.open(url, "_blank");
+
+      if (popup && !popup.closed) {
+        try {
+          popup.location.href = url;
+        } catch {
+          try {
+            popup.close();
+          } catch {
+            // ignore
+          }
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      } else {
+        const fallback = window.open(url, "_blank", "noopener,noreferrer");
+        if (!fallback || fallback.closed) {
+          toast.info("Pop-up blocked — tap “Open Telegram again” below, or allow pop-ups for this site.");
+        }
+      }
 
       const deadline = Date.now() + expiresInMs;
 
@@ -79,6 +104,13 @@ function TelegramDeeplinkLogin() {
         }
       }, 2000);
     } catch (e) {
+      if (popup && !popup.closed) {
+        try {
+          popup.close();
+        } catch {
+          // ignore
+        }
+      }
       setState("error");
       toast.error(e instanceof Error ? e.message : "Failed to start login");
     }
