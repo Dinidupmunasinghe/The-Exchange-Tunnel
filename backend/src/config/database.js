@@ -1,7 +1,13 @@
 const { Sequelize } = require("sequelize");
 const env = require("./env");
 
-const sslRejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false";
+// Default to NOT verifying the CA when the host's cert is self-signed
+// (Render Postgres, Heroku, Railway public proxies, etc.).
+// Override by setting DB_SSL_REJECT_UNAUTHORIZED=true.
+const explicitReject = process.env.DB_SSL_REJECT_UNAUTHORIZED;
+const sslRejectUnauthorized = explicitReject != null
+  ? explicitReject === "true"
+  : env.db.dialect !== "postgres";
 
 const baseOptions = {
   dialect: env.db.dialect,
