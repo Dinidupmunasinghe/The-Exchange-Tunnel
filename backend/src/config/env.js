@@ -2,18 +2,30 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+const explicitDialect = String(process.env.DB_DIALECT || "").toLowerCase();
+const databaseUrl = process.env.DATABASE_URL || "";
+const inferredDialect = explicitDialect
+  ? explicitDialect
+  : databaseUrl.startsWith("postgres")
+    ? "postgres"
+    : "mysql";
+
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 5000),
   dbSyncAlter: process.env.DB_SYNC_ALTER === "true",
   db: {
+    /** "postgres" or "mysql"; inferred from DATABASE_URL when not set. */
+    dialect: inferredDialect,
+    /** Full connection URL (preferred on Render/Railway/Heroku). */
+    url: databaseUrl,
     host: process.env.DB_HOST || "localhost",
-    port: Number(process.env.DB_PORT || 3306),
+    port: Number(process.env.DB_PORT || (inferredDialect === "postgres" ? 5432 : 3306)),
     name: process.env.DB_NAME || "exchange_tunnel",
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
-    /** Railway / cloud MySQL over public proxy often requires TLS. */
-    ssl: process.env.DB_SSL === "true"
+    /** Cloud Postgres/MySQL proxies often require TLS. Auto-on for Postgres URLs. */
+    ssl: process.env.DB_SSL === "true" || (Boolean(databaseUrl) && inferredDialect === "postgres")
   },
   jwt: {
     secret: process.env.JWT_SECRET || "dev-secret-change-me",

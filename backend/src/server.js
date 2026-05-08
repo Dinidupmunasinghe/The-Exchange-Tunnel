@@ -42,6 +42,7 @@ async function ensureDevSchema() {
 
 async function ensureActionKindColumnCompatibility() {
   const qi = db.sequelize.getQueryInterface();
+  const dialect = db.sequelize.getDialect();
   const tables = [
     { tableName: "engagements", columnName: "actionKind", allowNull: true },
     { tableName: "user_post_actions", columnName: "actionKind", allowNull: false }
@@ -52,7 +53,13 @@ async function ensureActionKindColumnCompatibility() {
       const col = columns?.[t.columnName];
       if (!col) continue;
       const typeText = String(col.type || "").toLowerCase();
-      if (typeText.includes("varchar") || typeText.includes("char")) continue;
+      if (
+        typeText.includes("varchar") ||
+        typeText.includes("character varying") ||
+        (dialect === "postgres" && typeText.includes("text"))
+      ) {
+        continue;
+      }
       await qi.changeColumn(t.tableName, t.columnName, {
         type: db.sequelize.Sequelize.STRING(16),
         allowNull: t.allowNull
