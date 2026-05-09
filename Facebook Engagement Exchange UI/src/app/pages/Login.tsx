@@ -48,8 +48,11 @@ function TelegramDeeplinkLogin() {
     setState("waiting");
     // Open a tab synchronously on click; `window.open` after `await` is usually blocked as a popup.
     let popup: Window | null = null;
+    // Do NOT pass noopener here: with noopener, many browsers return null from
+    // window.open, so we cannot assign popup.location after await — then Telegram
+    // never opens (popup blocker kills the late window.open).
     try {
-      popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+      popup = window.open("about:blank", "_blank");
     } catch {
       popup = null;
     }
@@ -68,10 +71,10 @@ function TelegramDeeplinkLogin() {
           } catch {
             // ignore
           }
-          window.open(url, "_blank", "noopener,noreferrer");
+          window.open(url, "_blank");
         }
       } else {
-        const fallback = window.open(url, "_blank", "noopener,noreferrer");
+        const fallback = window.open(url, "_blank");
         if (!fallback || fallback.closed) {
           toast.info("Pop-up blocked — tap “Open Telegram again” below, or allow pop-ups for this site.");
         }
@@ -166,6 +169,11 @@ function TelegramDeeplinkLogin() {
       {state === "error" && (
         <p className="text-xs text-destructive">Something went wrong. Please try again.</p>
       )}
+      {!BOT ? (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Set <code className="rounded bg-muted px-1">VITE_TELEGRAM_BOT_NAME</code> on your host (e.g. Vercel) to your bot username without @, then redeploy the frontend.
+        </p>
+      ) : null}
     </div>
   );
 }
