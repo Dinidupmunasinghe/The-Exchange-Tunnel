@@ -1,15 +1,16 @@
 import { Link, useLocation } from "react-router";
-import { 
-  LayoutDashboard, 
-  Sparkles, 
-  Upload, 
-  FolderOpen, 
-  BarChart3, 
-  Wallet, 
+import {
+  LayoutDashboard,
+  Sparkles,
+  Upload,
+  FolderOpen,
+  BarChart3,
+  Wallet,
   Settings,
   Waypoints,
   X,
-  Repeat2
+  Repeat2,
+  LifeBuoy
 } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -30,7 +31,7 @@ const navigation = [
   },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Wallet", href: "/wallet", icon: Wallet },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Settings", href: "/settings", icon: Settings }
 ];
 
 interface SidebarProps {
@@ -47,90 +48,96 @@ export function Sidebar({ onClose }: SidebarProps) {
   }
 
   return (
-    <aside className="flex h-full w-64 flex-col overflow-hidden border-r border-border bg-card">
-      {/* Logo */}
-      <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-border bg-background/60 px-4 py-3">
-        <div className="group/logo flex cursor-default items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand shadow-md shadow-brand/25 transition-transform group-hover/logo:scale-105">
-            <Waypoints className="h-6 w-6 text-brand-foreground" />
+    <aside className="flex h-full w-64 flex-col overflow-hidden border-r border-border bg-sidebar">
+      {/* Brand */}
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
+            <Waypoints className="h-4 w-4 text-primary-foreground" />
           </div>
-          <div className="min-w-0">
-            <h1 className="truncate whitespace-nowrap text-base font-semibold tracking-tight text-foreground transition-colors group-hover/logo:text-brand">
-              Exchange Tunnel
-            </h1>
-            <p className="truncate text-[11px] font-medium text-muted-foreground">Connect. Exchange. Grow.</p>
-          </div>
+          <span className="text-sm font-semibold tracking-tight text-foreground">
+            Exchange Tunnel
+          </span>
         </div>
         {onClose && (
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="lg:hidden"
+            className="h-8 w-8 lg:hidden"
+            aria-label="Close menu"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </Button>
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3 [scrollbar-color:#52525b_#09090b] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-thumb:hover]:bg-zinc-500 [&::-webkit-scrollbar-track]:bg-zinc-950/80 [&::-webkit-scrollbar]:w-2">
-        {navigation.map((item) => {
-          const isActive = isLinkActive(item.href);
-          const Icon = item.icon;
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Workspace
+        </p>
+        <div className="space-y-0.5">
+          {navigation.map((item) => {
+            const isActive = isLinkActive(item.href);
+            const Icon = item.icon;
 
-          return (
-            <div key={item.name}>
-              <Link
-                to={item.href}
-                onClick={onClose}
-                className={`
-                  group/nav flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all
-                  ${isActive
-                    ? "bg-brand text-brand-foreground shadow-lg shadow-brand/25"
-                    : "text-muted-foreground hover:bg-brand/10 hover:text-brand"
-                  }
-                `}
-              >
-                <Icon
-                  className={`h-5 w-5 transition-colors ${isActive ? "text-brand-foreground" : "group-hover/nav:text-brand"}`}
-                />
-                <span className="font-medium">{item.name}</span>
-              </Link>
-              {item.children && location.pathname === "/repost" ? (
-                <div className="mt-1 space-y-1 pl-10">
-                  {item.children.map((child) => {
-                    const childActive = isLinkActive(child.href);
-                    return (
-                      <Link
-                        key={child.name}
-                        to={child.href}
-                        onClick={onClose}
-                        className={`block rounded-lg px-3 py-2 text-sm font-medium transition ${
-                          childActive
-                            ? "bg-secondary text-foreground"
-                            : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
-                        }`}
-                      >
-                        {child.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+            return (
+              <div key={item.name}>
+                <Link
+                  to={item.href}
+                  onClick={onClose}
+                  className={`group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                  }`}
+                >
+                  <Icon
+                    className={`h-4 w-4 shrink-0 transition-colors ${
+                      isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    }`}
+                  />
+                  <span className="truncate">{item.name}</span>
+                </Link>
+
+                {item.children && location.pathname === "/repost" ? (
+                  <div className="mt-0.5 space-y-0.5 border-l border-border/80 pl-3 ml-4">
+                    {item.children.map((child) => {
+                      const childActive = isLinkActive(child.href);
+                      return (
+                        <Link
+                          key={child.name}
+                          to={child.href}
+                          onClick={onClose}
+                          className={`block rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+                            childActive
+                              ? "bg-accent text-foreground font-medium"
+                              : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                          }`}
+                        >
+                          {child.name}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-border p-4">
-        <div className="rounded-lg bg-secondary/50 p-3">
-          <p className="text-sm font-medium text-foreground">Need Help?</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Chat with our support team
-          </p>
-        </div>
+      <div className="border-t border-border p-3">
+        <Link
+          to="/settings"
+          onClick={onClose}
+          className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+        >
+          <LifeBuoy className="h-4 w-4" />
+          <span>Help & support</span>
+        </Link>
       </div>
     </aside>
   );

@@ -1,124 +1,176 @@
 @custom-variant dark (&:is(.dark *));
 
+/*
+  Modern SaaS design tokens.
+  Inspired by Linear / Vercel / Stripe — calm, neutral, confident.
+*/
+
 :root {
-  --font-size: 16px;
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  
-  /* Dark Mode Colors - ChatGPT inspired */
-  --background: #0f0f0f;
-  --foreground: #ececec;
-  --card: #1a1a1a;
-  --card-foreground: #ececec;
-  --popover: #1a1a1a;
-  --popover-foreground: #ececec;
-  --primary: #10a37f;
+  --font-family:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', sans-serif;
+  --font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+
+  /* ── Light mode (clean white SaaS) ──────────────────────────────── */
+  --background: #f7f8fa;
+  --foreground: #0a0b0d;
+
+  --card: #ffffff;
+  --card-foreground: #0a0b0d;
+
+  --popover: #ffffff;
+  --popover-foreground: #0a0b0d;
+
+  --primary: #6366f1;
   --primary-foreground: #ffffff;
-  --secondary: #2a2a2a;
-  --secondary-foreground: #ececec;
-  --muted: #2a2a2a;
-  --muted-foreground: #8e8ea0;
-  --accent: #10a37f;
-  --accent-foreground: #ffffff;
+
+  --secondary: #eef0f4;
+  --secondary-foreground: #0a0b0d;
+
+  --muted: #eef0f4;
+  --muted-foreground: #5b6573;
+
+  --accent: #eef0f4;
+  --accent-foreground: #0a0b0d;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --border: #e6e8ec;
+  --input: #e6e8ec;
+  --input-background: #ffffff;
+  --switch-background: #d6d9df;
+
+  --ring: #6366f1;
+
+  /* Telegram-flavored brand for logo / brand chips. */
+  --brand: #2aabee;
+  --brand-foreground: #ffffff;
+
+  --chart-1: #6366f1;
+  --chart-2: #22c55e;
+  --chart-3: #f59e0b;
+  --chart-4: #ec4899;
+  --chart-5: #06b6d4;
+
+  /* Typography scale (kept 16px base so Tailwind text-* utilities are standard). */
+  --font-size: 16px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --radius: 0.625rem; /* 10px — modern, calm */
+
+  /* Sidebar uses the same palette so it blends with the app. */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0a0b0d;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef0f4;
+  --sidebar-accent-foreground: #0a0b0d;
+  --sidebar-border: #e6e8ec;
+  --sidebar-ring: #6366f1;
+}
+
+/* ── Dark mode (default for this app) ─────────────────────────────── */
+.dark {
+  --background: #0a0b0d;
+  --foreground: #e7e9ee;
+
+  --card: #111317;
+  --card-foreground: #e7e9ee;
+
+  --popover: #15171c;
+  --popover-foreground: #e7e9ee;
+
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+
+  --secondary: #1a1d23;
+  --secondary-foreground: #e7e9ee;
+
+  --muted: #1a1d23;
+  --muted-foreground: #8b929e;
+
+  --accent: #1a1d23;
+  --accent-foreground: #e7e9ee;
+
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #2a2a2a;
-  --input: #2a2a2a;
-  --input-background: #2a2a2a;
-  --switch-background: #2a2a2a;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --ring: #10a37f;
-  /* Facebook / Meta brand — use for logo, hovers, accents (not all primary UI). */
-  --brand: #1877f2;
+
+  --border: #1f242d;
+  --input: #1f242d;
+  --input-background: #15171c;
+  --switch-background: #2a2f38;
+
+  --ring: #6366f1;
+
+  --brand: #2aabee;
   --brand-foreground: #ffffff;
-  --chart-1: #10a37f;
-  --chart-2: #3b82f6;
-  --chart-3: #8b5cf6;
-  --chart-4: #f59e0b;
-  --chart-5: #ec4899;
-  --radius: 0.75rem;
-  --sidebar: #0f0f0f;
-  --sidebar-foreground: #ececec;
-  --sidebar-primary: #10a37f;
+
+  --chart-1: #818cf8;
+  --chart-2: #34d399;
+  --chart-3: #fbbf24;
+  --chart-4: #f472b6;
+  --chart-5: #22d3ee;
+
+  --sidebar: #0a0b0d;
+  --sidebar-foreground: #e7e9ee;
+  --sidebar-primary: #6366f1;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #2a2a2a;
-  --sidebar-accent-foreground: #ececec;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #10a37f;
+  --sidebar-accent: #1a1d23;
+  --sidebar-accent-foreground: #e7e9ee;
+  --sidebar-border: #1f242d;
+  --sidebar-ring: #6366f1;
 }
 
-.dark {
-  --brand: #1877f2;
-  --brand-foreground: #ffffff;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
-}
-
+/* ── Tailwind v4 inline theme map ─────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-input-background: var(--input-background);
   --color-switch-background: var(--switch-background);
   --color-ring: var(--ring);
+
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -129,65 +181,81 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ── Base resets and typography ───────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-family);
-  }
-
-  /**
-  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
-  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
-  */
-
   html {
     font-size: var(--font-size);
     font-family: var(--font-family);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: var(--font-feature-settings);
   }
 
-  h1 {
-    font-size: var(--text-2xl);
-    font-weight: var(--font-weight-medium);
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-family);
+    font-size: 0.875rem; /* 14px — standard SaaS density */
     line-height: 1.5;
+  }
+
+  /* Heading hierarchy. Tailwind text-* utilities still override these. */
+  h1 {
+    font-size: 1.5rem;          /* 24px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
   }
 
   h2 {
-    font-size: var(--text-xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: 1.25rem;         /* 20px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.35;
+    letter-spacing: -0.005em;
   }
 
   h3 {
-    font-size: var(--text-lg);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: 1.0625rem;       /* 17px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.4;
   }
 
   h4 {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: 0.9375rem;       /* 15px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.4;
   }
 
-  label {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+  p {
+    line-height: 1.55;
   }
 
-  button {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+  /* Numbers feel more "product" with tabular figures. */
+  table,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
-  input {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-normal);
-    line-height: 1.5;
+  /* Subtle, modern scrollbars (dark mode). */
+  .dark ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #2a2f38;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 8px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #3a4150;
+    background-clip: padding-box;
   }
 }

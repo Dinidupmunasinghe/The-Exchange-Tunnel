@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { api, clearToken } from "../services/api";
@@ -58,38 +58,38 @@ export function TopBar() {
   }
 
   return (
-    <header className="hidden h-16 items-center justify-between border-b border-border bg-card px-6 lg:flex">
+    <header className="hidden h-14 items-center justify-between border-b border-border bg-background px-6 lg:flex">
       {/* Search */}
-      <div className="relative max-w-md flex-1">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="relative max-w-sm flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Search posts, campaigns..."
-          className="border-0 bg-secondary pl-10"
+          placeholder="Search posts, campaigns…"
+          className="h-9 border-border bg-card pl-9 text-sm placeholder:text-muted-foreground focus-visible:bg-card"
         />
       </div>
 
       {/* Right Side */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
         {/* Credits Balance */}
-        <div className="flex items-center gap-2 rounded-lg bg-brand/10 px-4 py-2 transition-colors hover:bg-brand/15">
-          <Coins className="h-5 w-5 text-brand" />
-          <div>
-            <p className="text-xs text-muted-foreground">Balance</p>
-            <p className="font-bold text-foreground">{profile?.credits ?? "—"}</p>
-          </div>
+        <div className="flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3">
+          <Coins className="h-4 w-4 text-primary" />
+          <span className="text-xs text-muted-foreground">Balance</span>
+          <span className="text-sm font-semibold tabular-nums text-foreground">
+            {profile?.credits ?? "—"}
+          </span>
         </div>
 
         {/* Notifications */}
         <Button
           variant="ghost"
           size="icon"
-          className="relative"
+          className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
           onClick={() => navigate("/repost?tab=received&pane=notifications")}
           aria-label="Open notifications"
         >
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span>
+          <Bell className="h-4 w-4" />
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary"></span>
         </Button>
 
         {/* User Menu */}
@@ -97,25 +97,33 @@ export function TopBar() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="h-10 gap-2 rounded-full px-2 ring-offset-background transition-shadow hover:ring-2 hover:ring-brand/40 hover:ring-offset-2"
+              className="h-9 gap-2 rounded-md px-1.5 text-sm font-medium text-foreground hover:bg-accent"
             >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-brand text-brand-foreground text-xs">{initials}</AvatarFallback>
+              <Avatar className="h-7 w-7">
+                <AvatarFallback className="bg-primary text-primary-foreground text-[11px] font-semibold">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium text-foreground">Account</span>
+              <span className="hidden md:inline">Account</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
+            <DropdownMenuLabel className="font-normal">
               <div>
-                <p className="font-medium">{profile?.name || "Account"}</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {profile?.name || "Account"}
+                </p>
                 <p className="text-xs text-muted-foreground">{profile?.email || ""}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate("/settings")}>Account Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings")}>
+              Account Settings
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>Log out</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
