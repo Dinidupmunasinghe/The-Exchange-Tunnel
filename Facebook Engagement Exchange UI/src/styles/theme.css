@@ -3,8 +3,7 @@
 /*
   Design tokens.
   Light: Vercel-style pure white content, hairline borders.
-  Dark: clean 3-layer SaaS surfaces (sidebar/topbar deepest, page bg, lifted cards),
-  flat #4444FF primary, hairline borders. No neon glows or glass blur.
+  Dark: clean 3-layer SaaS surfaces, flat primary bound to Tailwind blue-600.
 */
 
 :root {
@@ -75,7 +74,7 @@
   --sidebar-ring: #000000;
 }
 
-/* ── Dark mode (clean SaaS: 3-layer surfaces, flat #4444FF primary) ───── */
+/* ── Dark mode (clean SaaS: 3-layer surfaces, primary = blue-600) ───── */
 .dark {
   /* Surfaces (deepest -> lifted) */
   --background: #0d0e10;          /* main content area */
@@ -87,8 +86,8 @@
   --popover: #1c1d21;
   --popover-foreground: #ffffff;
 
-  /* Primary: flat blue-violet, no gradient/glow. */
-  --primary: #4444ff;
+  /* Primary: Tailwind blue-600 (same token as bg-blue-600). */
+  --primary: var(--color-blue-600, #2563eb);
   --primary-foreground: #ffffff;
 
   --secondary: #1f2024;
@@ -109,13 +108,13 @@
   --input-background: #18191c;
   --switch-background: #2e2f33;
 
-  --ring: #6b6bff;
+  --ring: var(--color-blue-500, #3b82f6);
 
   /* Telegram brand stays cyan for the logo. */
   --brand: #38bdf8;
   --brand-foreground: #0a0a0b;
 
-  --chart-1: #4444ff;
+  --chart-1: var(--color-blue-600, #2563eb);
   --chart-2: #22d3ee;
   --chart-3: #f97316;
   --chart-4: #34d399;
@@ -124,12 +123,12 @@
   /* Sidebar + mobile topbar: deepest layer. */
   --sidebar: #0a0a0b;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #4444ff;
+  --sidebar-primary: var(--color-blue-600, #2563eb);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1f2024;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #1a1b1e;
-  --sidebar-ring: #6b6bff;
+  --sidebar-ring: var(--color-blue-500, #3b82f6);
 
   --radius: 0.75rem;              /* 12px cards */
 }
