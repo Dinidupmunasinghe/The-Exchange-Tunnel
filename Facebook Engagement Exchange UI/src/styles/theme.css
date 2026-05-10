@@ -85,7 +85,7 @@
   --popover: #161b22;
   --popover-foreground: #f0f6fc;
 
-  --primary: #3b82f6;
+  --primary: #60a5fa;
   --primary-foreground: #ffffff;
 
   --secondary: #161b22;
@@ -100,31 +100,31 @@
   --destructive: #f85149;
   --destructive-foreground: #ffffff;
 
-  --border: #21262d;
-  --input: #21262d;
+  --border: #2a3344;
+  --input: #2a3344;
   --input-background: #0d1117;
   --switch-background: #30363d;
 
-  --ring: #58a6ff;
+  --ring: #7dd3fc;
 
-  /* Telegram logo / chips — cyan, distinct from primary blue buttons. */
-  --brand: #38bdf8;
-  --brand-foreground: #0b0e14;
+  /* Telegram logo / chips — electric cyan (neon), distinct from primary blue. */
+  --brand: #22d3ee;
+  --brand-foreground: #041018;
 
-  --chart-1: #3b82f6;
+  --chart-1: #60a5fa;
   --chart-2: #22d3ee;
-  --chart-3: #f97316;
-  --chart-4: #34d399;
+  --chart-3: #fb923c;
+  --chart-4: #4ade80;
   --chart-5: #94a3b8;
 
   --sidebar: #070a10;
   --sidebar-foreground: #f0f6fc;
-  --sidebar-primary: #3b82f6;
+  --sidebar-primary: #60a5fa;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #161b22;
   --sidebar-accent-foreground: #f0f6fc;
-  --sidebar-border: #151b24;
-  --sidebar-ring: #3b82f6;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #60a5fa;
 
   /* Slightly rounder panels in dark (dashboard cards read “softer”). */
   --radius: 0.75rem;
@@ -202,7 +202,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: var(--background);
     font-family: var(--font-family);
     font-size: 0.875rem; /* 14px — standard SaaS density */
     line-height: 1.5;
@@ -270,7 +271,16 @@
     border-radius: 8px;
   }
   .dark ::-webkit-scrollbar-thumb:hover {
-    background: #3a4150;
+    background: #475569;
     background-clip: padding-box;
+  }
+
+  /* Atmospheric neon wash behind glass UI (fixed so scroll feels depth). */
+  .dark body {
+    background-image:
+      radial-gradient(ellipse 130% 85% at 50% -30%, rgba(96, 165, 250, 0.32), transparent 58%),
+      radial-gradient(ellipse 100% 55% at 108% 8%, rgba(34, 211, 238, 0.22), transparent 52%),
+      radial-gradient(ellipse 90% 70% at -15% 75%, rgba(59, 130, 246, 0.18), transparent 55%);
+    background-attachment: fixed;
   }
 }

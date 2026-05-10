@@ -59,21 +59,21 @@ export function TopBar() {
   }
 
   return (
-    <header className="hidden h-14 items-center justify-between bg-background px-6 lg:flex">
+    <header className="hidden h-14 items-center justify-between border-b border-transparent bg-background px-6 dark:border-cyan-400/15 dark:bg-background/40 dark:backdrop-blur-xl dark:shadow-[0_12px_48px_-12px_rgba(0,0,0,0.5),0_0_40px_-14px_rgba(96,165,250,0.12)] lg:flex">
       {/* Search */}
       <div className="relative max-w-md flex-1">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
           placeholder="Search posts, campaigns…"
-          className="h-9 rounded-full border-transparent bg-card pl-10 text-sm placeholder:text-muted-foreground"
+          className="h-9 rounded-full border-transparent bg-card pl-10 text-sm placeholder:text-muted-foreground dark:border-white/10 dark:bg-card/40 dark:backdrop-blur-md dark:shadow-[0_0_32px_-10px_rgba(96,165,250,0.28)]"
         />
       </div>
 
       {/* Right Side */}
       <div className="flex items-center gap-2">
         {/* Credits Balance */}
-        <div className="flex h-9 items-center gap-2 rounded-full bg-card px-4">
+        <div className="flex h-9 items-center gap-2 rounded-full border border-transparent bg-card px-4 dark:border-white/10 dark:bg-card/40 dark:backdrop-blur-md dark:shadow-[0_0_28px_-10px_rgba(34,211,238,0.22)]">
           <Coins className="h-4 w-4 text-foreground" />
           <span className="text-xs text-muted-foreground">Balance</span>
           <span className="text-sm font-semibold tabular-nums text-foreground">
@@ -88,7 +88,7 @@ export function TopBar() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-9 w-9 rounded-full bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="relative h-9 w-9 rounded-full border border-transparent bg-card text-muted-foreground hover:bg-accent hover:text-foreground dark:border-white/10 dark:bg-card/40 dark:backdrop-blur-md dark:hover:bg-card/55"
           onClick={() => navigate("/repost?tab=received&pane=notifications")}
           aria-label="Open notifications"
         >

@@ -48,11 +48,11 @@ export function Sidebar({ onClose }: SidebarProps) {
   }
 
   return (
-    <aside className="flex h-full w-60 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <aside className="flex h-full w-60 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground dark:border-cyan-400/20 dark:bg-sidebar/40 dark:backdrop-blur-2xl dark:backdrop-saturate-150 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.07),0_0_60px_-20px_rgba(96,165,250,0.15)]">
       {/* Brand */}
       <div className="flex h-14 shrink-0 items-center justify-between px-5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground dark:shadow-[0_0_20px_-4px_rgba(59,130,246,0.55)]">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground dark:shadow-[0_0_22px_rgba(96,165,250,0.9),0_0_40px_rgba(34,211,238,0.45)]">
             <Waypoints className="h-4 w-4" />
           </div>
           <span className="text-[15px] font-semibold tracking-tight text-foreground">
@@ -86,7 +86,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                   onClick={onClose}
                   className={`group flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors ${
                     isActive
-                      ? "bg-sidebar-accent text-foreground font-semibold dark:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]"
+                      ? "bg-sidebar-accent text-foreground font-semibold dark:bg-sidebar-accent/60 dark:shadow-[inset_0_0_0_1px_rgba(96,165,250,0.45),0_0_24px_-4px_rgba(96,165,250,0.35)]"
                       : "text-muted-foreground font-medium hover:bg-sidebar-accent/60 hover:text-foreground"
                   }`}
                 >
@@ -109,7 +109,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                           onClick={onClose}
                           className={`block rounded-lg px-2.5 py-1.5 text-[12.5px] transition-colors ${
                             childActive
-                              ? "bg-sidebar-accent text-foreground font-semibold dark:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]"
+                              ? "bg-sidebar-accent text-foreground font-semibold dark:bg-sidebar-accent/60 dark:shadow-[inset_0_0_0_1px_rgba(96,165,250,0.45),0_0_20px_-4px_rgba(96,165,250,0.3)]"
                               : "text-muted-foreground font-medium hover:bg-sidebar-accent/60 hover:text-foreground"
                           }`}
                         >

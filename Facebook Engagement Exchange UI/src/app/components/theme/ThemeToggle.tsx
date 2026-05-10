@@ -8,7 +8,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <div
       role="group"
       aria-label="Toggle color theme"
-      className={`relative inline-flex h-9 items-center rounded-full border border-border bg-card p-1 ${className}`}
+      className={`relative inline-flex h-9 items-center rounded-full border border-border bg-card p-1 dark:border-white/12 dark:bg-card/45 dark:backdrop-blur-md dark:shadow-[0_0_24px_-8px_rgba(96,165,250,0.2)] ${className}`}
     >
       <span
         aria-hidden="true"
