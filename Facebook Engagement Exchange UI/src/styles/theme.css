@@ -21,7 +21,7 @@
   --popover: #ffffff;
   --popover-foreground: #0a0b0d;
 
-  --primary: #6366f1;
+  --primary: #0ea5e9;
   --primary-foreground: #ffffff;
 
   --secondary: #eef0f4;
@@ -41,13 +41,13 @@
   --input-background: #ffffff;
   --switch-background: #d6d9df;
 
-  --ring: #6366f1;
+  --ring: #0ea5e9;
 
   /* Telegram-flavored brand for logo / brand chips. */
   --brand: #2aabee;
   --brand-foreground: #ffffff;
 
-  --chart-1: #6366f1;
+  --chart-1: #0ea5e9;
   --chart-2: #22c55e;
   --chart-3: #f59e0b;
   --chart-4: #ec4899;
@@ -65,12 +65,12 @@
   /* Sidebar uses the same palette so it blends with the app. */
   --sidebar: #ffffff;
   --sidebar-foreground: #0a0b0d;
-  --sidebar-primary: #6366f1;
+  --sidebar-primary: #0ea5e9;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eef0f4;
   --sidebar-accent-foreground: #0a0b0d;
   --sidebar-border: #e6e8ec;
-  --sidebar-ring: #6366f1;
+  --sidebar-ring: #0ea5e9;
 }
 
 /* ── Dark mode (default for this app) ─────────────────────────────── */
@@ -85,8 +85,8 @@
   --popover: #1a1c22;
   --popover-foreground: #ffffff;
 
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
+  --primary: #38bdf8;
+  --primary-foreground: #0a0b0d;
 
   --secondary: #1f2228;
   --secondary-foreground: #ffffff;
@@ -106,12 +106,12 @@
   --input-background: #1a1c22;
   --switch-background: #2a2e36;
 
-  --ring: #6366f1;
+  --ring: #38bdf8;
 
   --brand: #2aabee;
   --brand-foreground: #ffffff;
 
-  --chart-1: #818cf8;
+  --chart-1: #38bdf8;
   --chart-2: #34d399;
   --chart-3: #fbbf24;
   --chart-4: #f472b6;
@@ -119,12 +119,12 @@
 
   --sidebar: #08090b;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #6366f1;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #38bdf8;
+  --sidebar-primary-foreground: #0a0b0d;
   --sidebar-accent: #1a1c22;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #15171c;
-  --sidebar-ring: #6366f1;
+  --sidebar-ring: #38bdf8;
 }
 
 /* ── Tailwind v4 inline theme map ─────────────────────────────────── */

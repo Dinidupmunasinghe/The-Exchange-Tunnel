@@ -40,7 +40,7 @@ const campaignPerformance = [
 const engagementTypeData = [
   { name: "Likes", value: 45, color: "#10a37f" },
   { name: "Comments", value: 30, color: "#3b82f6" },
-  { name: "Shares", value: 25, color: "#8b5cf6" },
+  { name: "Shares", value: 25, color: "#f59e0b" },
 ];
 
 const creditFlowData = [
@@ -188,8 +188,8 @@ export function Analytics() {
                       type="monotone"
                       dataKey="shares"
                       stackId="1"
-                      stroke="#8b5cf6"
-                      fill="#8b5cf6"
+                      stroke="#f59e0b"
+                      fill="#f59e0b"
                       fillOpacity={0.6}
                     />
                   </AreaChart>

@@ -675,8 +675,8 @@ export function EarnCredits() {
                 ) : null}
                 {!isSubscribeCampaign && bundleAllowsAction(et, "share") ? (
                   shared ? (
-                    <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-background/80 px-3 py-1.5">
-                      <Repeat2 className="h-4 w-4 text-violet-400" />
+                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-background/80 px-3 py-1.5">
+                      <Repeat2 className="h-4 w-4 text-emerald-500" />
                       <span className="text-sm font-medium text-foreground">Reposted</span>
                       <Button
                         type="button"
@@ -699,7 +699,7 @@ export function EarnCredits() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="rounded-full border-violet-500/25 bg-background/80 pr-3 hover:bg-violet-500/10"
+                      className="rounded-full border-border bg-background/80 pr-3 hover:bg-muted"
                       onClick={() => void handleAction(cid, campaignTasks, et, "share")}
                       disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
                     >
@@ -709,7 +709,7 @@ export function EarnCredits() {
                         <Repeat2 className="mr-2 h-4 w-4" />
                       )}
                       {busy === `${cid}-share` ? "Reposting..." : "Repost"}
-                      <Badge className="ml-2 rounded-full bg-violet-500/15 px-2 text-violet-600 dark:text-violet-400 hover:bg-violet-500/15">
+                      <Badge className="ml-2 rounded-full bg-muted px-2 text-foreground hover:bg-muted">
                         +{reward}
                       </Badge>
                     </Button>

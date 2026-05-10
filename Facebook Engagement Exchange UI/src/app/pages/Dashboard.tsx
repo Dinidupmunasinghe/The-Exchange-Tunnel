@@ -119,7 +119,7 @@ export function Dashboard() {
                 />
                 <Line type="monotone" dataKey="likes" stroke="#10a37f" strokeWidth={2} />
                 <Line type="monotone" dataKey="comments" stroke="#3b82f6" strokeWidth={2} />
-                <Line type="monotone" dataKey="shares" stroke="#8b5cf6" strokeWidth={2} />
+                <Line type="monotone" dataKey="shares" stroke="#f59e0b" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -166,12 +166,12 @@ export function Dashboard() {
                   <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
                     activity.type === 'like' ? 'bg-primary/10' :
                     activity.type === 'comment' ? 'bg-blue-500/10' :
-                    activity.type === 'share' ? 'bg-purple-500/10' :
+                    activity.type === 'share' ? 'bg-emerald-500/10' :
                     'bg-orange-500/10'
                   }`}>
                     {activity.type === 'like' && <ThumbsUp className="h-5 w-5 text-primary" />}
                     {activity.type === 'comment' && <MessageCircle className="h-5 w-5 text-blue-500" />}
-                    {activity.type === 'share' && <Share2 className="h-5 w-5 text-purple-500" />}
+                    {activity.type === 'share' && <Share2 className="h-5 w-5 text-emerald-500" />}
                     {activity.type === 'campaign' && <Activity className="h-5 w-5 text-orange-500" />}
                   </div>
                   <div>
