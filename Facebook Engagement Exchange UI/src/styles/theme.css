@@ -73,58 +73,61 @@
   --sidebar-ring: #000000;
 }
 
-/* ── Dark mode (default for this app) ─────────────────────────────── */
+/* ── Dark mode (NeuroBank-style: deep navy, blue CTAs, cyan secondaries) ── */
 .dark {
-  /* Layered surfaces: sidebar (deepest) → background → card. */
-  --background: #0d0e11;
-  --foreground: #ffffff;
+  /* Deepest canvas → slightly lifted cards (no purple anywhere). */
+  --background: #0b0e14;
+  --foreground: #f0f6fc;
 
-  --card: #16181d;
-  --card-foreground: #ffffff;
+  --card: #121820;
+  --card-foreground: #f0f6fc;
 
-  --popover: #1a1c22;
-  --popover-foreground: #ffffff;
+  --popover: #161b22;
+  --popover-foreground: #f0f6fc;
 
-  --primary: #ffffff;
-  --primary-foreground: #0a0b0d;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
 
-  --secondary: #1f2228;
-  --secondary-foreground: #ffffff;
+  --secondary: #161b22;
+  --secondary-foreground: #f0f6fc;
 
-  --muted: #1f2228;
-  --muted-foreground: #8a8f99;
+  --muted: #161b22;
+  --muted-foreground: #8b949e;
 
-  --accent: #1f2228;
-  --accent-foreground: #ffffff;
+  --accent: #1c2433;
+  --accent-foreground: #f0f6fc;
 
-  --destructive: #ef4444;
+  --destructive: #f85149;
   --destructive-foreground: #ffffff;
 
-  /* Borders are mostly invisible in this aesthetic — keep for inputs/dividers only. */
-  --border: #20232a;
-  --input: #20232a;
-  --input-background: #1a1c22;
-  --switch-background: #2a2e36;
+  --border: #21262d;
+  --input: #21262d;
+  --input-background: #0d1117;
+  --switch-background: #30363d;
 
-  --ring: #ffffff;
+  --ring: #58a6ff;
 
-  --brand: #2aabee;
-  --brand-foreground: #ffffff;
+  /* Telegram logo / chips — cyan, distinct from primary blue buttons. */
+  --brand: #38bdf8;
+  --brand-foreground: #0b0e14;
 
-  --chart-1: #34d399;
-  --chart-2: #34d399;
-  --chart-3: #fbbf24;
-  --chart-4: #f472b6;
-  --chart-5: #22d3ee;
+  --chart-1: #3b82f6;
+  --chart-2: #22d3ee;
+  --chart-3: #f97316;
+  --chart-4: #34d399;
+  --chart-5: #94a3b8;
 
-  --sidebar: #08090b;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #0a0b0d;
-  --sidebar-accent: #1a1c22;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #15171c;
-  --sidebar-ring: #ffffff;
+  --sidebar: #070a10;
+  --sidebar-foreground: #f0f6fc;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #161b22;
+  --sidebar-accent-foreground: #f0f6fc;
+  --sidebar-border: #151b24;
+  --sidebar-ring: #3b82f6;
+
+  /* Slightly rounder panels in dark (dashboard cards read “softer”). */
+  --radius: 0.75rem;
 }
 
 /* ── Tailwind v4 inline theme map ─────────────────────────────────── */

@@ -7,8 +7,8 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        // Borderless in dark mode (matches Linear/Phantom aesthetic), subtle border in light mode.
-        "bg-card text-card-foreground flex flex-col gap-5 rounded-xl border border-border/60 dark:border-transparent shadow-sm dark:shadow-none",
+        // Light: hairline border. Dark: subtle edge + soft lift (NeuroBank-style depth).
+        "bg-card text-card-foreground flex flex-col gap-5 rounded-xl border border-border/60 shadow-sm dark:border-border/50 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.03)_inset,0_12px_40px_-24px_rgba(59,130,246,0.12)]",
         className,
       )}
       {...props}

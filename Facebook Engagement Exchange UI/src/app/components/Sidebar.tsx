@@ -52,8 +52,8 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Brand */}
       <div className="flex h-14 shrink-0 items-center justify-between px-5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground">
-            <Waypoints className="h-4 w-4 text-background" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground dark:shadow-[0_0_20px_-4px_rgba(59,130,246,0.55)]">
+            <Waypoints className="h-4 w-4" />
           </div>
           <span className="text-[15px] font-semibold tracking-tight text-foreground">
             Exchange Tunnel
@@ -84,15 +84,15 @@ export function Sidebar({ onClose }: SidebarProps) {
                 <Link
                   to={item.href}
                   onClick={onClose}
-                  className={`group flex items-center gap-3 rounded-md px-2.5 py-2 text-[13.5px] transition-colors ${
+                  className={`group flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors ${
                     isActive
-                      ? "bg-sidebar-accent text-foreground font-semibold"
+                      ? "bg-sidebar-accent text-foreground font-semibold dark:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]"
                       : "text-muted-foreground font-medium hover:bg-sidebar-accent/60 hover:text-foreground"
                   }`}
                 >
                   <Icon
                     className={`h-4 w-4 shrink-0 transition-colors ${
-                      isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                      isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                     }`}
                   />
                   <span className="truncate">{item.name}</span>
@@ -107,9 +107,9 @@ export function Sidebar({ onClose }: SidebarProps) {
                           key={child.name}
                           to={child.href}
                           onClick={onClose}
-                          className={`block rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors ${
+                          className={`block rounded-lg px-2.5 py-1.5 text-[12.5px] transition-colors ${
                             childActive
-                              ? "bg-sidebar-accent text-foreground font-semibold"
+                              ? "bg-sidebar-accent text-foreground font-semibold dark:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]"
                               : "text-muted-foreground font-medium hover:bg-sidebar-accent/60 hover:text-foreground"
                           }`}
                         >
