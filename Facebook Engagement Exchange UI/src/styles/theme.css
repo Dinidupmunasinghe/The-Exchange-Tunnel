@@ -11,37 +11,37 @@
     'Ubuntu', 'Cantarell', sans-serif;
   --font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
 
-  /* ── Light mode (clean white SaaS) ──────────────────────────────── */
-  --background: #f7f8fa;
-  --foreground: #0a0b0d;
+  /* ── Light mode (Vercel-style: pure white content, hairline borders) ── */
+  --background: #ffffff;
+  --foreground: #000000;
 
   --card: #ffffff;
-  --card-foreground: #0a0b0d;
+  --card-foreground: #000000;
 
   --popover: #ffffff;
-  --popover-foreground: #0a0b0d;
+  --popover-foreground: #000000;
 
-  --primary: #0a0b0d;
+  --primary: #000000;
   --primary-foreground: #ffffff;
 
-  --secondary: #eef0f4;
-  --secondary-foreground: #0a0b0d;
+  --secondary: #fafafa;
+  --secondary-foreground: #000000;
 
-  --muted: #eef0f4;
-  --muted-foreground: #5b6573;
+  --muted: #f4f4f5;
+  --muted-foreground: #666666;
 
-  --accent: #eef0f4;
-  --accent-foreground: #0a0b0d;
+  --accent: #f4f4f5;
+  --accent-foreground: #000000;
 
-  --destructive: #dc2626;
+  --destructive: #e5484d;
   --destructive-foreground: #ffffff;
 
-  --border: #e6e8ec;
-  --input: #e6e8ec;
+  --border: #eaeaea;
+  --input: #eaeaea;
   --input-background: #ffffff;
-  --switch-background: #d6d9df;
+  --switch-background: #d4d4d8;
 
-  --ring: #0a0b0d;
+  --ring: #000000;
 
   /* Telegram-flavored brand for logo / brand chips. */
   --brand: #2aabee;
@@ -62,15 +62,15 @@
 
   --radius: 0.625rem; /* 10px — modern, calm */
 
-  /* Sidebar uses the same palette so it blends with the app. */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0a0b0d;
-  --sidebar-primary: #0ea5e9;
+  /* Sidebar slightly off-white so it separates from pure-white content. */
+  --sidebar: #fafafa;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #000000;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef0f4;
-  --sidebar-accent-foreground: #0a0b0d;
-  --sidebar-border: #e6e8ec;
-  --sidebar-ring: #0ea5e9;
+  --sidebar-accent: #f0f0f0;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #eaeaea;
+  --sidebar-ring: #000000;
 }
 
 /* ── Dark mode (default for this app) ─────────────────────────────── */
@@ -242,13 +242,23 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Subtle, modern scrollbars (dark mode). */
-  .dark ::-webkit-scrollbar {
+  /* Subtle, modern scrollbars. */
+  ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
-  .dark ::-webkit-scrollbar-track {
+  ::-webkit-scrollbar-track {
     background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+    background-clip: padding-box;
   }
   .dark ::-webkit-scrollbar-thumb {
     background: #2a2f38;
