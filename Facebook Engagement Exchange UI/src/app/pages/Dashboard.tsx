@@ -118,7 +118,7 @@ export function Dashboard() {
                   labelStyle={{ color: '#ececec' }}
                 />
                 <Line type="monotone" dataKey="likes" stroke="#10a37f" strokeWidth={2} />
-                <Line type="monotone" dataKey="comments" stroke="#3b82f6" strokeWidth={2} />
+                <Line type="monotone" dataKey="comments" stroke="#4444ff" strokeWidth={2} />
                 <Line type="monotone" dataKey="shares" stroke="#f59e0b" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>

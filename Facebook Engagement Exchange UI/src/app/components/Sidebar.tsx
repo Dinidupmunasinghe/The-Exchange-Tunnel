@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard,
   Sparkles,
@@ -10,9 +10,11 @@ import {
   Waypoints,
   X,
   Repeat2,
-  LifeBuoy
+  LifeBuoy,
+  LogOut
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { clearToken } from "../services/api";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -40,6 +42,7 @@ interface SidebarProps {
 
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const current = `${location.pathname}${location.search}${location.hash}`;
 
   function isLinkActive(href: string): boolean {
@@ -47,12 +50,18 @@ export function Sidebar({ onClose }: SidebarProps) {
     return location.pathname === href;
   }
 
+  function handleLogout() {
+    clearToken();
+    onClose?.();
+    navigate("/login", { replace: true });
+  }
+
   return (
-    <aside className="flex h-full w-60 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground dark:border-cyan-400/20 dark:bg-sidebar/40 dark:backdrop-blur-2xl dark:backdrop-saturate-150 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.07),0_0_60px_-20px_rgba(96,165,250,0.15)]">
+    <aside className="flex h-full w-60 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       {/* Brand */}
       <div className="flex h-14 shrink-0 items-center justify-between px-5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground dark:shadow-[0_0_22px_rgba(96,165,250,0.9),0_0_40px_rgba(34,211,238,0.45)]">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground text-background">
             <Waypoints className="h-4 w-4" />
           </div>
           <span className="text-[15px] font-semibold tracking-tight text-foreground">
@@ -86,13 +95,13 @@ export function Sidebar({ onClose }: SidebarProps) {
                   onClick={onClose}
                   className={`group flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors ${
                     isActive
-                      ? "bg-sidebar-accent text-foreground font-semibold dark:bg-sidebar-accent/60 dark:shadow-[inset_0_0_0_1px_rgba(96,165,250,0.45),0_0_24px_-4px_rgba(96,165,250,0.35)]"
+                      ? "bg-sidebar-accent text-foreground font-medium"
                       : "text-muted-foreground font-medium hover:bg-sidebar-accent/60 hover:text-foreground"
                   }`}
                 >
                   <Icon
                     className={`h-4 w-4 shrink-0 transition-colors ${
-                      isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                      isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                     }`}
                   />
                   <span className="truncate">{item.name}</span>
@@ -109,7 +118,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                           onClick={onClose}
                           className={`block rounded-lg px-2.5 py-1.5 text-[12.5px] transition-colors ${
                             childActive
-                              ? "bg-sidebar-accent text-foreground font-semibold dark:bg-sidebar-accent/60 dark:shadow-[inset_0_0_0_1px_rgba(96,165,250,0.45),0_0_20px_-4px_rgba(96,165,250,0.3)]"
+                              ? "bg-sidebar-accent text-foreground font-medium"
                               : "text-muted-foreground font-medium hover:bg-sidebar-accent/60 hover:text-foreground"
                           }`}
                         >
@@ -126,15 +135,23 @@ export function Sidebar({ onClose }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border p-3">
+      <div className="space-y-0.5 border-t border-sidebar-border p-3">
         <Link
           to="/settings"
           onClick={onClose}
-          className="flex items-center gap-3 rounded-md px-2.5 py-2 text-[13.5px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
+          className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
         >
           <LifeBuoy className="h-4 w-4" />
-          <span>Help & support</span>
+          <span>Support</span>
         </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[13.5px] font-medium text-destructive transition-colors hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Logout</span>
+        </button>
       </div>
     </aside>
   );

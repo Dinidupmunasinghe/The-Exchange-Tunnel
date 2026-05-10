@@ -39,7 +39,7 @@ const campaignPerformance = [
 
 const engagementTypeData = [
   { name: "Likes", value: 45, color: "#10a37f" },
-  { name: "Comments", value: 30, color: "#3b82f6" },
+  { name: "Comments", value: 30, color: "#4444ff" },
   { name: "Shares", value: 25, color: "#f59e0b" },
 ];
 
@@ -180,8 +180,8 @@ export function Analytics() {
                       type="monotone"
                       dataKey="comments"
                       stackId="1"
-                      stroke="#3b82f6"
-                      fill="#3b82f6"
+                      stroke="#4444ff"
+                      fill="#4444ff"
                       fillOpacity={0.6}
                     />
                     <Area
@@ -257,7 +257,7 @@ export function Analytics() {
                   />
                   <Legend />
                   <Bar dataKey="engagements" fill="#10a37f" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="credits" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="credits" fill="#4444ff" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

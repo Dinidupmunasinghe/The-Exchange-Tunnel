@@ -10,11 +10,11 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background dark:bg-transparent">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm dark:bg-background/50 dark:backdrop-blur-md lg:hidden"
+          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -30,7 +30,7 @@ export function Layout() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile Menu Button */}
-        <div className="flex items-center gap-4 border-b border-border bg-card px-4 py-3 dark:border-white/10 dark:bg-card/40 dark:backdrop-blur-xl dark:shadow-[0_0_40px_-12px_rgba(96,165,250,0.2)] lg:hidden">
+        <div className="flex items-center gap-4 border-b border-border bg-sidebar px-4 py-3 lg:hidden">
           <Button
             variant="ghost"
             size="icon"

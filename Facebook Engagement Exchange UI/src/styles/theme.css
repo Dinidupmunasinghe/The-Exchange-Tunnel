@@ -1,8 +1,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Modern SaaS design tokens.
-  Inspired by Linear / Vercel / Stripe — calm, neutral, confident.
+  Design tokens.
+  Light: Vercel-style pure white content, hairline borders.
+  Dark: clean 3-layer SaaS surfaces (sidebar/topbar deepest, page bg, lifted cards),
+  flat #4444FF primary, hairline borders. No neon glows or glass blur.
 */
 
 :root {
@@ -73,61 +75,63 @@
   --sidebar-ring: #000000;
 }
 
-/* ── Dark mode (NeuroBank-style: deep navy, blue CTAs, cyan secondaries) ── */
+/* ── Dark mode (clean SaaS: 3-layer surfaces, flat #4444FF primary) ───── */
 .dark {
-  /* Deepest canvas → slightly lifted cards (no purple anywhere). */
-  --background: #0b0e14;
-  --foreground: #f0f6fc;
+  /* Surfaces (deepest -> lifted) */
+  --background: #0d0e10;          /* main content area */
+  --foreground: #ffffff;
 
-  --card: #121820;
-  --card-foreground: #f0f6fc;
+  --card: #18191c;                /* lifted card */
+  --card-foreground: #ffffff;
 
-  --popover: #161b22;
-  --popover-foreground: #f0f6fc;
+  --popover: #1c1d21;
+  --popover-foreground: #ffffff;
 
-  --primary: #60a5fa;
+  /* Primary: flat blue-violet, no gradient/glow. */
+  --primary: #4444ff;
   --primary-foreground: #ffffff;
 
-  --secondary: #161b22;
-  --secondary-foreground: #f0f6fc;
+  --secondary: #1f2024;
+  --secondary-foreground: #ffffff;
 
-  --muted: #161b22;
-  --muted-foreground: #8b949e;
+  --muted: #1f2024;
+  --muted-foreground: #a1a1aa;    /* zinc-400 */
 
-  --accent: #1c2433;
-  --accent-foreground: #f0f6fc;
+  --accent: #1f2024;
+  --accent-foreground: #ffffff;
 
-  --destructive: #f85149;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  --border: #2a3344;
-  --input: #2a3344;
-  --input-background: #0d1117;
-  --switch-background: #30363d;
+  /* Hairline lines; inputs sit flat on the card. */
+  --border: #26272b;
+  --input: #26272b;
+  --input-background: #18191c;
+  --switch-background: #2e2f33;
 
-  --ring: #7dd3fc;
+  --ring: #6b6bff;
 
-  /* Telegram logo / chips — electric cyan (neon), distinct from primary blue. */
-  --brand: #22d3ee;
-  --brand-foreground: #041018;
+  /* Telegram brand stays cyan for the logo. */
+  --brand: #38bdf8;
+  --brand-foreground: #0a0a0b;
 
-  --chart-1: #60a5fa;
+  --chart-1: #4444ff;
   --chart-2: #22d3ee;
-  --chart-3: #fb923c;
-  --chart-4: #4ade80;
-  --chart-5: #94a3b8;
+  --chart-3: #f97316;
+  --chart-4: #34d399;
+  --chart-5: #a1a1aa;
 
-  --sidebar: #070a10;
-  --sidebar-foreground: #f0f6fc;
-  --sidebar-primary: #60a5fa;
+  /* Sidebar + mobile topbar: deepest layer. */
+  --sidebar: #0a0a0b;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #4444ff;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #161b22;
-  --sidebar-accent-foreground: #f0f6fc;
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #60a5fa;
+  --sidebar-accent: #1f2024;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1a1b1e;
+  --sidebar-ring: #6b6bff;
 
-  /* Slightly rounder panels in dark (dashboard cards read “softer”). */
-  --radius: 0.75rem;
+  --radius: 0.75rem;              /* 12px cards */
 }
 
 /* ── Tailwind v4 inline theme map ─────────────────────────────────── */
@@ -202,8 +206,7 @@
   }
 
   body {
-    @apply text-foreground;
-    background-color: var(--background);
+    @apply bg-background text-foreground;
     font-family: var(--font-family);
     font-size: 0.875rem; /* 14px — standard SaaS density */
     line-height: 1.5;
@@ -211,27 +214,27 @@
 
   /* Heading hierarchy. Tailwind text-* utilities still override these. */
   h1 {
-    font-size: 1.5rem;          /* 24px */
+    font-size: 1.75rem;         /* 28px — page titles */
+    font-weight: var(--font-weight-bold);
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+
+  h2 {
+    font-size: 1.25rem;         /* 20px — section titles */
     font-weight: var(--font-weight-semibold);
     line-height: 1.3;
     letter-spacing: -0.01em;
   }
 
-  h2 {
-    font-size: 1.25rem;         /* 20px */
-    font-weight: var(--font-weight-semibold);
-    line-height: 1.35;
-    letter-spacing: -0.005em;
-  }
-
   h3 {
-    font-size: 1.0625rem;       /* 17px */
+    font-size: 1rem;            /* 16px — card titles */
     font-weight: var(--font-weight-semibold);
     line-height: 1.4;
   }
 
   h4 {
-    font-size: 0.9375rem;       /* 15px */
+    font-size: 0.875rem;        /* 14px */
     font-weight: var(--font-weight-semibold);
     line-height: 1.4;
   }
@@ -265,22 +268,13 @@
     background-clip: padding-box;
   }
   .dark ::-webkit-scrollbar-thumb {
-    background: #2a2f38;
+    background: #2e2f33;
     border: 2px solid transparent;
     background-clip: padding-box;
     border-radius: 8px;
   }
   .dark ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+    background: #3a3b40;
     background-clip: padding-box;
-  }
-
-  /* Atmospheric neon wash behind glass UI (fixed so scroll feels depth). */
-  .dark body {
-    background-image:
-      radial-gradient(ellipse 130% 85% at 50% -30%, rgba(96, 165, 250, 0.32), transparent 58%),
-      radial-gradient(ellipse 100% 55% at 108% 8%, rgba(34, 211, 238, 0.22), transparent 52%),
-      radial-gradient(ellipse 90% 70% at -15% 75%, rgba(59, 130, 246, 0.18), transparent 55%);
-    background-attachment: fixed;
   }
 }
