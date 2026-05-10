@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { ThemeToggle } from "./theme/ThemeToggle";
 import { api, clearToken } from "../services/api";
 
 export function TopBar() {
@@ -79,6 +80,9 @@ export function TopBar() {
             {profile?.credits ?? "—"}
           </span>
         </div>
+
+        {/* Theme toggle */}
+        <ThemeToggle />
 
         {/* Notifications */}
         <Button
