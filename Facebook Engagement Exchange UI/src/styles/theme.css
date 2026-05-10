@@ -75,34 +75,36 @@
 
 /* ── Dark mode (default for this app) ─────────────────────────────── */
 .dark {
-  --background: #0a0b0d;
-  --foreground: #e7e9ee;
+  /* Layered surfaces: sidebar (deepest) → background → card. */
+  --background: #0d0e11;
+  --foreground: #ffffff;
 
-  --card: #111317;
-  --card-foreground: #e7e9ee;
+  --card: #16181d;
+  --card-foreground: #ffffff;
 
-  --popover: #15171c;
-  --popover-foreground: #e7e9ee;
+  --popover: #1a1c22;
+  --popover-foreground: #ffffff;
 
   --primary: #6366f1;
   --primary-foreground: #ffffff;
 
-  --secondary: #1a1d23;
-  --secondary-foreground: #e7e9ee;
+  --secondary: #1f2228;
+  --secondary-foreground: #ffffff;
 
-  --muted: #1a1d23;
-  --muted-foreground: #8b929e;
+  --muted: #1f2228;
+  --muted-foreground: #8a8f99;
 
-  --accent: #1a1d23;
-  --accent-foreground: #e7e9ee;
+  --accent: #1f2228;
+  --accent-foreground: #ffffff;
 
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  --border: #1f242d;
-  --input: #1f242d;
-  --input-background: #15171c;
-  --switch-background: #2a2f38;
+  /* Borders are mostly invisible in this aesthetic — keep for inputs/dividers only. */
+  --border: #20232a;
+  --input: #20232a;
+  --input-background: #1a1c22;
+  --switch-background: #2a2e36;
 
   --ring: #6366f1;
 
@@ -115,13 +117,13 @@
   --chart-4: #f472b6;
   --chart-5: #22d3ee;
 
-  --sidebar: #0a0b0d;
-  --sidebar-foreground: #e7e9ee;
+  --sidebar: #08090b;
+  --sidebar-foreground: #ffffff;
   --sidebar-primary: #6366f1;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a1d23;
-  --sidebar-accent-foreground: #e7e9ee;
-  --sidebar-border: #1f242d;
+  --sidebar-accent: #1a1c22;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #15171c;
   --sidebar-ring: #6366f1;
 }
 
