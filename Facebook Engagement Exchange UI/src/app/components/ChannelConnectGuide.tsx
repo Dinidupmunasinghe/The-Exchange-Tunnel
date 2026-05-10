@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   Bot,
-  CheckCircle2,
   Info,
   LayoutGrid,
   Megaphone,
@@ -233,31 +232,15 @@ export function DashboardChannelHint({ hasChannel, telegramConnected }: Dashboar
 
   if (hasChannel) return null;
   if (!telegramConnected) return null;
-
-  if (goal === "earn_only") {
-    return (
-      <Alert className="border-border bg-secondary/30">
-        <CheckCircle2 className="text-brand" />
-        <AlertTitle>Browse mode</AlertTitle>
-        <AlertDescription className="text-muted-foreground">
-          You&apos;re set to earn and browse — no channel connection needed. To{" "}
-          <strong>run campaigns</strong> for your own channel, open{" "}
-          <Link to="/settings" className="font-medium text-primary underline underline-offset-2">
-            Settings
-          </Link>{" "}
-          and switch to &quot;Run campaigns&quot;, then add {BOT_AT} as admin.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  if (goal === "earn_only") return null;
 
   return (
-    <Alert className="border-brand/30 bg-brand/5">
-      <Megaphone className="text-brand" />
+    <Alert className="border-border bg-muted/40">
+      <Megaphone className="text-foreground" />
       <AlertTitle>Connect your channel to run campaigns</AlertTitle>
       <AlertDescription className="text-muted-foreground">
         Add <strong>{BOT_AT}</strong> as a channel administrator, then link the channel in{" "}
-        <Link to="/settings" className="font-medium text-primary underline underline-offset-2">
+        <Link to="/settings" className="font-medium text-foreground underline underline-offset-2">
           Settings
         </Link>
         . That step is required by Telegram — not optional for promoters.
