@@ -30,7 +30,7 @@ const AUDIT_KINDS: {
 
 function YesNo({ value }: { value: boolean }) {
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${value ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-rose-500/40 bg-rose-500/10 text-rose-300"}`}>
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${value ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
       {value ? "Yes" : "No"}
     </span>
   );

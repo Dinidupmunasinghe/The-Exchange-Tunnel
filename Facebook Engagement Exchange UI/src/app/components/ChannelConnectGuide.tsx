@@ -102,8 +102,8 @@ export function ChannelConnectPrerequisites({ disabled }: PrerequisitesProps) {
   return (
     <Alert className="border-amber-500/40 bg-amber-500/5">
       <Info className="text-amber-500" />
-      <AlertTitle className="text-amber-100">Before you connect a channel</AlertTitle>
-      <AlertDescription className="text-amber-100/90">
+      <AlertTitle className="text-amber-800 dark:text-amber-100">Before you connect a channel</AlertTitle>
+      <AlertDescription className="text-amber-800/90 dark:text-amber-100/90">
         <ul className="mt-2 list-inside list-decimal space-y-1.5 text-sm">
           <li>
             You must be a <strong>creator or admin</strong> of that Telegram channel (same account you used to log in).

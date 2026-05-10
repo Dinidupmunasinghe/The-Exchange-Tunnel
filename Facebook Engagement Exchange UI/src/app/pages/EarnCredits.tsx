@@ -459,7 +459,7 @@ export function EarnCredits() {
         </p>
       </div>
       {hasTelegram === false ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
           Sign in with Telegram on{" "}
           <Link to="/login" className="font-medium underline underline-offset-2">
             Login
@@ -468,7 +468,7 @@ export function EarnCredits() {
         </div>
       ) : null}
       {hasTelegram && hasMtprotoSession === false ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
           Subscribe, Like, and Comment require Telegram user session connection. Go to{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
             Settings

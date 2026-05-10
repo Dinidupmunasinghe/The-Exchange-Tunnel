@@ -175,7 +175,7 @@ export function Campaigns() {
         </Card>
       </div>
       {!selectedPageName ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
           No Page selected for actions yet.{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
             Select a Page in Settings

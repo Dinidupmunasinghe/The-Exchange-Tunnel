@@ -128,7 +128,7 @@ export function AdminTransactions() {
                     <td className="px-3 py-2">
                       <StatusPill value={tx.type === "earn" ? "active" : "cancelled"} />
                     </td>
-                    <td className={`px-3 py-2 font-medium ${tx.amount < 0 ? "text-rose-300" : "text-emerald-300"}`}>
+                    <td className={`px-3 py-2 font-medium ${tx.amount < 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"}`}>
                       {tx.amount}
                     </td>
                     <td className="px-3 py-2 text-xs">{tx.reason}</td>

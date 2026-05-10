@@ -199,7 +199,7 @@ export function AdminUserDetails() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Pending refund debt</p>
-                    <p className="text-2xl font-semibold text-amber-300">{detail.pendingRefundDebt}</p>
+                    <p className="text-2xl font-semibold text-amber-800 dark:text-amber-300">{detail.pendingRefundDebt}</p>
                   </div>
                 </div>
                 <form className="space-y-3" onSubmit={handleAdjust}>

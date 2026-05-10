@@ -287,7 +287,7 @@ export function SubmitPost() {
                   <UserRoundCheck
                     className={cn(
                       "h-4 w-4 transition-all duration-300",
-                      hasTelegramLogin ? "text-emerald-400 scale-110" : "text-muted-foreground"
+                      hasTelegramLogin ? "text-emerald-600 dark:text-emerald-400 scale-110" : "text-muted-foreground"
                     )}
                   />
                 </div>
@@ -296,7 +296,7 @@ export function SubmitPost() {
                     <Link to="/login">Open login</Link>
                   </Button>
                 ) : (
-                  <p className="mt-3 text-xs text-emerald-300">Done</p>
+                  <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Done</p>
                 )}
               </div>
 
@@ -314,12 +314,12 @@ export function SubmitPost() {
                   <CheckCircle
                     className={cn(
                       "h-4 w-4 transition-all duration-300",
-                      channelTitle ? "text-emerald-400 scale-110" : "text-muted-foreground"
+                      channelTitle ? "text-emerald-600 dark:text-emerald-400 scale-110" : "text-muted-foreground"
                     )}
                   />
                 </div>
                 {channelTitle ? (
-                  <p className="mt-3 truncate text-xs text-emerald-300">{channelTitle}</p>
+                  <p className="mt-3 truncate text-xs text-emerald-700 dark:text-emerald-300">{channelTitle}</p>
                 ) : (
                   <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
                     <Link to="/settings">Open settings</Link>

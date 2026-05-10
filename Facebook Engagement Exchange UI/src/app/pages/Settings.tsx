@@ -439,7 +439,7 @@ export function Settings() {
                 <UserRoundCheck
                   className={cn(
                     "h-4 w-4 transition-all duration-300",
-                    hasTelegramLogin ? "scale-110 text-emerald-400" : "text-muted-foreground"
+                    hasTelegramLogin ? "scale-110 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
                   )}
                 />
               </div>
@@ -448,7 +448,7 @@ export function Settings() {
                   <Link to="/login">Open login</Link>
                 </Button>
               ) : (
-                <p className="mt-3 text-xs text-emerald-300">Done</p>
+                <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Done</p>
               )}
             </div>
 
@@ -466,12 +466,12 @@ export function Settings() {
                 <CheckCircle2
                   className={cn(
                     "h-4 w-4 transition-all duration-300",
-                    hasConnectedChannel ? "scale-110 text-emerald-400" : "text-muted-foreground"
+                    hasConnectedChannel ? "scale-110 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
                   )}
                 />
               </div>
               {hasConnectedChannel ? (
-                <p className="mt-3 truncate text-xs text-emerald-300">
+                <p className="mt-3 truncate text-xs text-emerald-700 dark:text-emerald-300">
                   {selectedPage?.name || profile?.telegramActingChannelTitle || "Connected"}
                 </p>
               ) : (

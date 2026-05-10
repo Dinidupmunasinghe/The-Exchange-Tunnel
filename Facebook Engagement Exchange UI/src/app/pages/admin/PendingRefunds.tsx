@@ -118,7 +118,7 @@ export function AdminPendingRefunds() {
                       {r.owner?.email || `User #${r.ownerUserId}`}
                     </td>
                     <td className="px-3 py-2">{r.amountInitial}</td>
-                    <td className="px-3 py-2 font-medium text-amber-300">{r.amountRemaining}</td>
+                    <td className="px-3 py-2 font-medium text-amber-800 dark:text-amber-300">{r.amountRemaining}</td>
                     <td className="px-3 py-2">
                       <StatusPill value={r.status} />
                     </td>

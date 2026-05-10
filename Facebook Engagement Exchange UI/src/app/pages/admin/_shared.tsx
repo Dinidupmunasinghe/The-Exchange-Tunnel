@@ -31,17 +31,17 @@ export function PageHeader({
 export function StatusPill({ value }: { value: string }) {
   const v = String(value || "").toLowerCase();
   const map: Record<string, string> = {
-    active: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-    completed: "border-blue-500/40 bg-blue-500/10 text-blue-300",
-    paused: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-    pending: "border-slate-500/40 bg-slate-500/10 text-slate-300",
-    open: "border-slate-500/40 bg-slate-500/10 text-slate-300",
-    assigned: "border-blue-500/40 bg-blue-500/10 text-blue-300",
-    cancelled: "border-rose-500/40 bg-rose-500/10 text-rose-300",
-    settled: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-    blocked: "border-rose-500/40 bg-rose-500/10 text-rose-300"
+    active: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    completed: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+    paused: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300",
+    pending: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    open: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    assigned: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+    cancelled: "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    settled: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    blocked: "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"
   };
-  const cls = map[v] || "border-slate-500/40 bg-slate-500/10 text-slate-300";
+  const cls = map[v] || "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300";
   return (
     <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>
       {value}
@@ -100,7 +100,7 @@ export function FormError({ error }: { error: string | null | undefined }) {
 
 export function FormMessage({ message }: { message: string | null | undefined }) {
   if (!message) return null;
-  return <p className="mt-2 text-sm text-emerald-400">{message}</p>;
+  return <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">{message}</p>;
 }
 
 export function EmptyTableRow({ message, colSpan }: { message: string; colSpan: number }) {

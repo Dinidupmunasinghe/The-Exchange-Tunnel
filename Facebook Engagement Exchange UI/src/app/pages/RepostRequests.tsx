@@ -157,10 +157,10 @@ export function RepostRequests() {
 
   function statusBadge(status?: string | null) {
     const v = String(status || "").toLowerCase();
-    if (v === "completed") return <Badge className="bg-emerald-500/15 text-emerald-300">Completed</Badge>;
+    if (v === "completed") return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">Completed</Badge>;
     if (v === "cancelled") return <Badge className="bg-rose-500/15 text-rose-300">Cancelled</Badge>;
     if (v === "assigned" || v === "active")
-      return <Badge className="bg-amber-500/15 text-amber-300">{v === "assigned" ? "Pending action" : "Active"}</Badge>;
+      return <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-300">{v === "assigned" ? "Pending action" : "Active"}</Badge>;
     return <Badge variant="outline">{status || "Unknown"}</Badge>;
   }
 
@@ -245,7 +245,7 @@ export function RepostRequests() {
             <p className="text-xs text-muted-foreground">Paste any valid Telegram post link to request repost.</p>
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
+          {notice ? <p className="text-sm text-emerald-700 dark:text-emerald-400">{notice}</p> : null}
         </CardContent>
       </Card>
       ) : null}
@@ -403,11 +403,11 @@ export function RepostRequests() {
                     <p className="text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</p>
                   </div>
                   {n.request.taskStatus === "completed" || n.request.status === "completed" ? (
-                    <CircleCheck className="h-4 w-4 text-emerald-400" />
+                    <CircleCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   ) : n.request.taskStatus === "cancelled" || n.request.status === "cancelled" ? (
                     <XCircle className="h-4 w-4 text-rose-400" />
                   ) : (
-                    <CircleDashed className="h-4 w-4 text-amber-400" />
+                    <CircleDashed className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
