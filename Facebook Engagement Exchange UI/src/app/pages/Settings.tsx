@@ -1,12 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ArrowUpRight, CheckCircle2, Loader2, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowUpRight,
+  Bell,
+  CheckCircle2,
+  KeyRound,
+  Link2,
+  Loader2,
+  Send,
+  Shield,
+  ShieldCheck,
+  User,
+  UserRoundCheck,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
+import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
@@ -43,6 +57,16 @@ const COUNTRY_CODES = [
   { code: "+61", label: "Australia (+61)" },
 ];
 
+type SettingsNavId = "general" | "channel" | "session" | "notifications" | "security";
+
+const SETTINGS_NAV: { id: SettingsNavId; label: string; Icon: LucideIcon }[] = [
+  { id: "general", label: "General", Icon: User },
+  { id: "channel", label: "Channel", Icon: Link2 },
+  { id: "session", label: "User session", Icon: KeyRound },
+  { id: "notifications", label: "Notifications", Icon: Bell },
+  { id: "security", label: "Security", Icon: Shield },
+];
+
 export function Settings() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pages, setPages] = useState<ManagedPage[]>([]);
@@ -63,6 +87,7 @@ export function Settings() {
   const [signingIn, setSigningIn] = useState(false);
   const [submitting2fa, setSubmitting2fa] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [settingsNav, setSettingsNav] = useState<SettingsNavId>("general");
 
   const refreshProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -117,10 +142,18 @@ export function Settings() {
   }, [profile?.telegramUserId, refreshPages, refreshProfile]);
 
   useEffect(() => {
-    if (window.location.hash !== "#user-session") return;
-    const node = document.getElementById("user-session");
-    if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (window.location.hash === "#user-session") {
+      setSettingsNav("session");
+    }
   }, []);
+
+  useEffect(() => {
+    if (window.location.hash !== "#user-session" || settingsNav !== "session") return;
+    const t = window.setTimeout(() => {
+      document.getElementById("user-session")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => window.clearTimeout(t);
+  }, [settingsNav]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -297,17 +330,84 @@ export function Settings() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-        <p className="mt-1 text-muted-foreground">
-          Link Telegram and connect your campaign channel.
-        </p>
-      </div>
+  const profileInitials = useMemo(() => {
+    const raw = profile?.name?.trim();
+    if (!raw) return "?";
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+    }
+    return raw.slice(0, 2).toUpperCase();
+  }, [profile?.name]);
 
-      <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/20">
-        <CardContent className="space-y-4 p-4">
+  const panelCopy: Record<SettingsNavId, { title: string; description: string }> = {
+    general: {
+      title: "General",
+      description: "Profile, setup checklist, and account summary.",
+    },
+    channel: {
+      title: "Channel",
+      description: "Connect and select the Telegram channel used for campaigns.",
+    },
+    session: {
+      title: "User session",
+      description: "MTProto session so Likes can run as your Telegram user.",
+    },
+    notifications: {
+      title: "Notifications",
+      description: "How we reach you about campaigns and tasks.",
+    },
+    security: {
+      title: "Security",
+      description: "Protect your account and review sign-in activity.",
+    },
+  };
+  const { title: panelTitle, description: panelDesc } = panelCopy[settingsNav];
+
+  return (
+    <div className="flex min-h-0 flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+      <nav
+        className="flex shrink-0 gap-1 overflow-x-auto pb-1 lg:w-52 lg:flex-col lg:overflow-x-visible lg:pb-0"
+        aria-label="Settings sections"
+      >
+        {SETTINGS_NAV.map(({ id, label, Icon }) => {
+          const active = settingsNav === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSettingsNav(id)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors",
+                active
+                  ? "bg-muted text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="min-w-0 flex-1 space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your account, channel, and Telegram session.
+          </p>
+        </div>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle className="text-lg text-foreground">{panelTitle}</CardTitle>
+            <CardDescription>{panelDesc}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            {settingsNav === "general" ? (
+              <>
+                <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-base font-semibold text-foreground">Creator setup checklist</p>
@@ -316,8 +416,8 @@ export function Settings() {
             <Badge
               variant="outline"
               className={cn(
-                "border-primary/40 bg-primary/10 text-primary transition-all duration-300",
-                setupReady ? "scale-105 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]" : ""
+                "border-border bg-muted text-foreground transition-all duration-300",
+                setupReady ? "scale-105 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 shadow-[0_0_0_1px_rgba(34,197,94,0.25)] dark:text-emerald-400" : ""
               )}
             >
               {completedSteps}/3 complete
@@ -408,48 +508,78 @@ export function Settings() {
             </Button>
             <p className="text-xs text-muted-foreground">Returns from Telegram auto-refresh this page too.</p>
           </div>
-        </CardContent>
-      </Card>
+                </div>
 
-      <Card className="border-amber-500/30 bg-amber-500/10">
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-foreground">New: Telegram User Session required for Like</p>
+            <p className="text-sm font-semibold text-foreground">Telegram User Session required for Like</p>
             <p className="text-xs text-muted-foreground">
               If Like fails, complete this once. Then Like works normally.
             </p>
           </div>
-          <Button size="sm" asChild>
-            <a href="#user-session">Open User Session setup</a>
+          <Button
+            size="sm"
+            type="button"
+            onClick={() => {
+              setSettingsNav("session");
+              window.location.hash = "user-session";
+            }}
+          >
+            Open User Session setup
           </Button>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-foreground">Account</CardTitle>
-          <CardDescription>Current Telegram user and selected channel.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">Profile information</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">What we store for your account.</p>
+                  </div>
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+                    <Avatar className="h-20 w-20 shrink-0 border border-border">
+                      <AvatarFallback className="bg-muted text-lg font-medium text-foreground">
+                        {profileInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-display-name">Name</Label>
+                        <Input id="settings-display-name" readOnly value={displayName} className="bg-background" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settings-email">Email address</Label>
+                        <Input id="settings-email" readOnly value={displayEmail} className="bg-background" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-md border border-border bg-secondary/20 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Name</p>
-              <p className="mt-1 text-sm text-foreground">{displayName}</p>
-            </div>
-            <div className="rounded-md border border-border bg-secondary/20 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Email</p>
-              <p className="mt-1 text-sm text-foreground">{displayEmail}</p>
-            </div>
-            <div className="rounded-md border border-border bg-secondary/20 p-3">
+            <div className="rounded-md border border-border bg-muted/40 p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Telegram</p>
-              <div className="mt-1">
-                <Badge variant={profile?.telegramUserId ? "default" : "outline"}>{connectionStatus}</Badge>
+              <div className="mt-2">
+                <Badge
+                  variant="outline"
+                  className={
+                    profile?.telegramUserId
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      : "border-border text-muted-foreground"
+                  }
+                >
+                  {connectionStatus}
+                </Badge>
               </div>
+            </div>
+            <div className="rounded-md border border-border bg-muted/40 p-3 sm:col-span-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Channel status</p>
+              <p className="mt-2 text-sm text-foreground">
+                {hasConnectedChannel
+                  ? selectedPage?.name || profile?.telegramActingChannelTitle || "Connected"
+                  : "No channel linked yet. Use the Channel tab to connect."}
+              </p>
             </div>
           </div>
           <Separator />
-          <div className="rounded-lg border border-border bg-secondary/30 p-4">
-            <div className="flex items-center justify-between gap-4">
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
                 <p className="font-medium text-foreground">Active channel</p>
                 <p className="text-sm text-muted-foreground">
@@ -457,8 +587,8 @@ export function Settings() {
                 </p>
               </div>
               {selectedPage ? (
-                <div className="flex items-center gap-2">
-                  <Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Used for your campaigns
                   </Badge>
@@ -466,6 +596,7 @@ export function Settings() {
                     type="button"
                     variant="ghost"
                     size="sm"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => void handleClearSelected()}
                     disabled={clearingSelection}
                   >
@@ -475,18 +606,18 @@ export function Settings() {
               ) : null}
             </div>
           </div>
-        </CardContent>
-      </Card>
+                  </div>
+                </div>
+              </>
+            ) : null}
 
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-foreground">Telegram channel</CardTitle>
-          <CardDescription>
-            Required only to <strong>run campaigns</strong> for a channel. Use e.g.{" "}
-            <code className="text-xs">@mychannel</code> or <code className="text-xs">https://t.me/mychannel</code>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+            {settingsNav === "channel" ? (
+              <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Required only to <strong className="text-foreground">run campaigns</strong> for a channel. Use e.g.{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">@mychannel</code> or{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">https://t.me/mychannel</code>.
+          </p>
           {!hasConnectedChannel ? (
             <>
               <ChannelConnectPrerequisites disabled={!profile?.telegramUserId} />
@@ -535,7 +666,12 @@ export function Settings() {
                   </div>
                   <Button
                     type="button"
-                    variant={page.selected ? "default" : "outline"}
+                    variant="outline"
+                    className={
+                      page.selected
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                        : ""
+                    }
                     disabled={selecting || page.selected}
                     onClick={() => void handleSelectPage(page.id)}
                   >
@@ -545,21 +681,25 @@ export function Settings() {
               );
             })}
           </div>
-        </CardContent>
-      </Card>
+              </div>
+            ) : null}
 
-      <Card id="user-session" className="border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/20">
-        <CardHeader>
-          <CardTitle className="text-foreground">Telegram User Session (for Like)</CardTitle>
-          <CardDescription>
+            {settingsNav === "session" ? (
+              <div id="user-session" className="space-y-4">
+          <p className="text-sm text-muted-foreground">
             Required for publishing real Telegram reactions as the user. This is separate from normal Telegram login.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-md border border-border bg-secondary/20 p-3">
+          </p>
+          <div className="rounded-md border border-border bg-muted/40 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
             <div className="mt-2">
-              <Badge variant={profile?.hasMtprotoSession ? "default" : "outline"}>
+              <Badge
+                variant="outline"
+                className={
+                  profile?.hasMtprotoSession
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                    : "border-border text-muted-foreground"
+                }
+              >
                 {profile?.hasMtprotoSession ? "Connected" : "Not connected"}
               </Badge>
             </div>
@@ -641,8 +781,25 @@ export function Settings() {
               </Button>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+              </div>
+            ) : null}
+
+            {settingsNav === "notifications" ? (
+              <p className="text-sm text-muted-foreground">
+                Notification preferences are not configurable yet. Campaign and task alerts use your connected Telegram
+                account.
+              </p>
+            ) : null}
+
+            {settingsNav === "security" ? (
+              <p className="text-sm text-muted-foreground">
+                Security settings such as password change and active sessions are not exposed in this app yet. Use
+                Telegram to secure your linked account.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
