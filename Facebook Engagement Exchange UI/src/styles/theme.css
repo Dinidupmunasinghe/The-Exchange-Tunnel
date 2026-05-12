@@ -2,7 +2,7 @@
 
 /*
   Design tokens.
-  Light: Vercel-style pure white content, hairline borders.
+  Light: premium SaaS palette (cool slate neutrals, layered surfaces, blue-600 primary).
   Dark: clean 3-layer SaaS surfaces, flat primary bound to Tailwind blue-600.
 */
 
@@ -12,44 +12,48 @@
     'Ubuntu', 'Cantarell', sans-serif;
   --font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
 
-  /* ── Light mode (Vercel-style: pure white content, hairline borders) ── */
-  --background: #ffffff;
-  --foreground: #000000;
+  /* ── Light mode (premium SaaS: cool slate neutrals, blue-600 primary) ── */
+  /* Surfaces — page sits a touch below cards so panels naturally lift. */
+  --background: #f6f8fb;            /* page canvas */
+  --foreground: #0f172a;            /* slate-900: primary text */
 
-  --card: #ffffff;
-  --card-foreground: #000000;
+  --card: #ffffff;                  /* cards / elevated panels */
+  --card-foreground: #0f172a;
 
-  --popover: #ffffff;
-  --popover-foreground: #000000;
+  --popover: #ffffff;               /* dropdowns, popovers, modals */
+  --popover-foreground: #0f172a;
 
-  --primary: #000000;
+  /* Primary — Tailwind blue-600, with blue-500 focus ring. */
+  --primary: var(--color-blue-600, #2563eb);
   --primary-foreground: #ffffff;
 
-  --secondary: #fafafa;
-  --secondary-foreground: #000000;
+  /* Subdued blocks (alerts, inline tags, ghost rows). */
+  --secondary: #eef2f7;
+  --secondary-foreground: #0f172a;
 
-  --muted: #f4f4f5;
-  --muted-foreground: #666666;
+  --muted: #f1f4f9;                 /* table rows / muted sections */
+  --muted-foreground: #64748b;      /* slate-500: secondary text */
 
-  --accent: #f4f4f5;
-  --accent-foreground: #000000;
+  --accent: #eef2f7;                /* hover surfaces */
+  --accent-foreground: #0f172a;
 
-  --destructive: #e5484d;
+  --destructive: #dc2626;           /* red-600: aligns with blue-600 family */
   --destructive-foreground: #ffffff;
 
-  --border: #eaeaea;
-  --input: #eaeaea;
+  /* Lines: subtle but visible, slightly cool — avoid harsh grey. */
+  --border: #e4e7ec;
+  --input: #d8dce3;                 /* slightly darker so inputs read as fields */
   --input-background: #ffffff;
-  --switch-background: #d4d4d8;
+  --switch-background: #cbd5e1;     /* slate-300: clear off state */
 
-  --ring: #000000;
+  --ring: var(--color-blue-600, #2563eb);
 
   /* Telegram-flavored brand for logo / brand chips. */
   --brand: #2aabee;
   --brand-foreground: #ffffff;
 
-  --chart-1: #10b981;
-  --chart-2: #22c55e;
+  --chart-1: var(--color-blue-600, #2563eb);
+  --chart-2: #10b981;
   --chart-3: #f59e0b;
   --chart-4: #ec4899;
   --chart-5: #06b6d4;
@@ -63,15 +67,15 @@
 
   --radius: 0.625rem; /* 10px — modern, calm */
 
-  /* Sidebar slightly off-white so it separates from pure-white content. */
-  --sidebar: #fafafa;
-  --sidebar-foreground: #000000;
-  --sidebar-primary: #000000;
+  /* Sidebar / topbar: one shade cooler than canvas so chrome is distinct. */
+  --sidebar: #f9fafb;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: var(--color-blue-600, #2563eb);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0f0f0;
-  --sidebar-accent-foreground: #000000;
-  --sidebar-border: #eaeaea;
-  --sidebar-ring: #000000;
+  --sidebar-accent: #eef2f7;        /* selected/hover row in sidebar */
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e4e7ec;
+  --sidebar-ring: var(--color-blue-600, #2563eb);
 }
 
 /* ── Dark mode (clean SaaS: 3-layer surfaces, primary = blue-600) ───── */
@@ -257,13 +261,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #d4d4d8;
+    background: #cbd5e1;
     border: 2px solid transparent;
     background-clip: padding-box;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #a1a1aa;
+    background: #94a3b8;
     background-clip: padding-box;
   }
   .dark ::-webkit-scrollbar-thumb {
