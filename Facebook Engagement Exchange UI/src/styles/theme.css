@@ -40,9 +40,9 @@
   --destructive: #dc2626;           /* red-600: aligns with blue-600 family */
   --destructive-foreground: #ffffff;
 
-  /* Lines: subtle but visible, slightly cool — avoid harsh grey. */
-  --border: #e4e7ec;
-  --input: #d8dce3;                 /* slightly darker so inputs read as fields */
+  /* Lines: crisp hairlines — nudged darker for sharper separation on light UI. */
+  --border: #d6dae2;
+  --input: #c8ced8;                 /* slightly darker so inputs read as fields */
   --input-background: #ffffff;
   --switch-background: #cbd5e1;     /* slate-300: clear off state */
 
@@ -74,7 +74,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eef2f7;        /* selected/hover row in sidebar */
   --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #e4e7ec;
+  --sidebar-border: #d6dae2;
   --sidebar-ring: var(--color-blue-600, #2563eb);
 }
 
@@ -106,9 +106,9 @@
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  /* Hairline lines; inputs sit flat on the card. */
-  --border: #26272b;
-  --input: #26272b;
+  /* Hairlines — lifted a touch for clearer edges on deep surfaces. */
+  --border: #32333b;
+  --input: #32333b;
   --input-background: #18191c;
   --switch-background: #2e2f33;
 
@@ -131,7 +131,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1f2024;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #1a1b1e;
+  --sidebar-border: #25262c;
   --sidebar-ring: var(--color-blue-500, #3b82f6);
 
   --radius: 0.75rem;              /* 12px cards */
@@ -196,7 +196,7 @@
 /* ── Base resets and typography ───────────────────────────────────── */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/65;
   }
 
   html {

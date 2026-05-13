@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { TrendingUp, ThumbsUp, MessageCircle, Share2, Activity } from "lucide-react";
+import { Coins, ThumbsUp, MessageCircle, Share2, Activity, TrendingUp, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { StatsCard } from "../components/StatsCard";
+import { StatsCard, type StatsAccent } from "../components/StatsCard";
 import { DashboardChannelHint } from "../components/ChannelConnectGuide";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../services/api";
@@ -51,29 +51,33 @@ export function Dashboard() {
         title: "Total Credits",
         value: String(profile?.credits ?? 0),
         change: "live",
-        icon: TrendingUp,
-        trend: "up" as const
+        icon: Coins,
+        trend: "up" as const,
+        accent: "blue" as StatsAccent,
       },
       {
         title: "Credits Earned (30d)",
         value: String(dashboard?.creditsEarned30d ?? 0),
         change: "live",
-        icon: Activity,
-        trend: "up" as const
+        icon: TrendingUp,
+        trend: "up" as const,
+        accent: "emerald" as StatsAccent,
       },
       {
         title: "Active Campaigns",
         value: String(dashboard?.activeCampaigns ?? 0),
         change: "live",
-        icon: ThumbsUp,
-        trend: "up" as const
+        icon: Activity,
+        trend: "up" as const,
+        accent: "amber" as StatsAccent,
       },
       {
         title: "Credits Spent (30d)",
         value: String(dashboard?.creditsSpent30d ?? 0),
         change: "live",
-        icon: MessageCircle,
-        trend: "up" as const
+        icon: Wallet,
+        trend: "up" as const,
+        accent: "rose" as StatsAccent,
       }
     ],
     [dashboard, profile]
@@ -102,7 +106,7 @@ export function Dashboard() {
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Engagement Trends */}
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card dark:bg-gradient-to-br dark:from-card dark:to-card/70">
           <CardHeader>
             <CardTitle className="text-foreground">Engagement Trends</CardTitle>
             <p className="text-sm text-muted-foreground">Last 7 days activity</p>
@@ -126,7 +130,7 @@ export function Dashboard() {
         </Card>
 
         {/* Credits Overview */}
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card dark:bg-gradient-to-br dark:from-card dark:to-card/70">
           <CardHeader>
             <CardTitle className="text-foreground">Credits Overview</CardTitle>
             <p className="text-sm text-muted-foreground">Earned vs Spent</p>
@@ -150,7 +154,7 @@ export function Dashboard() {
       </div>
 
       {/* Recent Activity */}
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card dark:bg-gradient-to-br dark:from-card dark:to-card/70">
         <CardHeader>
           <CardTitle className="text-foreground">Recent Activity</CardTitle>
           <p className="text-sm text-muted-foreground">Your latest interactions</p>
@@ -160,19 +164,19 @@ export function Dashboard() {
             {recentActivity.map((activity, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 p-4 transition-colors hover:bg-secondary/50"
+                className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 p-4 transition-colors hover:bg-secondary/50 dark:bg-card/40 dark:hover:bg-card/70"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                    activity.type === 'like' ? 'bg-primary/10' :
-                    activity.type === 'comment' ? 'bg-blue-500/10' :
-                    activity.type === 'share' ? 'bg-emerald-500/10' :
-                    'bg-orange-500/10'
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset ${
+                    activity.type === 'like' ? 'bg-blue-500/10 ring-blue-500/15 dark:bg-blue-500/15 dark:ring-blue-400/25' :
+                    activity.type === 'comment' ? 'bg-violet-500/10 ring-violet-500/15 dark:bg-violet-500/15 dark:ring-violet-400/25' :
+                    activity.type === 'share' ? 'bg-emerald-500/10 ring-emerald-500/15 dark:bg-emerald-500/15 dark:ring-emerald-400/25' :
+                    'bg-amber-500/10 ring-amber-500/15 dark:bg-amber-500/15 dark:ring-amber-400/25'
                   }`}>
-                    {activity.type === 'like' && <ThumbsUp className="h-5 w-5 text-primary" />}
-                    {activity.type === 'comment' && <MessageCircle className="h-5 w-5 text-blue-500" />}
-                    {activity.type === 'share' && <Share2 className="h-5 w-5 text-emerald-500" />}
-                    {activity.type === 'campaign' && <Activity className="h-5 w-5 text-orange-500" />}
+                    {activity.type === 'like' && <ThumbsUp className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={2.25} />}
+                    {activity.type === 'comment' && <MessageCircle className="h-5 w-5 text-violet-600 dark:text-violet-400" strokeWidth={2.25} />}
+                    {activity.type === 'share' && <Share2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} />}
+                    {activity.type === 'campaign' && <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400" strokeWidth={2.25} />}
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{activity.action}</p>
