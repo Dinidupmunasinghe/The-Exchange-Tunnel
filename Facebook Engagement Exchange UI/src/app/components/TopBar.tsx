@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { Search, Bell, Coins } from "lucide-react";
+import { Search, Coins } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -13,6 +13,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { ThemeToggle } from "./theme/ThemeToggle";
+import { NotificationsPopover } from "./NotificationsPopover";
 import { api, clearToken } from "../services/api";
 
 export function TopBar() {
@@ -85,16 +86,7 @@ export function TopBar() {
         <ThemeToggle />
 
         {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-9 w-9 rounded-full border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => navigate("/repost?tab=received&pane=notifications")}
-          aria-label="Open notifications"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-destructive"></span>
-        </Button>
+        <NotificationsPopover />
 
         {/* User Menu */}
         <DropdownMenu>

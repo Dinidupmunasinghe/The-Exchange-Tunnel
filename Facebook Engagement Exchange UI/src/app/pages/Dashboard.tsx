@@ -3,7 +3,19 @@ import { Coins, ThumbsUp, MessageCircle, Share2, Activity, TrendingUp, Wallet } 
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { StatsCard, type StatsAccent } from "../components/StatsCard";
 import { DashboardChannelHint } from "../components/ChannelConnectGuide";
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useTheme } from "../components/theme/ThemeProvider";
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import type { TooltipProps } from "recharts";
 import { api } from "../services/api";
 
 const engagementData = [
@@ -32,7 +44,55 @@ const recentActivity = [
   { action: "Earned 20 credits", post: "Growth Hacking Techniques", time: "2 hours ago", type: "share" },
 ];
 
+const COLORS = {
+  likes: "#059669",
+  comments: "#2563eb",
+  shares: "#d97706",
+  earned: "#059669",
+  spent: "#dc2626",
+} as const;
+
+function DashboardTooltip({ active, payload, label }: TooltipProps<number, string>) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-xs shadow-lg">
+      <p className="mb-2 font-semibold tracking-tight text-foreground">{label}</p>
+      <ul className="space-y-1.5">
+        {payload.map((entry) => (
+          <li key={String(entry.dataKey)} className="flex items-center justify-between gap-6 tabular-nums">
+            <span className="font-medium capitalize" style={{ color: entry.color }}>
+              {entry.name}
+            </span>
+            <span className="font-semibold text-foreground">{entry.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function Dashboard() {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
+
+  const chartChrome = useMemo(
+    () =>
+      isLight
+        ? {
+            grid: "#f0f2f6",
+            axisLine: "#eef1f5",
+            tick: "#526175",
+            cursor: "rgba(15, 23, 42, 0.045)",
+          }
+        : {
+            grid: "#2a2a2a",
+            axisLine: "#3f3f46",
+            tick: "#8e8ea0",
+            cursor: "rgba(255,255,255,0.08)",
+          },
+    [isLight],
+  );
+
   const [profile, setProfile] = useState<any>(null);
   const [dashboard, setDashboard] = useState<any>(null);
 
@@ -106,47 +166,131 @@ export function Dashboard() {
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Engagement Trends */}
-        <Card className="border-border bg-card dark:bg-gradient-to-br dark:from-card dark:to-card/70">
-          <CardHeader>
+        <Card className="border-border bg-card shadow-sm ring-1 ring-black/[0.02] dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:shadow-sm dark:ring-1 dark:ring-white/[0.06]">
+          <CardHeader className="pb-2">
             <CardTitle className="text-foreground">Engagement Trends</CardTitle>
             <p className="text-sm text-muted-foreground">Last 7 days activity</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={engagementData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                <XAxis dataKey="name" stroke="#8e8ea0" />
-                <YAxis stroke="#8e8ea0" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '8px' }}
-                  labelStyle={{ color: '#ececec' }}
+              <LineChart data={engagementData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid
+                  strokeDasharray="4 6"
+                  stroke={chartChrome.grid}
+                  vertical={false}
+                  strokeOpacity={isLight ? 1 : 0.9}
                 />
-                <Line type="monotone" dataKey="likes" stroke="#10a37f" strokeWidth={2} />
-                <Line type="monotone" dataKey="comments" stroke="#2563eb" strokeWidth={2} />
-                <Line type="monotone" dataKey="shares" stroke="#f59e0b" strokeWidth={2} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={{ stroke: chartChrome.axisLine, strokeWidth: 1 }}
+                  dy={6}
+                />
+                <YAxis
+                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={36}
+                />
+                <Tooltip
+                  content={<DashboardTooltip />}
+                  cursor={{ stroke: chartChrome.cursor, strokeWidth: 1 }}
+                  wrapperStyle={{ outline: "none" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="likes"
+                  name="likes"
+                  stroke={COLORS.likes}
+                  strokeWidth={isLight ? 2.25 : 2}
+                  dot={false}
+                  activeDot={{ r: 5, strokeWidth: 2, stroke: isLight ? "#fff" : "#18191c", fill: COLORS.likes }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="comments"
+                  name="comments"
+                  stroke={COLORS.comments}
+                  strokeWidth={isLight ? 2.25 : 2}
+                  dot={false}
+                  activeDot={{ r: 5, strokeWidth: 2, stroke: isLight ? "#fff" : "#18191c", fill: COLORS.comments }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="shares"
+                  name="shares"
+                  stroke={COLORS.shares}
+                  strokeWidth={isLight ? 2.25 : 2}
+                  dot={false}
+                  activeDot={{ r: 5, strokeWidth: 2, stroke: isLight ? "#fff" : "#18191c", fill: COLORS.shares }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
         {/* Credits Overview */}
-        <Card className="border-border bg-card dark:bg-gradient-to-br dark:from-card dark:to-card/70">
-          <CardHeader>
+        <Card className="border-border bg-card shadow-sm ring-1 ring-black/[0.02] dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:shadow-sm dark:ring-1 dark:ring-white/[0.06]">
+          <CardHeader className="pb-2">
             <CardTitle className="text-foreground">Credits Overview</CardTitle>
             <p className="text-sm text-muted-foreground">Earned vs Spent</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={creditsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                <XAxis dataKey="name" stroke="#8e8ea0" />
-                <YAxis stroke="#8e8ea0" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '8px' }}
-                  labelStyle={{ color: '#ececec' }}
+              <AreaChart data={creditsData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fillEarned" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={COLORS.earned} stopOpacity={isLight ? 0.35 : 0.45} />
+                    <stop offset="100%" stopColor={COLORS.earned} stopOpacity={isLight ? 0.02 : 0.05} />
+                  </linearGradient>
+                  <linearGradient id="fillSpent" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={COLORS.spent} stopOpacity={isLight ? 0.32 : 0.42} />
+                    <stop offset="100%" stopColor={COLORS.spent} stopOpacity={isLight ? 0.02 : 0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="4 6"
+                  stroke={chartChrome.grid}
+                  vertical={false}
+                  strokeOpacity={isLight ? 1 : 0.9}
                 />
-                <Area type="monotone" dataKey="earned" stroke="#10a37f" fill="#10a37f" fillOpacity={0.2} />
-                <Area type="monotone" dataKey="spent" stroke="#ef4444" fill="#ef4444" fillOpacity={0.2} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={{ stroke: chartChrome.axisLine, strokeWidth: 1 }}
+                  dy={6}
+                />
+                <YAxis
+                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={36}
+                />
+                <Tooltip
+                  content={<DashboardTooltip />}
+                  cursor={{ stroke: chartChrome.cursor, strokeWidth: 1 }}
+                  wrapperStyle={{ outline: "none" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="earned"
+                  name="earned"
+                  stroke={COLORS.earned}
+                  strokeWidth={isLight ? 1.75 : 2}
+                  fill="url(#fillEarned)"
+                  fillOpacity={1}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="spent"
+                  name="spent"
+                  stroke={COLORS.spent}
+                  strokeWidth={isLight ? 1.75 : 2}
+                  fill="url(#fillSpent)"
+                  fillOpacity={1}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>

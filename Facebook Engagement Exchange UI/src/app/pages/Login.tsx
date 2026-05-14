@@ -128,7 +128,7 @@ function TelegramDeeplinkLogin() {
   if (state === "waiting") {
     return (
       <div className="flex flex-col items-center gap-4 py-2 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-brand" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <div className="space-y-1">
           <p className="text-sm font-medium text-foreground">Waiting for Telegram confirmation…</p>
           <p className="text-xs text-muted-foreground">
@@ -159,7 +159,7 @@ function TelegramDeeplinkLogin() {
       </p>
       <Button
         type="button"
-        className="w-full gap-2 bg-brand text-brand-foreground hover:bg-brand/90"
+        className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
         onClick={startLogin}
         disabled={!BOT}
       >
@@ -248,13 +248,18 @@ function EmailLogin() {
           <button
             type="button"
             onClick={() => setShowPw((s) => !s)}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
+            aria-label={showPw ? "Hide password" : "Show password"}
           >
             {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
       </div>
-      <Button type="submit" disabled={busy} className="w-full gap-2">
+      <Button
+        type="submit"
+        disabled={busy}
+        className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+      >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
         {mode === "login" ? "Sign In" : "Create Account"}
       </Button>
@@ -344,8 +349,8 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-border bg-card shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-brand shadow-lg shadow-brand/30">
-            <Send className="h-8 w-8 text-brand-foreground" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
+            <Send className="h-8 w-8" />
           </div>
           <CardTitle className="text-2xl text-foreground">Exchange Tunnel</CardTitle>
           <CardDescription>Sign in with your Telegram account to use the platform.</CardDescription>
@@ -356,13 +361,18 @@ export function Login() {
             <div className="space-y-3 rounded-md border border-border bg-secondary/50 p-4 text-sm">
               <p className="font-medium text-foreground">You&apos;re already signed in</p>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button type="button" variant="default" className="flex-1" onClick={() => navigate("/", { replace: true })}>
+                <Button
+                  type="button"
+                  variant="default"
+                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={() => navigate("/", { replace: true })}
+                >
                   Go to dashboard
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 border-primary/35 text-primary hover:bg-primary/10 hover:text-primary"
                   onClick={() => {
                     clearToken();
                     setSessionTick((n) => n + 1);
@@ -377,9 +387,24 @@ export function Login() {
 
           <Tabs defaultValue="widget" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="widget">Widget</TabsTrigger>
-              <TabsTrigger value="deeplink">Bot Link</TabsTrigger>
-              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger
+                value="widget"
+                className="data-[state=active]:border-primary/25 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm dark:data-[state=active]:border-primary/25 dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground"
+              >
+                Widget
+              </TabsTrigger>
+              <TabsTrigger
+                value="deeplink"
+                className="data-[state=active]:border-primary/25 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm dark:data-[state=active]:border-primary/25 dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground"
+              >
+                Bot Link
+              </TabsTrigger>
+              <TabsTrigger
+                value="email"
+                className="data-[state=active]:border-primary/25 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm dark:data-[state=active]:border-primary/25 dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground"
+              >
+                Email
+              </TabsTrigger>
             </TabsList>
 
             {/* Tab 1: Telegram official widget */}

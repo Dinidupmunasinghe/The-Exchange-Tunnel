@@ -2,7 +2,7 @@
 
 /*
   Design tokens.
-  Light: premium SaaS palette (cool slate neutrals, layered surfaces, blue-600 primary).
+  Light: near-white canvas, minimal gray chrome, blue-600 primary.
   Dark: clean 3-layer SaaS surfaces, flat primary bound to Tailwind blue-600.
 */
 
@@ -12,39 +12,36 @@
     'Ubuntu', 'Cantarell', sans-serif;
   --font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
 
-  /* ── Light mode (premium SaaS: cool slate neutrals, blue-600 primary) ── */
-  /* Surfaces — page sits a touch below cards so panels naturally lift. */
-  --background: #f6f8fb;            /* page canvas */
-  --foreground: #0f172a;            /* slate-900: primary text */
+  /* ── Light mode: near-white surfaces, very light chrome — minimal gray. ── */
+  --background: #fcfcfd;
+  --foreground: #0f172a;
 
-  --card: #ffffff;                  /* cards / elevated panels */
+  --card: #ffffff;
   --card-foreground: #0f172a;
 
-  --popover: #ffffff;               /* dropdowns, popovers, modals */
+  --popover: #ffffff;
   --popover-foreground: #0f172a;
 
-  /* Primary — Tailwind blue-600, with blue-500 focus ring. */
   --primary: var(--color-blue-600, #2563eb);
   --primary-foreground: #ffffff;
 
-  /* Subdued blocks (alerts, inline tags, ghost rows). */
-  --secondary: #eef2f7;
+  --secondary: #f7f8fa;
   --secondary-foreground: #0f172a;
 
-  --muted: #f1f4f9;                 /* table rows / muted sections */
-  --muted-foreground: #64748b;      /* slate-500: secondary text */
+  --muted: #fafbfc;
+  --muted-foreground: #526175;
 
-  --accent: #eef2f7;                /* hover surfaces */
+  --accent: #f5f7fa;
   --accent-foreground: #0f172a;
 
-  --destructive: #dc2626;           /* red-600: aligns with blue-600 family */
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
 
-  /* Lines: crisp hairlines — nudged darker for sharper separation on light UI. */
-  --border: #d6dae2;
-  --input: #c8ced8;                 /* slightly darker so inputs read as fields */
+  /* Hairlines — very light; rely on spacing + type for hierarchy. */
+  --border: #f0f2f6;
+  --input: #e8ecf2;
   --input-background: #ffffff;
-  --switch-background: #cbd5e1;     /* slate-300: clear off state */
+  --switch-background: #e8edf3;
 
   --ring: var(--color-blue-600, #2563eb);
 
@@ -65,17 +62,35 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  --radius: 0.625rem; /* 10px — modern, calm */
+  --radius: 0.5rem; /* 8px (was 10px) */
 
-  /* Sidebar / topbar: one shade cooler than canvas so chrome is distinct. */
-  --sidebar: #f9fafb;
+  /* Sidebar / topbar — almost flush with canvas. */
+  --sidebar: #fcfcfd;
   --sidebar-foreground: #0f172a;
   --sidebar-primary: var(--color-blue-600, #2563eb);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef2f7;        /* selected/hover row in sidebar */
+  --sidebar-accent: #f5f7fa;
   --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #d6dae2;
+  --sidebar-border: #f0f2f6;
   --sidebar-ring: var(--color-blue-600, #2563eb);
+
+  /*
+   * Light: barely-there shadow (less gray in elevation).
+   */
+  --shadow-2xs: 0 1px rgb(15 23 42 / 0.01);
+  --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.016);
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.018), 0 1px 3px rgb(15 23 42 / 0.024);
+  --shadow-md: 0 1px 2px rgb(15 23 42 / 0.02), 0 4px 12px rgb(15 23 42 / 0.03);
+  --shadow-lg: 0 2px 5px rgb(15 23 42 / 0.018), 0 8px 18px rgb(15 23 42 / 0.034);
+  --shadow-xl: 0 3px 8px rgb(15 23 42 / 0.02), 0 14px 34px rgb(15 23 42 / 0.04);
+  --shadow-2xl: 0 6px 14px rgb(15 23 42 / 0.022), 0 22px 44px rgb(15 23 42 / 0.044);
+
+  --drop-shadow-xs: 0 1px 1px rgb(15 23 42 / 0.016);
+  --drop-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.034);
+  --drop-shadow-md: 0 2px 3px rgb(15 23 42 / 0.032);
+  --drop-shadow-lg: 0 3px 4px rgb(15 23 42 / 0.034);
+  --drop-shadow-xl: 0 5px 8px rgb(15 23 42 / 0.032);
+  --drop-shadow-2xl: 0 12px 20px rgb(15 23 42 / 0.04);
 }
 
 /* ── Dark mode (clean SaaS: 3-layer surfaces, primary = blue-600) ───── */
@@ -134,7 +149,25 @@
   --sidebar-border: #25262c;
   --sidebar-ring: var(--color-blue-500, #3b82f6);
 
-  --radius: 0.75rem;              /* 12px cards */
+  /*
+   * Dark: layered depth with cool slate tint — popovers/modals read clearly vs canvas.
+   */
+  --shadow-2xs: 0 1px rgb(2 6 23 / 0.32);
+  --shadow-xs: 0 1px 2px rgb(2 6 23 / 0.36);
+  --shadow-sm: 0 1px 2px rgb(2 6 23 / 0.4), 0 4px 14px rgb(2 6 23 / 0.28);
+  --shadow-md: 0 2px 5px rgb(2 6 23 / 0.36), 0 8px 20px rgb(2 6 23 / 0.26);
+  --shadow-lg: 0 4px 10px rgb(2 6 23 / 0.34), 0 14px 32px rgb(2 6 23 / 0.24);
+  --shadow-xl: 0 8px 18px rgb(2 6 23 / 0.32), 0 22px 48px rgb(2 6 23 / 0.22);
+  --shadow-2xl: 0 12px 28px rgb(2 6 23 / 0.34), 0 32px 64px rgb(2 6 23 / 0.24);
+
+  --drop-shadow-xs: 0 1px 1px rgb(2 6 23 / 0.35);
+  --drop-shadow-sm: 0 1px 2px rgb(2 6 23 / 0.38);
+  --drop-shadow-md: 0 3px 4px rgb(2 6 23 / 0.34);
+  --drop-shadow-lg: 0 4px 6px rgb(2 6 23 / 0.34);
+  --drop-shadow-xl: 0 8px 12px rgb(2 6 23 / 0.32);
+  --drop-shadow-2xl: 0 20px 30px rgb(2 6 23 / 0.32);
+
+  --radius: 0.625rem;             /* 10px (was 12px) */
 }
 
 /* ── Tailwind v4 inline theme map ─────────────────────────────────── */
@@ -261,20 +294,20 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #eceff4;
     border: 2px solid transparent;
     background-clip: padding-box;
-    border-radius: 8px;
+    border-radius: 6px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #dfe5ee;
     background-clip: padding-box;
   }
   .dark ::-webkit-scrollbar-thumb {
     background: #2e2f33;
     border: 2px solid transparent;
     background-clip: padding-box;
-    border-radius: 8px;
+    border-radius: 6px;
   }
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #3a3b40;

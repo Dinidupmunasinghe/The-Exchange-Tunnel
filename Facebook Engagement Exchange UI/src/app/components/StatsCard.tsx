@@ -25,12 +25,12 @@ const accentTile: Record<StatsAccent, string> = {
 };
 
 const accentGlow: Record<StatsAccent, string> = {
-  blue: "dark:hover:shadow-[0_0_0_1px_rgba(59,130,246,0.28)_inset,0_18px_40px_-18px_rgba(59,130,246,0.55)]",
+  blue: "dark:hover:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.18),0_12px_32px_-10px_rgba(59,130,246,0.22)]",
   emerald:
-    "dark:hover:shadow-[0_0_0_1px_rgba(16,185,129,0.28)_inset,0_18px_40px_-18px_rgba(16,185,129,0.45)]",
+    "dark:hover:shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18),0_12px_32px_-10px_rgba(16,185,129,0.2)]",
   amber:
-    "dark:hover:shadow-[0_0_0_1px_rgba(245,158,11,0.28)_inset,0_18px_40px_-18px_rgba(245,158,11,0.45)]",
-  rose: "dark:hover:shadow-[0_0_0_1px_rgba(244,63,94,0.28)_inset,0_18px_40px_-18px_rgba(244,63,94,0.5)]",
+    "dark:hover:shadow-[inset_0_0_0_1px_rgba(245,158,11,0.18),0_12px_32px_-10px_rgba(245,158,11,0.2)]",
+  rose: "dark:hover:shadow-[inset_0_0_0_1px_rgba(244,63,94,0.18),0_12px_32px_-10px_rgba(244,63,94,0.22)]",
 };
 
 const trendPill: Record<"up" | "down", string> = {

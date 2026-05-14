@@ -4,6 +4,8 @@ import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { ChatWidget } from "./ChatWidget";
+import { NotificationsPopover } from "./NotificationsPopover";
+import { ThemeToggle } from "./theme/ThemeToggle";
 import { Button } from "./ui/button";
 
 export function Layout() {
@@ -30,15 +32,22 @@ export function Layout() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile Menu Button */}
-        <div className="flex items-center gap-4 border-b border-border bg-sidebar px-4 py-3 lg:hidden">
+        <div className="flex items-center gap-2 border-b border-border bg-sidebar px-3 py-2.5 lg:hidden">
           <Button
             variant="ghost"
             size="icon"
+            className="shrink-0"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <h1 className="font-bold text-brand">Exchange Tunnel</h1>
+          <h1 className="min-w-0 flex-1 truncate text-center text-sm font-bold text-brand sm:text-base">
+            Exchange Tunnel
+          </h1>
+          <div className="flex shrink-0 items-center gap-1">
+            <NotificationsPopover />
+            <ThemeToggle />
+          </div>
         </div>
 
         <TopBar />
