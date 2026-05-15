@@ -402,41 +402,41 @@ export function Settings() {
   const { title: panelTitle, description: panelDesc } = panelCopy[settingsNav];
 
   return (
-    <div className="flex min-h-0 flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-      <aside className="flex shrink-0 flex-col gap-4 lg:sticky lg:top-6 lg:w-52 lg:self-start">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your account, channel, and Telegram session.
-          </p>
-        </div>
-        <nav
-          className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0"
-          aria-label="Settings sections"
-        >
-          {SETTINGS_NAV.map(({ id, label, Icon }) => {
-            const active = settingsNav === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setSettingsNav(id)}
-                className={cn(
-                  "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors",
-                  active
-                    ? "bg-muted text-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                {label}
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+    <div className="flex min-h-0 flex-col">
+      <header className="mb-6 shrink-0">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Manage your account settings and preferences.</p>
+      </header>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
+        <aside className="shrink-0 lg:sticky lg:top-6 lg:w-56 lg:self-start">
+          <nav
+            className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0"
+            aria-label="Settings sections"
+          >
+            {SETTINGS_NAV.map(({ id, label, Icon }) => {
+              const active = settingsNav === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSettingsNav(id)}
+                  className={cn(
+                    "flex w-full shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                    active
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <div className="min-w-0 flex-1">
         <Card className="border-border bg-card">
           <CardHeader className="border-b border-border pb-4">
             <CardTitle className="text-lg text-foreground">{panelTitle}</CardTitle>
@@ -888,6 +888,7 @@ export function Settings() {
             ) : null}
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );
