@@ -817,31 +817,37 @@ export function Settings() {
             </Button>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-            <div className="space-y-2">
-              <Label htmlFor="mtproto-code">Code</Label>
-              <Input
-                id="mtproto-code"
-                value={mtprotoCode}
-                onChange={(e) => setMtprotoCode(e.target.value)}
-                placeholder="Telegram login code"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
-                disabled={sendingCode || resendCooldown > 0}
-                onClick={() => void handleSendMtprotoCode()}
-              >
-                {sendingCode
-                  ? "Sending..."
-                  : resendCooldown > 0
-                    ? `Resend code in ${resendCooldown}s`
-                    : "Resend code"}
-              </Button>
-            </div>
-            <Button type="button" className="self-end" onClick={() => void handleMtprotoSignIn()} disabled={signingIn}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="mtproto-code" className="shrink-0">
+              Code
+            </Label>
+            <Input
+              id="mtproto-code"
+              value={mtprotoCode}
+              onChange={(e) => setMtprotoCode(e.target.value)}
+              placeholder="Telegram login code"
+              className="h-9 min-w-0 flex-1 basis-48"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
+              disabled={sendingCode || resendCooldown > 0}
+              onClick={() => void handleSendMtprotoCode()}
+            >
+              {sendingCode
+                ? "Sending..."
+                : resendCooldown > 0
+                  ? `Resend in ${resendCooldown}s`
+                  : "Resend code"}
+            </Button>
+            <Button
+              type="button"
+              className="h-9 shrink-0"
+              onClick={() => void handleMtprotoSignIn()}
+              disabled={signingIn}
+            >
               {signingIn ? "Verifying..." : "Connect session"}
             </Button>
           </div>
