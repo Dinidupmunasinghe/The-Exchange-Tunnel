@@ -15,13 +15,13 @@ interface StatsCardProps {
 
 const accentTile: Record<StatsAccent, string> = {
   blue:
-    "bg-blue-500/10 text-blue-600 ring-1 ring-inset ring-blue-500/15 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-400/25",
+    "bg-blue-500/10 text-blue-600 ring-1 ring-inset ring-blue-600/22 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-400/25",
   emerald:
-    "bg-emerald-500/10 text-emerald-600 ring-1 ring-inset ring-emerald-500/15 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/25",
+    "bg-emerald-500/10 text-emerald-600 ring-1 ring-inset ring-emerald-600/22 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/25",
   amber:
-    "bg-amber-500/10 text-amber-600 ring-1 ring-inset ring-amber-500/15 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-400/25",
+    "bg-amber-500/10 text-amber-600 ring-1 ring-inset ring-amber-600/24 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-400/25",
   rose:
-    "bg-rose-500/10 text-rose-600 ring-1 ring-inset ring-rose-500/15 dark:bg-rose-500/15 dark:text-rose-400 dark:ring-rose-400/25",
+    "bg-rose-500/10 text-rose-600 ring-1 ring-inset ring-rose-600/22 dark:bg-rose-500/15 dark:text-rose-400 dark:ring-rose-400/25",
 };
 
 const accentGlow: Record<StatsAccent, string> = {
@@ -34,8 +34,8 @@ const accentGlow: Record<StatsAccent, string> = {
 };
 
 const trendPill: Record<"up" | "down", string> = {
-  up: "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/15 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/25",
-  down: "bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-500/15 dark:bg-rose-500/15 dark:text-rose-400 dark:ring-rose-400/25",
+  up: "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-600/22 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/25",
+  down: "bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-600/22 dark:bg-rose-500/15 dark:text-rose-400 dark:ring-rose-400/25",
 };
 
 export function StatsCard({
@@ -50,7 +50,7 @@ export function StatsCard({
     <Card
       className={cn(
         "group relative overflow-hidden border-border bg-card shadow-none transition-all duration-300",
-        "hover:-translate-y-0.5 hover:shadow-none hover:ring-1 hover:ring-border/45 dark:hover:ring-0",
+        "hover:-translate-y-0.5 hover:shadow-none hover:ring-1 hover:ring-border dark:hover:ring-0",
         "dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:hover:shadow-lg",
         accentGlow[accent],
       )}

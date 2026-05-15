@@ -90,10 +90,10 @@ export function Dashboard() {
     () =>
       isLight
         ? {
-            grid: "#f0f2f6",
-            axisLine: "#eef1f5",
+            grid: "#e8edf5",
+            axisLine: "#d7dfea",
             tick: "#526175",
-            cursor: "rgba(15, 23, 42, 0.045)",
+            cursor: "rgba(15, 23, 42, 0.06)",
           }
         : {
             grid: "#2a2a2a",
@@ -323,10 +323,10 @@ export function Dashboard() {
               >
                 <div className="flex items-center gap-4">
                   <div className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset ${
-                    activity.type === 'like' ? 'bg-blue-500/10 ring-blue-500/15 dark:bg-blue-500/15 dark:ring-blue-400/25' :
-                    activity.type === 'comment' ? 'bg-violet-500/10 ring-violet-500/15 dark:bg-violet-500/15 dark:ring-violet-400/25' :
-                    activity.type === 'share' ? 'bg-emerald-500/10 ring-emerald-500/15 dark:bg-emerald-500/15 dark:ring-emerald-400/25' :
-                    'bg-amber-500/10 ring-amber-500/15 dark:bg-amber-500/15 dark:ring-amber-400/25'
+                    activity.type === 'like' ? 'bg-blue-500/10 ring-blue-600/22 dark:bg-blue-500/15 dark:ring-blue-400/25' :
+                    activity.type === 'comment' ? 'bg-violet-500/10 ring-violet-600/22 dark:bg-violet-500/15 dark:ring-violet-400/25' :
+                    activity.type === 'share' ? 'bg-emerald-500/10 ring-emerald-600/22 dark:bg-emerald-500/15 dark:ring-emerald-400/25' :
+                    'bg-amber-500/10 ring-amber-600/24 dark:bg-amber-500/15 dark:ring-amber-400/25'
                   }`}>
                     {activity.type === 'like' && <ThumbsUp className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={2.25} />}
                     {activity.type === 'comment' && <MessageCircle className="h-5 w-5 text-violet-600 dark:text-violet-400" strokeWidth={2.25} />}

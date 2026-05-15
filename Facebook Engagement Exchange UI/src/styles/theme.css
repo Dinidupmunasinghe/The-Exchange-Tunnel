@@ -37,11 +37,11 @@
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
 
-  /* Hairlines — very light; rely on spacing + type for hierarchy. */
-  --border: #f0f2f6;
-  --input: #e8ecf2;
+  /* Crisp 1px strokes — cool slate (not warm gray) so edges read clearly on white. */
+  --border: #d7dfea;
+  --input: #cad6e6;
   --input-background: #ffffff;
-  --switch-background: #e8edf3;
+  --switch-background: #dce5f0;
 
   --ring: var(--color-blue-600, #2563eb);
 
@@ -71,7 +71,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f5f7fa;
   --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #f0f2f6;
+  --sidebar-border: #d7dfea;
   --sidebar-ring: var(--color-blue-600, #2563eb);
 
   /*
@@ -294,13 +294,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #eceff4;
+    background: #d7dfea;
     border: 2px solid transparent;
     background-clip: padding-box;
     border-radius: 6px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #dfe5ee;
+    background: #c8d2e2;
     background-clip: padding-box;
   }
   .dark ::-webkit-scrollbar-thumb {
