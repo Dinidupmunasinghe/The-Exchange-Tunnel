@@ -7,7 +7,7 @@ const TTL_MS = 15 * 60 * 1000;
 
 /** @typedef {{ id: number, first_name?: string, last_name?: string, username?: string, photo_url?: string }} TelegramFrom */
 
-/** @type {Map<string, { expires: number, resolved?: TelegramFrom }>} */
+/** @type {Map<string, { expires: number, resolved?: TelegramFrom, linkUserId?: number }>} */
 const pending = new Map();
 
 function prune() {
@@ -43,9 +43,16 @@ function takeResolved(token) {
 /**
  * @param {string} token
  */
-function create(token) {
+/**
+ * @param {string} token
+ * @param {{ linkUserId?: number }} [opts]
+ */
+function create(token, opts = {}) {
   prune();
-  pending.set(token, { expires: Date.now() + TTL_MS });
+  pending.set(token, {
+    expires: Date.now() + TTL_MS,
+    ...(opts.linkUserId != null ? { linkUserId: opts.linkUserId } : {})
+  });
 }
 
 /**

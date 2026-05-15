@@ -212,6 +212,31 @@ export async function pollTelegramDeeplinkLogin(token: string): Promise<Deeplink
   );
 }
 
+/** Link Telegram widget to the signed-in Exchange Tunnel account. */
+export async function linkTelegramToAccount(auth: Record<string, string | number | undefined>) {
+  return authRequest<{ message: string; user: unknown }>("/users/me/telegram/link", {
+    method: "POST",
+    body: JSON.stringify(auth),
+  });
+}
+
+export async function startTelegramLinkDeeplink() {
+  return authRequest<{ token: string; expiresInMs: number }>("/users/me/telegram/link-deeplink/start", {
+    method: "POST",
+  });
+}
+
+type LinkDeeplinkPollResult =
+  | { status: "pending" }
+  | { status: "expired"; message?: string }
+  | { status: "ok"; user: unknown };
+
+export async function pollTelegramLinkDeeplink(token: string): Promise<LinkDeeplinkPollResult> {
+  return authRequest<LinkDeeplinkPollResult>(
+    `/users/me/telegram/link-deeplink/poll?token=${encodeURIComponent(token)}`
+  );
+}
+
 export const api = {
   getProfile: () => authRequest("/users/me") as Promise<{ user: any }>,
   getDashboard: () => authRequest("/users/dashboard") as Promise<{ stats: any }>,

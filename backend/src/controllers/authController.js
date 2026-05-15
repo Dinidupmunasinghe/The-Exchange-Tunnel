@@ -154,6 +154,12 @@ async function telegramDeeplinkPoll(req, res) {
   if (!row) {
     return res.status(410).json({ status: "expired", message: "Login link expired, please try again" });
   }
+  if (row.linkUserId != null) {
+    return res.status(400).json({
+      status: "error",
+      message: "This link is for connecting Telegram in Settings. Stay signed in and open Settings → Connect Telegram."
+    });
+  }
 
   const from = deeplinkStore.takeResolved(token);
   if (!from) {

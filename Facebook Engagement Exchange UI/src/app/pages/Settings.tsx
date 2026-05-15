@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowUpRight,
@@ -29,6 +29,7 @@ import {
   ChannelConnectPrerequisites,
   ChannelConnectVisualGuide,
 } from "../components/ChannelConnectGuide";
+import { TelegramLinkPanel } from "../components/TelegramLinkPanel";
 
 type Profile = {
   telegramUserId?: string;
@@ -68,6 +69,7 @@ const SETTINGS_NAV: { id: SettingsNavId; label: string; Icon: LucideIcon }[] = [
 ];
 
 export function Settings() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pages, setPages] = useState<ManagedPage[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -117,6 +119,14 @@ export function Settings() {
   useEffect(() => {
     void refreshProfile();
   }, [refreshProfile]);
+
+  useEffect(() => {
+    if (searchParams.get("connectTelegram") !== "1") return;
+    setSearchParams({}, { replace: true });
+    if (!profile?.telegramUserId) {
+      window.location.replace("/connect-telegram");
+    }
+  }, [searchParams, setSearchParams, profile?.telegramUserId]);
 
   useEffect(() => {
     if (profile?.telegramUserId) void refreshPages();
@@ -199,7 +209,7 @@ export function Settings() {
       return;
     }
     if (!profile?.telegramUserId) {
-      toast.error("Log in with Telegram first (Login page).");
+      toast.error("Connect Telegram in Settings first (Profile tab).");
       return;
     }
     setConnecting(true);
@@ -434,7 +444,7 @@ export function Settings() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-xs text-muted-foreground">Step 1</p>
-                  <p className="font-medium text-foreground">Login with Telegram</p>
+                  <p className="font-medium text-foreground">Connect Telegram</p>
                 </div>
                 <UserRoundCheck
                   className={cn(
@@ -445,7 +455,7 @@ export function Settings() {
               </div>
               {!hasTelegramLogin ? (
                 <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
-                  <Link to="/login">Open login</Link>
+                  <Link to="/settings">Connect in Profile</Link>
                 </Button>
               ) : (
                 <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Done</p>
@@ -551,6 +561,9 @@ export function Settings() {
                       </div>
                     </div>
                   </div>
+                  {!hasTelegramLogin ? (
+                    <TelegramLinkPanel onLinked={() => void refreshProfile()} />
+                  ) : null}
                   <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-md border border-border bg-muted/40 p-3">
@@ -646,7 +659,7 @@ export function Settings() {
             </div>
             {!profile?.telegramUserId ? (
               <Button variant="outline" asChild>
-                <Link to="/login">Log in with Telegram</Link>
+                <Link to="/settings">Connect Telegram in Profile</Link>
               </Button>
             ) : null}
           </div>

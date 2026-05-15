@@ -223,7 +223,7 @@ export function SubmitPost() {
     try {
       const snapshot = await refreshSetupState();
       if (!snapshot.hasLogin) {
-        setSetupCheckMessage("Log in with Telegram first.");
+        setSetupCheckMessage("Connect Telegram in Settings first.");
         return;
       }
       if (!snapshot.channelId) {

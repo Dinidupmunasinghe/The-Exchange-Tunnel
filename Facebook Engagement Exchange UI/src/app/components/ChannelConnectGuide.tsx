@@ -115,7 +115,7 @@ export function ChannelConnectPrerequisites({ disabled }: PrerequisitesProps) {
           <li>Then enter <code className="rounded bg-black/30 px-1 py-0.5 font-mono text-xs">@yourchannel</code> or a t.me link below.</li>
         </ul>
         {disabled ? (
-          <p className="mt-2 text-xs text-muted-foreground">Log in with Telegram first to connect a channel.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Connect Telegram in Settings (Profile) first.</p>
         ) : null}
       </AlertDescription>
     </Alert>

@@ -14,6 +14,9 @@ import { Settings } from "./pages/Settings";
 import { AdminLogin } from "./pages/AdminLogin";
 import { NotFound } from "./pages/NotFound";
 import { Login } from "./pages/Login";
+import { LoginTelegram } from "./pages/LoginTelegram";
+import { ConnectTelegram } from "./pages/ConnectTelegram";
+import { TelegramRequiredRoute } from "./components/TelegramRequiredRoute";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
 import { DataDeletion } from "./pages/DataDeletion";
 import { AdminOverview } from "./pages/admin/Overview";
@@ -35,6 +38,7 @@ import { Landing } from "./pages/Landing";
 
 export const router = createBrowserRouter([
   { path: "/login", Component: Login },
+  { path: "/login/telegram", Component: LoginTelegram },
   {
     path: "/admin",
     children: [
@@ -77,6 +81,10 @@ export const router = createBrowserRouter([
       {
         Component: ProtectedRoute,
         children: [
+          { path: "connect-telegram", Component: ConnectTelegram },
+          {
+            Component: TelegramRequiredRoute,
+            children: [
           {
             Component: Layout,
             children: [
@@ -89,6 +97,8 @@ export const router = createBrowserRouter([
               { path: "wallet", Component: Wallet },
               { path: "settings", Component: Settings },
               { path: "*", Component: NotFound },
+            ],
+          },
             ],
           },
         ],
