@@ -1,0 +1,28 @@
+/* Landing route: escape app shell overflow locks and force readable light text. */
+html.landing-route,
+html.landing-route body,
+html.landing-route #root {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+html.landing-route body {
+  overflow-y: auto !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+#landing-scroll {
+  color-scheme: light;
+  background: #ffffff;
+  color: #0f172a;
+  -webkit-overflow-scrolling: touch;
+}
+
+#landing-scroll h1,
+#landing-scroll h2,
+#landing-scroll h3,
+#landing-scroll h4 {
+  color: #0f172a;
+}

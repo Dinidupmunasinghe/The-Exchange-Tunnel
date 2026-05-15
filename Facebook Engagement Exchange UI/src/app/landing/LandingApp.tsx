@@ -28,7 +28,7 @@ export function LandingApp() {
   ];
 
   return (
-    <motion.div className="min-h-screen overflow-x-hidden bg-white text-gray-900 antialiased">
+    <div className="landing-page min-h-full w-full bg-white text-gray-900 antialiased">
       {/* Navigation */}
       <motion.nav
         initial={{ y: -100 }}
@@ -100,11 +100,7 @@ export function LandingApp() {
 
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-12">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
+            <div>
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-6 cursor-pointer"
@@ -117,22 +113,12 @@ export function LandingApp() {
                 </motion.div>
                 <span className="text-sm text-blue-600 font-medium">Telegram growth platform</span>
               </motion.div>
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-5xl md:text-6xl font-bold mb-6 leading-tight text-gray-900"
-              >
+              <h1 className="mb-6 text-5xl font-bold leading-tight text-gray-900 md:text-6xl">
                 Boost your Telegram<br />engagement effortlessly
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-xl text-gray-600 max-w-2xl mx-auto mb-8"
-              >
+              </h1>
+              <p className="mx-auto mb-8 max-w-2xl text-xl text-gray-600">
                 Connect with <span className="text-blue-600 font-medium">thousands of users</span>, exchange engagement, and grow your community with our <span className="text-blue-500 font-medium">powerful platform</span> designed for <span className="text-blue-700 font-medium">real results</span>.
-              </motion.p>
+              </p>
               <GetStartedLink
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -149,7 +135,7 @@ export function LandingApp() {
                   <ArrowRight className="w-5 h-5" />
                 </motion.div>
               </GetStartedLink>
-            </motion.div>
+            </div>
           </div>
 
           {/* Dashboard Mockup */}
@@ -182,7 +168,7 @@ export function LandingApp() {
                 <div className="flex-1 text-center text-sm text-gray-500">Dashboard</div>
               </div>
 
-              <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <StatCard
                   icon={Send}
                   label="Total Exchanges"
@@ -219,7 +205,7 @@ export function LandingApp() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -710,6 +696,6 @@ export function LandingApp() {
           </div>
         </div>
       </footer>
-    </motion.div>
+    </div>
   );
 }

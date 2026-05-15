@@ -25,7 +25,7 @@ export function PricingCard({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: true, amount: 0.05 }}
       transition={{ delay, duration: 0.5 }}
       whileHover={{ y: -8, scale: 1.02 }}
       className="relative h-full"
@@ -79,7 +79,7 @@ export function PricingCard({
               key={i}
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.05 }}
               transition={{ delay: delay + i * 0.1 }}
               className="flex items-start gap-3"
             >
