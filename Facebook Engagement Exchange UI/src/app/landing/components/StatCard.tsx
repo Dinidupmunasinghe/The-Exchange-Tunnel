@@ -38,7 +38,7 @@ export function StatCard({ label, value, suffix = "", trend, color, icon: Icon, 
           <Icon className="w-5 h-5 text-white" />
         </motion.div>
       </div>
-      <div className="text-3xl font-bold mb-2">
+      <div className="mb-2 text-3xl font-bold text-gray-900">
         <AnimatedCounter value={value} suffix={suffix} duration={2} />
       </div>
       <motion.div

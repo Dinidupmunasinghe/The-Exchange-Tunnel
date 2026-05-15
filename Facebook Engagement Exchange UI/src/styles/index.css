@@ -3,10 +3,21 @@
 @import './theme.css';
 
 html,
-body,
+body {
+  min-height: 100%;
+}
+
 #root {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+}
+
+/* Marketing landing: allow full-page scroll (app routes use h-screen on Layout). */
+body.landing-active,
+body.landing-active #root {
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .hide-scrollbar {

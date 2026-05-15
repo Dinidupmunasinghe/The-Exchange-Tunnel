@@ -28,7 +28,7 @@ export function LandingApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-white overflow-hidden">
+    <motion.div className="min-h-screen overflow-x-hidden bg-white text-gray-900 antialiased">
       {/* Navigation */}
       <motion.nav
         initial={{ y: -100 }}
@@ -48,9 +48,9 @@ export function LandingApp() {
             >
               <Send className="w-5 h-5 text-white" />
             </motion.div>
-            <span className="text-xl font-semibold">Exchange Tunnel</span>
+            <span className="text-xl font-semibold text-gray-900">Exchange Tunnel</span>
           </motion.div>
-          <div className="flex items-center gap-8">
+          <motion.div className="flex items-center gap-4 sm:gap-8">
             <motion.a
               whileHover={{ scale: 1.05, color: "#000" }}
               href="#features"
@@ -72,7 +72,7 @@ export function LandingApp() {
             >
               Get Started
             </GetStartedLink>
-          </div>
+          </motion.div>
         </div>
       </motion.nav>
 
@@ -121,7 +121,7 @@ export function LandingApp() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-5xl md:text-6xl font-bold mb-6 leading-tight"
+                className="text-5xl md:text-6xl font-bold mb-6 leading-tight text-gray-900"
               >
                 Boost your Telegram<br />engagement effortlessly
               </motion.h1>
@@ -229,7 +229,7 @@ export function LandingApp() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <BarChart3 className="w-4 h-4" />
-                      <span className="font-medium">Engagement Analytics</span>
+                      <span className="font-medium text-gray-900">Engagement Analytics</span>
                     </div>
                   </div>
                   <InteractiveChart data={chartData} />
@@ -244,7 +244,7 @@ export function LandingApp() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <MessageCircle className="w-4 h-4" />
-                      <span className="font-medium">Recent Activity</span>
+                      <span className="font-medium text-gray-900">Recent Activity</span>
                     </div>
                   </div>
                   <ActivityFeed activities={activities} />
@@ -317,7 +317,7 @@ export function LandingApp() {
               <Zap className="w-4 h-4 text-green-600" />
               <span className="text-sm text-green-600 font-medium">Features</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
               Features designed to<br />empower your workflow
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -373,7 +373,7 @@ export function LandingApp() {
                   >
                     <feature.icon className="w-6 h-6 text-white" />
                   </motion.div>
-                  <h3 className="text-lg font-semibold mb-2 group-hover:text-blue-600 transition-colors">{feature.title}</h3>
+                  <h3 className="mb-2 text-lg font-semibold text-gray-900 transition-colors group-hover:text-blue-600">{feature.title}</h3>
                   <p className="text-gray-600 text-sm">{feature.description}</p>
                   <motion.div
                     initial={{ width: 0 }}
@@ -397,7 +397,7 @@ export function LandingApp() {
               <Sparkles className="w-4 h-4 text-blue-600" />
               <span className="text-sm text-blue-600 font-medium">See it in action</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
               How the exchange works
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -417,7 +417,7 @@ export function LandingApp() {
               <CheckCircle2 className="w-4 h-4 text-purple-600" />
               <span className="text-sm text-purple-600 font-medium">How it works</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
               Get started in minutes
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -478,11 +478,11 @@ export function LandingApp() {
                     <motion.div
                       whileHover={{ scale: 1.1, rotate: 360 }}
                       transition={{ duration: 0.5 }}
-                      className={`w-12 h-12 bg-gradient-to-br from-${item.color}-500 to-${item.color}-600 rounded-xl flex items-center justify-center mb-4`}
+                      className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600"
                     >
                       <item.icon className="w-6 h-6 text-white" />
                     </motion.div>
-                    <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
+                    <h3 className="mb-3 text-xl font-semibold text-gray-900">{item.title}</h3>
                     <p className="text-gray-600">{item.description}</p>
                   </motion.div>
                 </FloatingCard>
@@ -515,7 +515,7 @@ export function LandingApp() {
               <Zap className="w-4 h-4 text-blue-600" />
               <span className="text-sm text-blue-600 font-medium">Pricing</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
               Choose your perfect plan
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -605,7 +605,7 @@ export function LandingApp() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-6 relative overflow-hidden">
+      <section className="relative overflow-x-hidden px-6 py-20">
         <motion.div
           animate={{
             scale: [1, 1.1, 1],
@@ -697,7 +697,7 @@ export function LandingApp() {
               >
                 <Send className="w-5 h-5 text-white" />
               </motion.div>
-              <span className="text-xl font-semibold">Exchange Tunnel</span>
+              <span className="text-xl font-semibold text-gray-900">Exchange Tunnel</span>
             </motion.div>
             <motion.div
               initial={{ opacity: 0 }}
@@ -710,6 +710,6 @@ export function LandingApp() {
           </div>
         </div>
       </footer>
-    </div>
+    </motion.div>
   );
 }

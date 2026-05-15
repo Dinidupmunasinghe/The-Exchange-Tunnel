@@ -50,7 +50,7 @@ export function ExchangeAnimation() {
                 <User className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="font-semibold">Alex</div>
+                <div className="font-semibold text-gray-900">Alex</div>
                 <motion.div
                   key={user1Credits}
                   initial={{ scale: 1.5, color: "#3B82F6" }}
@@ -107,7 +107,7 @@ export function ExchangeAnimation() {
                 <User className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="font-semibold">Sarah</div>
+                <div className="font-semibold text-gray-900">Sarah</div>
                 <motion.div
                   key={user2Likes}
                   initial={{ scale: 1.5, color: "#6366F1" }}

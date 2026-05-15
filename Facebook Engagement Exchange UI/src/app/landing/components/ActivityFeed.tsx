@@ -49,7 +49,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
               {activity.user[0]}
             </div>
             <div className="flex-1">
-              <div className="text-sm font-medium">{activity.user}</div>
+              <div className="text-sm font-medium text-gray-900">{activity.user}</div>
               <div className="text-xs text-gray-500">{activity.action}</div>
             </div>
             <div className="text-xs text-gray-400">{activity.time}</div>
