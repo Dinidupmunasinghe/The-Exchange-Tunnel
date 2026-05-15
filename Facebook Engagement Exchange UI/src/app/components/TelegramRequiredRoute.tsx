@@ -1,20 +1,18 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
-import { Loader2 } from "lucide-react";
 import { api } from "../services/api";
 
 /**
- * After sign-in, users with an Exchange Tunnel account must link Telegram
- * before using the main app (dashboard, earn, etc.).
+ * After sign-in, users must link Telegram before using the main app.
+ * Checks once on mount — does not refetch or block the whole UI on tab changes.
  */
 export function TelegramRequiredRoute() {
   const location = useLocation();
-  const [loading, setLoading] = useState(true);
+  const [checked, setChecked] = useState(false);
   const [hasTelegram, setHasTelegram] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     api
       .getProfile()
       .then((res) => {
@@ -24,22 +22,14 @@ export function TelegramRequiredRoute() {
         if (!cancelled) setHasTelegram(false);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setChecked(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [location.pathname]);
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!hasTelegram) {
+  if (checked && !hasTelegram) {
     return <Navigate to="/connect-telegram" replace state={{ from: location }} />;
   }
 
