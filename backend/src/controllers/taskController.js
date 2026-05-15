@@ -191,38 +191,38 @@ async function submitTaskCompletion(req, res) {
   }
 
   try {
-    const done = await sequelize.transaction(async (transaction) => {
-      const task = await db.Task.findByPk(taskId, {
-        transaction,
-        lock: true,
-        include: [{ model: db.Campaign, as: "campaign" }]
-      });
-      if (!task || task.status === "completed" || task.status === "cancelled") {
-        const error = new Error("Task is not available");
-        error.status = 404;
-        throw error;
-      }
-      if (task.campaign.userId === req.user.id) {
-        const error = new Error("Cannot complete your own campaign task");
-        error.status = 400;
-        throw error;
-      }
-      if (task.assignedUserId && task.assignedUserId !== req.user.id) {
-        const error = new Error("Task is assigned to another user");
-        error.status = 400;
-        throw error;
-      }
-      const c = task.campaign;
-      const campaignRunnable =
-        c.status !== "paused" &&
+  const done = await sequelize.transaction(async (transaction) => {
+    const task = await db.Task.findByPk(taskId, {
+      transaction,
+      lock: true,
+      include: [{ model: db.Campaign, as: "campaign" }]
+    });
+    if (!task || task.status === "completed" || task.status === "cancelled") {
+      const error = new Error("Task is not available");
+      error.status = 404;
+      throw error;
+    }
+    if (task.campaign.userId === req.user.id) {
+      const error = new Error("Cannot complete your own campaign task");
+      error.status = 400;
+      throw error;
+    }
+    if (task.assignedUserId && task.assignedUserId !== req.user.id) {
+      const error = new Error("Task is assigned to another user");
+      error.status = 400;
+      throw error;
+    }
+    const c = task.campaign;
+    const campaignRunnable =
+      c.status !== "paused" &&
         (c.status === "active" || (c.status === "pending" && c.scheduledLaunchAt && new Date(c.scheduledLaunchAt) <= new Date()));
-      if (!campaignRunnable) {
-        const error = new Error(
-          c.status === "paused" ? "Campaign is paused" : "Campaign is not active yet"
-        );
-        error.status = 400;
-        throw error;
-      }
+    if (!campaignRunnable) {
+      const error = new Error(
+        c.status === "paused" ? "Campaign is paused" : "Campaign is not active yet"
+      );
+      error.status = 400;
+      throw error;
+    }
       const storedActionKind = actionKind === "subscribe" ? null : actionKind;
       if (engagementType === "subscribe") {
         const channelKey = String(task.campaign?.messageKey || `sub_${String(task.campaignId)}`);
@@ -240,21 +240,21 @@ async function submitTaskCompletion(req, res) {
         if (postKey) {
           const prior = await db.UserPostAction.findOne({
             where: { userId: req.user.id, postKey, actionKind: storedActionKind },
-            transaction
-          });
+      transaction
+    });
           if (prior) {
             const error = new Error("You already completed this action for this post");
-            error.status = 400;
-            throw error;
-          }
+      error.status = 400;
+      throw error;
+    }
         }
       }
-      const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
-      if (!worker) {
-        const error = new Error("User not found");
-        error.status = 404;
-        throw error;
-      }
+    const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
+    if (!worker) {
+      const error = new Error("User not found");
+      error.status = 404;
+      throw error;
+    }
       const tUid = requireWorkerTelegramId(worker);
       const msgUrl = c.messageUrl || c.soundcloudPostUrl;
       if (!msgUrl || !tg.isLikelyTelegramMessageUrl(String(msgUrl))) {
@@ -597,17 +597,17 @@ async function submitTaskCompletion(req, res) {
         req._shareForwarded = forwarded;
       }
       const verifiedViaProvider = true;
-      const verification = await verifyEngagement({
-        campaign: task.campaign,
-        engagementType,
-        proofText,
+    const verification = await verifyEngagement({
+      campaign: task.campaign,
+      engagementType,
+      proofText,
         verifiedViaProvider
-      });
-      if (!verification.isValid) {
-        const error = new Error(`Engagement verification failed: ${verification.reason}`);
-        error.status = 400;
-        throw error;
-      }
+    });
+    if (!verification.isValid) {
+      const error = new Error(`Engagement verification failed: ${verification.reason}`);
+      error.status = 400;
+      throw error;
+    }
 
       task.assignedUserId = req.user.id;
       task.status = "assigned";
@@ -634,14 +634,14 @@ async function submitTaskCompletion(req, res) {
             : `tg-mem-${tUid}-${channelId}`;
 
       const createdEngagement = await db.Engagement.create(
-        {
-          userId: req.user.id,
-          campaignId: task.campaignId,
-          taskId: task.id,
-          engagementType,
+      {
+        userId: req.user.id,
+        campaignId: task.campaignId,
+        taskId: task.id,
+        engagementType,
           actionKind: storedActionKind,
           metaEngagementId: metaId,
-          verificationStatus: "verified",
+        verificationStatus: "verified",
           verificationDetails:
             actionKind === "subscribe"
               ? "Telegram: channel membership verified for subscribe campaign"
@@ -675,37 +675,37 @@ async function submitTaskCompletion(req, res) {
             channelKey,
             lastEngagementId: createdEngagement.id,
             details: createdEngagement.verificationDetails || null
-          },
-          { transaction }
-        );
+      },
+      { transaction }
+    );
       }
 
-      task.status = "completed";
-      task.completedAt = new Date();
-      await task.save({ transaction });
+    task.status = "completed";
+    task.completedAt = new Date();
+    await task.save({ transaction });
 
-      await earnCredits({
-        userId: req.user.id,
-        amount: task.rewardCredits,
+    await earnCredits({
+      userId: req.user.id,
+      amount: task.rewardCredits,
         reason:
           actionKind === "subscribe"
             ? `Earned from channel subscribe on campaign #${task.campaignId} (task #${task.id})`
             : `Earned from ${actionKind} on campaign #${task.campaignId} (task #${task.id})`,
-        referenceType: "task",
-        referenceId: task.id,
-        transaction
-      });
-      const completedCount = await db.Task.count({
-        where: { campaignId: task.campaignId, status: "completed" },
-        transaction
-      });
-      if (completedCount >= task.campaign.maxEngagements) {
-        task.campaign.status = "completed";
-        await task.campaign.save({ transaction });
-      }
-      return task;
+      referenceType: "task",
+      referenceId: task.id,
+      transaction
     });
-    return res.json({ message: "Task completed and credits added", task: done });
+    const completedCount = await db.Task.count({
+      where: { campaignId: task.campaignId, status: "completed" },
+      transaction
+    });
+    if (completedCount >= task.campaign.maxEngagements) {
+      task.campaign.status = "completed";
+      await task.campaign.save({ transaction });
+    }
+    return task;
+  });
+  return res.json({ message: "Task completed and credits added", task: done });
   } catch (err) {
     const status = err.status || 500;
     return res.status(status).json({ message: err.message || "Could not complete task" });
@@ -930,21 +930,21 @@ async function revertEngagement(req, res) {
   }
   let fallbackResult = null;
   try {
-    await sequelize.transaction(async (transaction) => {
+  await sequelize.transaction(async (transaction) => {
       const engagementWhere =
         actionKind === "subscribe"
           ? { userId: req.user.id, campaignId, engagementType: "subscribe" }
           : { userId: req.user.id, campaignId, actionKind };
-      const engagement = await db.Engagement.findOne({
+    const engagement = await db.Engagement.findOne({
         where: engagementWhere,
-        transaction,
-        lock: true,
-        include: [
-          { model: db.Task, as: "task", required: true },
-          { model: db.Campaign, as: "campaign", required: true }
-        ]
-      });
-      if (!engagement) {
+      transaction,
+      lock: true,
+      include: [
+        { model: db.Task, as: "task", required: true },
+        { model: db.Campaign, as: "campaign", required: true }
+      ]
+    });
+    if (!engagement) {
         // Fallback: no Engagement row for this campaign, but the user may carry
         // inherited memory from a previous campaign on the same Telegram post
         // (UserPostAction / UserSubscriptionMemory survive campaign deletion and
@@ -958,15 +958,15 @@ async function revertEngagement(req, res) {
         });
         return;
       }
-      const campaign = engagement.campaign;
-      const task = engagement.task;
+    const campaign = engagement.campaign;
+    const task = engagement.task;
       if (campaign.userId === req.user.id) {
-        const error = new Error("Cannot revert on your own campaign");
-        error.status = 400;
-        throw error;
-      }
+      const error = new Error("Cannot revert on your own campaign");
+      error.status = 400;
+      throw error;
+    }
       if (actionKind === "subscribe") {
-        const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
+    const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
         const creds = parseStoredMtprotoCredentials(worker);
         const sessionString = parseStoredSessionString(worker);
         if (!creds || !sessionString) {
@@ -989,7 +989,7 @@ async function revertEngagement(req, res) {
           channel: leaveRef
         });
       }
-      if (actionKind === "like") {
+    if (actionKind === "like") {
         const worker = await db.User.findByPk(req.user.id, { transaction, lock: true });
         const creds = parseStoredMtprotoCredentials(worker);
         const sessionString = parseStoredSessionString(worker);
@@ -1081,8 +1081,8 @@ async function revertEngagement(req, res) {
           const error = new Error(
             (lastErr && lastErr.message) || "Could not delete Telegram comment. Try again."
           );
-          error.status = 400;
-          throw error;
+        error.status = 400;
+        throw error;
         }
       }
       if (actionKind === "share") {
@@ -1109,28 +1109,28 @@ async function revertEngagement(req, res) {
           msgId: Number(parsed.forwardedMessageId)
         });
       }
-      const amount = task.rewardCredits;
+    const amount = task.rewardCredits;
       const reversal = await reverseEarnCredits({
-        userId: req.user.id,
-        amount,
-        reason: `Reverted ${actionKind} on campaign #${campaignId} (task #${task.id})`,
-        referenceType: "task",
-        referenceId: task.id,
+      userId: req.user.id,
+      amount,
+      reason: `Reverted ${actionKind} on campaign #${campaignId} (task #${task.id})`,
+      referenceType: "task",
+      referenceId: task.id,
         beneficiaryUserId: campaign.userId,
-        transaction
-      });
+      transaction
+    });
       const collected = Number(reversal?.collected || 0);
       if (collected > 0) {
-        await refundCredits({
+    await refundCredits({
           userId: campaign.userId,
           amount: collected,
-          reason: `Refund: ${actionKind} reverted on campaign #${campaignId}`,
-          referenceType: "campaign",
-          referenceId: campaign.id,
-          transaction
-        });
+      reason: `Refund: ${actionKind} reverted on campaign #${campaignId}`,
+      referenceType: "campaign",
+      referenceId: campaign.id,
+      transaction
+    });
       }
-      await engagement.destroy({ transaction });
+    await engagement.destroy({ transaction });
       if (campaign.messageKey && actionKind !== "subscribe") {
         await db.UserPostAction.destroy({
           where: {
@@ -1147,22 +1147,22 @@ async function revertEngagement(req, res) {
           transaction
         });
       }
-      task.status = "open";
-      task.assignedUserId = null;
-      task.assignedAt = null;
-      task.completedAt = null;
-      await task.save({ transaction });
-      if (campaign.status === "completed") {
-        const stillCompleted = await db.Task.count({
-          where: { campaignId: campaign.id, status: "completed" },
-          transaction
-        });
-        if (stillCompleted < campaign.maxEngagements) {
-          campaign.status = "active";
-          await campaign.save({ transaction });
-        }
+    task.status = "open";
+    task.assignedUserId = null;
+    task.assignedAt = null;
+    task.completedAt = null;
+    await task.save({ transaction });
+    if (campaign.status === "completed") {
+      const stillCompleted = await db.Task.count({
+        where: { campaignId: campaign.id, status: "completed" },
+        transaction
+      });
+      if (stillCompleted < campaign.maxEngagements) {
+        campaign.status = "active";
+        await campaign.save({ transaction });
       }
-    });
+    }
+  });
     if (fallbackResult) {
       return res.json({
         message: fallbackResult.message,

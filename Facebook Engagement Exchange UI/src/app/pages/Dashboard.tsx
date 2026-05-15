@@ -17,6 +17,10 @@ import {
 } from "recharts";
 import type { TooltipProps } from "recharts";
 import { api } from "../services/api";
+import { cn } from "../components/ui/utils";
+
+const dashboardCardClass =
+  "border-border bg-card shadow-none ring-0 dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:shadow-sm dark:ring-1 dark:ring-white/[0.06]";
 
 const engagementData = [
   { name: "Mon", likes: 45, comments: 25, shares: 15 },
@@ -53,9 +57,16 @@ const COLORS = {
 } as const;
 
 function DashboardTooltip({ active, payload, label }: TooltipProps<number, string>) {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-xs shadow-lg">
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card px-3 py-2.5 text-xs",
+        isLight ? "shadow-none" : "shadow-lg",
+      )}
+    >
       <p className="mb-2 font-semibold tracking-tight text-foreground">{label}</p>
       <ul className="space-y-1.5">
         {payload.map((entry) => (
@@ -166,7 +177,7 @@ export function Dashboard() {
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Engagement Trends */}
-        <Card className="border-border bg-card shadow-sm ring-1 ring-black/[0.02] dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:shadow-sm dark:ring-1 dark:ring-white/[0.06]">
+        <Card className={dashboardCardClass}>
           <CardHeader className="pb-2">
             <CardTitle className="text-foreground">Engagement Trends</CardTitle>
             <p className="text-sm text-muted-foreground">Last 7 days activity</p>
@@ -231,7 +242,7 @@ export function Dashboard() {
         </Card>
 
         {/* Credits Overview */}
-        <Card className="border-border bg-card shadow-sm ring-1 ring-black/[0.02] dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:shadow-sm dark:ring-1 dark:ring-white/[0.06]">
+        <Card className={dashboardCardClass}>
           <CardHeader className="pb-2">
             <CardTitle className="text-foreground">Credits Overview</CardTitle>
             <p className="text-sm text-muted-foreground">Earned vs Spent</p>
@@ -298,7 +309,7 @@ export function Dashboard() {
       </div>
 
       {/* Recent Activity */}
-      <Card className="border-border bg-card dark:bg-gradient-to-br dark:from-card dark:to-card/70">
+      <Card className={dashboardCardClass}>
         <CardHeader>
           <CardTitle className="text-foreground">Recent Activity</CardTitle>
           <p className="text-sm text-muted-foreground">Your latest interactions</p>
@@ -308,7 +319,7 @@ export function Dashboard() {
             {recentActivity.map((activity, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 p-4 transition-colors hover:bg-secondary/50 dark:bg-card/40 dark:hover:bg-card/70"
+                className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-4 transition-colors hover:bg-muted/35 dark:bg-card/40 dark:hover:bg-card/70"
               >
                 <div className="flex items-center gap-4">
                   <div className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset ${

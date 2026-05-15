@@ -34,16 +34,16 @@ import { AdminAuditLogs } from "./pages/admin/AuditLogs";
 
 export const router = createBrowserRouter([
   { path: "/login", Component: Login },
-  { path: "/admin", Component: AdminLogin },
   {
     path: "/admin",
-    Component: AdminProtectedRoute,
     children: [
+      { index: true, Component: AdminLogin },
       {
-        Component: AdminLayout,
+        Component: AdminProtectedRoute,
         children: [
           {
             path: "dashboard",
+            Component: AdminLayout,
             children: [
               { index: true, element: <Navigate to="overview" replace /> },
               { path: "overview", Component: AdminOverview },

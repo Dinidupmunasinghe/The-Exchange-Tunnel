@@ -49,9 +49,9 @@ export function StatsCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden border-border bg-card transition-all duration-300",
-        "hover:-translate-y-0.5 hover:shadow-lg",
-        "dark:bg-gradient-to-br dark:from-card dark:to-card/70",
+        "group relative overflow-hidden border-border bg-card shadow-none transition-all duration-300",
+        "hover:-translate-y-0.5 hover:shadow-none hover:ring-1 hover:ring-border/45 dark:hover:ring-0",
+        "dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:hover:shadow-lg",
         accentGlow[accent],
       )}
     >
