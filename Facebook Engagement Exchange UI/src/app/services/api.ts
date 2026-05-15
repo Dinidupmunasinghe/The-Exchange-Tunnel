@@ -237,9 +237,16 @@ export async function pollTelegramLinkDeeplink(token: string): Promise<LinkDeepl
   );
 }
 
+export async function unlinkTelegramFromAccount() {
+  return authRequest<{ message: string; user: unknown }>("/users/me/telegram/unlink", {
+    method: "POST",
+  });
+}
+
 export const api = {
   getProfile: () => authRequest("/users/me") as Promise<{ user: any }>,
   getDashboard: () => authRequest("/users/dashboard") as Promise<{ stats: any }>,
+  unlinkTelegram: () => unlinkTelegramFromAccount(),
   connectTelegramChannel: (channel: string) =>
     authRequest("/telegram/connect", {
       method: "POST",

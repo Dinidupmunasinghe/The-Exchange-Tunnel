@@ -139,10 +139,32 @@ async function linkTelegramDeeplinkPoll(req, res) {
   }
 }
 
+/** Remove Telegram link from this Exchange Tunnel account (keeps email login). */
+async function unlinkTelegram(req, res) {
+  const user = await db.User.findByPk(req.user.id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (!user.telegramUserId) {
+    return res.status(400).json({ message: "No Telegram account is linked" });
+  }
+
+  user.telegramUserId = null;
+  if (typeof user.clearActingTelegramChannel === "function") {
+    user.clearActingTelegramChannel();
+  }
+  user.userActingTokenEncrypted = null;
+  await user.save();
+
+  return res.json({
+    message: "Telegram unlinked from your account",
+    user: profileUserPayload(user)
+  });
+}
+
 module.exports = {
   getProfile,
   getDashboard,
   linkTelegram,
   linkTelegramDeeplinkStart,
-  linkTelegramDeeplinkPoll
+  linkTelegramDeeplinkPoll,
+  unlinkTelegram
 };

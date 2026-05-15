@@ -5,7 +5,8 @@ const {
   getDashboard,
   linkTelegram,
   linkTelegramDeeplinkStart,
-  linkTelegramDeeplinkPoll
+  linkTelegramDeeplinkPoll,
+  unlinkTelegram
 } = require("../controllers/userController");
 const validateRequest = require("../middleware/validateRequest");
 const { authLimiter } = require("../middleware/rateLimiters");
@@ -30,5 +31,6 @@ router.post(
 
 router.post("/me/telegram/link-deeplink/start", authLimiter, linkTelegramDeeplinkStart);
 router.get("/me/telegram/link-deeplink/poll", linkTelegramDeeplinkPoll);
+router.post("/me/telegram/unlink", authLimiter, unlinkTelegram);
 
 module.exports = router;

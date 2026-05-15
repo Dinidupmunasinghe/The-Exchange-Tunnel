@@ -9,6 +9,7 @@ import {
   Link2,
   Loader2,
   Send,
+  Unlink,
   Shield,
   ShieldCheck,
   User,
@@ -20,6 +21,17 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { cn } from "../components/ui/utils";
@@ -90,6 +102,7 @@ export function Settings() {
   const [submitting2fa, setSubmitting2fa] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [settingsNav, setSettingsNav] = useState<SettingsNavId>("general");
+  const [unlinkingTelegram, setUnlinkingTelegram] = useState(false);
 
   const refreshProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -248,6 +261,20 @@ export function Settings() {
       toast.error(error instanceof Error ? error.message : "Could not remove");
     } finally {
       setClearingSelection(false);
+    }
+  }
+
+  async function handleUnlinkTelegram() {
+    setUnlinkingTelegram(true);
+    try {
+      const res = await api.unlinkTelegram();
+      setProfile(res.user as Profile);
+      setPages([]);
+      toast.success("Telegram unlinked. Connect again when you are ready.");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not unlink Telegram");
+    } finally {
+      setUnlinkingTelegram(false);
     }
   }
 
@@ -568,7 +595,7 @@ export function Settings() {
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-md border border-border bg-muted/40 p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Telegram</p>
-              <div className="mt-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge
                   variant="outline"
                   className={
@@ -579,6 +606,44 @@ export function Settings() {
                 >
                   {connectionStatus}
                 </Badge>
+                {hasTelegramLogin ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={unlinkingTelegram}
+                      >
+                        {unlinkingTelegram ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Unlink className="h-3.5 w-3.5" />
+                        )}
+                        Unlink Telegram
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Unlink Telegram?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Your Exchange Tunnel account stays signed in. Earn tasks and channel campaigns will stop
+                          until you connect Telegram again. Your linked channel and user session will also be cleared.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => void handleUnlinkTelegram()}
+                        >
+                          Unlink Telegram
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : null}
               </div>
             </div>
             <div className="rounded-md border border-border bg-muted/40 p-3 sm:col-span-2">
