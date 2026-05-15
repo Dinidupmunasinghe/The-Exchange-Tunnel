@@ -338,7 +338,7 @@ export function EarnCredits() {
         const key = `${campaignId}-like`;
         setBusy(key);
         if (hasMtprotoSession !== true) {
-          toast.error("Like requires Telegram user session auth first.", {
+          toast.error("Engagement requires Telegram user session auth first.", {
             description: "Opening Settings now. Complete User Session setup and try again.",
           });
           setBusy(null);
@@ -408,8 +408,11 @@ export function EarnCredits() {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Could not update engagement";
       toast.error(msg);
-      if (msg.includes("Like requires Telegram user session auth first")) {
-        toast.info("Open Settings to connect Telegram User Session for Like.");
+      if (
+        msg.includes("requires Telegram user session") ||
+        msg.includes("Like requires Telegram user session auth first")
+      ) {
+        toast.info("Open Settings to connect Telegram User Session for engagement.");
         window.location.href = "/settings#user-session";
       }
       setBusy(null);
@@ -469,7 +472,7 @@ export function EarnCredits() {
       ) : null}
       {hasTelegram && hasMtprotoSession === false ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
-          Subscribe, Like, and Comment require Telegram user session connection. Go to{" "}
+          Earn engagements (subscribe, like, comment, repost) require Telegram user session connection. Go to{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
             Settings
           </Link>{" "}

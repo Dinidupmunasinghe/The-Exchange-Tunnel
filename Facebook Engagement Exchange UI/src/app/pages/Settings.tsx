@@ -380,7 +380,7 @@ export function Settings() {
   const panelCopy: Record<SettingsNavId, { title: string; description: string }> = {
     general: {
       title: "General",
-      description: "Profile, setup checklist, and account summary.",
+      description: "Profile, setup checklist, and engagement session.",
     },
     channel: {
       title: "Channel",
@@ -388,7 +388,7 @@ export function Settings() {
     },
     session: {
       title: "User session",
-      description: "MTProto session so Likes can run as your Telegram user.",
+      description: "MTProto session so engagement actions can run as your Telegram user.",
     },
     notifications: {
       title: "Notifications",
@@ -444,127 +444,6 @@ export function Settings() {
           <CardContent className="space-y-6 pt-6">
             {settingsNav === "general" ? (
               <>
-                <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-base font-semibold text-foreground">Creator setup checklist</p>
-              <p className="text-sm text-muted-foreground">Complete these steps once to launch campaigns smoothly.</p>
-            </div>
-            <Badge
-              variant="outline"
-              className={cn(
-                "border-border bg-muted text-foreground transition-all duration-300",
-                setupReady ? "scale-105 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 shadow-[0_0_0_1px_rgba(34,197,94,0.25)] dark:text-emerald-400" : ""
-              )}
-            >
-              {completedSteps}/3 complete
-            </Badge>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div
-              className={cn(
-                "rounded-lg border p-3 transition-all duration-300",
-                hasTelegramLogin ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Step 1</p>
-                  <p className="font-medium text-foreground">Connect Telegram</p>
-                </div>
-                <UserRoundCheck
-                  className={cn(
-                    "h-4 w-4 transition-all duration-300",
-                    hasTelegramLogin ? "scale-110 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-                  )}
-                />
-              </div>
-              {!hasTelegramLogin ? (
-                <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
-                  <Link to="/settings">Connect in Profile</Link>
-                </Button>
-              ) : (
-                <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Done</p>
-              )}
-            </div>
-
-            <div
-              className={cn(
-                "rounded-lg border p-3 transition-all duration-300",
-                hasConnectedChannel ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Step 2</p>
-                  <p className="font-medium text-foreground">Connect channel</p>
-                </div>
-                <CheckCircle2
-                  className={cn(
-                    "h-4 w-4 transition-all duration-300",
-                    hasConnectedChannel ? "scale-110 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-                  )}
-                />
-              </div>
-              {hasConnectedChannel ? (
-                <p className="mt-3 truncate text-xs text-emerald-700 dark:text-emerald-300">
-                  {selectedPage?.name || profile?.telegramActingChannelTitle || "Connected"}
-                </p>
-              ) : (
-                <p className="mt-3 text-xs text-muted-foreground">Use the channel connect form below.</p>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-border bg-card/60 p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Step 3</p>
-                  <p className="font-medium text-foreground">Telegram permissions</p>
-                </div>
-                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="mt-3 space-y-2">
-                <Button size="sm" variant="outline" className="w-full justify-between" asChild>
-                  <a href={fixBotAdminUrl} target="_blank" rel="noreferrer">
-                    Add bot to channel <ArrowUpRight className="h-3.5 w-3.5" />
-                  </a>
-                </Button>
-                <Button size="sm" variant="outline" className="w-full justify-between" asChild>
-                  <a href={fixBotFatherUrl} target="_blank" rel="noreferrer">
-                    Open BotFather <ArrowUpRight className="h-3.5 w-3.5" />
-                  </a>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={rechecking}>
-              {rechecking ? "Rechecking..." : "I fixed it, recheck now"}
-            </Button>
-            <p className="text-xs text-muted-foreground">Returns from Telegram auto-refresh this page too.</p>
-          </div>
-                </div>
-
-                <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Telegram User Session required for Like</p>
-            <p className="text-xs text-muted-foreground">
-              If Like fails, complete this once. Then Like works normally.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            type="button"
-            onClick={() => {
-              setSettingsNav("session");
-              window.location.hash = "user-session";
-            }}
-          >
-            Open User Session setup
-          </Button>
-        </div>
 
                 <div className="space-y-6">
                   <div>
@@ -686,6 +565,131 @@ export function Settings() {
           </div>
                   </div>
                 </div>
+
+                <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-base font-semibold text-foreground">Creator setup checklist</p>
+              <p className="text-sm text-muted-foreground">Complete these steps once to launch campaigns smoothly.</p>
+            </div>
+            <Badge
+              variant="outline"
+              className={cn(
+                "border-border bg-muted text-foreground transition-all duration-300",
+                setupReady ? "scale-105 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 shadow-[0_0_0_1px_rgba(34,197,94,0.25)] dark:text-emerald-400" : ""
+              )}
+            >
+              {completedSteps}/3 complete
+            </Badge>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div
+              className={cn(
+                "rounded-lg border p-3 transition-all duration-300",
+                hasTelegramLogin ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Step 1</p>
+                  <p className="font-medium text-foreground">Connect Telegram</p>
+                </div>
+                <UserRoundCheck
+                  className={cn(
+                    "h-4 w-4 transition-all duration-300",
+                    hasTelegramLogin ? "scale-110 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                  )}
+                />
+              </div>
+              {!hasTelegramLogin ? (
+                <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
+                  <Link to="/settings">Connect in Profile</Link>
+                </Button>
+              ) : (
+                <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Done</p>
+              )}
+            </div>
+
+            <div
+              className={cn(
+                "rounded-lg border p-3 transition-all duration-300",
+                hasConnectedChannel ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Step 2</p>
+                  <p className="font-medium text-foreground">Connect channel</p>
+                </div>
+                <CheckCircle2
+                  className={cn(
+                    "h-4 w-4 transition-all duration-300",
+                    hasConnectedChannel ? "scale-110 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                  )}
+                />
+              </div>
+              {hasConnectedChannel ? (
+                <p className="mt-3 truncate text-xs text-emerald-700 dark:text-emerald-300">
+                  {selectedPage?.name || profile?.telegramActingChannelTitle || "Connected"}
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-muted-foreground">Use the channel connect form below.</p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card/60 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Step 3</p>
+                  <p className="font-medium text-foreground">Telegram permissions</p>
+                </div>
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="mt-3 space-y-2">
+                <Button size="sm" variant="outline" className="w-full justify-between" asChild>
+                  <a href={fixBotAdminUrl} target="_blank" rel="noreferrer">
+                    Add bot to channel <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+                <Button size="sm" variant="outline" className="w-full justify-between" asChild>
+                  <a href={fixBotFatherUrl} target="_blank" rel="noreferrer">
+                    Open BotFather <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={rechecking}>
+              {rechecking ? "Rechecking..." : "I fixed it, recheck now"}
+            </Button>
+            <p className="text-xs text-muted-foreground">Returns from Telegram auto-refresh this page too.</p>
+          </div>
+                </div>
+
+
+                <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Telegram User Session required for engagement</p>
+            <p className="text-xs text-muted-foreground">
+              Complete this once for likes, comments, reposts, and other earn actions. Then engagement works normally.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            type="button"
+            onClick={() => {
+              setSettingsNav("session");
+              window.location.hash = "user-session";
+            }}
+          >
+            Open User Session setup
+          </Button>
+        </div>
+
+
               </>
             ) : null}
 
@@ -765,7 +769,7 @@ export function Settings() {
             {settingsNav === "session" ? (
               <div id="user-session" className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Required for publishing real Telegram reactions as the user. This is separate from normal Telegram login.
+            Required for earn engagements (likes, comments, reposts, and related actions) as your Telegram user. Separate from normal Telegram login.
           </p>
           <div className="rounded-md border border-border bg-muted/40 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
