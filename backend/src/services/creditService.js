@@ -307,14 +307,157 @@ async function adjustCreditsByAdmin({
   });
 }
 
-async function getDashboardStats(userId) {
-  const campaigns = await db.Campaign.findAll({ where: { userId } });
-  const tx = await db.Transaction.findAll({
-    where: {
-      userId,
-      createdAt: { [Op.gte]: new Date(Date.now() - 30 * 24 * 3600 * 1000) }
+function inferActivityType(reason) {
+  const r = String(reason || "").toLowerCase();
+  if (r.includes("comment")) return "comment";
+  if (r.includes("share") || r.includes("repost")) return "share";
+  if (r.includes("subscribe")) return "campaign";
+  if (r.includes("like")) return "like";
+  return "like";
+}
+
+function campaignActivityLabel(campaign, fallbackId) {
+  if (!campaign) return fallbackId ? `Campaign #${fallbackId}` : "Campaign";
+  const name = String(campaign.name || "").trim();
+  if (name && name !== "Untitled campaign") return name;
+  const url = String(campaign.messageUrl || "").trim();
+  if (url) {
+    try {
+      const u = new URL(url);
+      const path = u.pathname.replace(/\/$/, "");
+      return `${u.hostname}${path}` || url;
+    } catch {
+      return url.length > 56 ? `${url.slice(0, 53)}…` : url;
     }
+  }
+  return `Campaign #${campaign.id}`;
+}
+
+function mapTransactionToActivity(tx, taskMap, campaignMap) {
+  const amount = Math.abs(Number(tx.amount) || 0);
+  const reason = String(tx.reason || "").trim();
+  const at = tx.createdAt;
+
+  if (tx.referenceType === "task" && tx.referenceId) {
+    const task = taskMap.get(tx.referenceId);
+    const post = campaignActivityLabel(task?.campaign, task?.campaignId);
+    if (tx.type === "earn") {
+      return {
+        id: `tx-${tx.id}`,
+        at,
+        action: `Earned ${amount} credits`,
+        post,
+        type: inferActivityType(reason)
+      };
+    }
+  }
+
+  if (tx.referenceType === "campaign" && tx.referenceId) {
+    const campaign = campaignMap.get(tx.referenceId);
+    const post = campaignActivityLabel(campaign, tx.referenceId);
+    if (tx.type === "spend" && /budget locked/i.test(reason)) {
+      return {
+        id: `tx-${tx.id}`,
+        at,
+        action: "Campaign started",
+        post,
+        type: "campaign"
+      };
+    }
+    if (tx.type === "spend") {
+      return {
+        id: `tx-${tx.id}`,
+        at,
+        action: `Spent ${amount} credits`,
+        post,
+        type: "campaign"
+      };
+    }
+    if (tx.type === "earn" && /refund/i.test(reason)) {
+      return {
+        id: `tx-${tx.id}`,
+        at,
+        action: `Refunded ${amount} credits`,
+        post,
+        type: "campaign"
+      };
+    }
+  }
+
+  if (tx.type === "earn") {
+    return {
+      id: `tx-${tx.id}`,
+      at,
+      action: `Earned ${amount} credits`,
+      post: reason || "Credit earned",
+      type: inferActivityType(reason)
+    };
+  }
+  if (tx.type === "spend") {
+    return {
+      id: `tx-${tx.id}`,
+      at,
+      action: `Spent ${amount} credits`,
+      post: reason || "Credit spent",
+      type: "campaign"
+    };
+  }
+  return null;
+}
+
+async function listRecentActivityForUser(userId, limit = 8) {
+  const transactions = await db.Transaction.findAll({
+    where: { userId },
+    order: [["createdAt", "DESC"]],
+    limit: Math.max(limit, 12)
   });
+  if (!transactions.length) return [];
+
+  const taskIds = [];
+  const campaignIds = [];
+  for (const tx of transactions) {
+    if (tx.referenceType === "task" && tx.referenceId) taskIds.push(tx.referenceId);
+    if (tx.referenceType === "campaign" && tx.referenceId) campaignIds.push(tx.referenceId);
+  }
+
+  const [tasks, campaigns] = await Promise.all([
+    taskIds.length
+      ? db.Task.findAll({
+          where: { id: [...new Set(taskIds)] },
+          include: [{ model: db.Campaign, as: "campaign", attributes: ["id", "name", "messageUrl"] }]
+        })
+      : [],
+    campaignIds.length
+      ? db.Campaign.findAll({
+          where: { id: [...new Set(campaignIds)] },
+          attributes: ["id", "name", "messageUrl"]
+        })
+      : []
+  ]);
+
+  const taskMap = new Map(tasks.map((t) => [t.id, t]));
+  const campaignMap = new Map(campaigns.map((c) => [c.id, c]));
+
+  const items = [];
+  for (const tx of transactions) {
+    const row = mapTransactionToActivity(tx, taskMap, campaignMap);
+    if (row) items.push(row);
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+async function getDashboardStats(userId) {
+  const [campaigns, tx, recentActivity] = await Promise.all([
+    db.Campaign.findAll({ where: { userId } }),
+    db.Transaction.findAll({
+      where: {
+        userId,
+        createdAt: { [Op.gte]: new Date(Date.now() - 30 * 24 * 3600 * 1000) }
+      }
+    }),
+    listRecentActivityForUser(userId, 8)
+  ]);
   const activeCampaigns = campaigns.filter((c) => {
     if (c.status === "active") return true;
     if (
@@ -328,7 +471,7 @@ async function getDashboardStats(userId) {
   }).length;
   const creditsEarned30d = tx.filter((t) => t.type === "earn").reduce((sum, t) => sum + t.amount, 0);
   const creditsSpent30d = Math.abs(tx.filter((t) => t.type === "spend").reduce((sum, t) => sum + t.amount, 0));
-  return { activeCampaigns, creditsEarned30d, creditsSpent30d };
+  return { activeCampaigns, creditsEarned30d, creditsSpent30d, recentActivity };
 }
 
 module.exports = {
@@ -340,5 +483,6 @@ module.exports = {
   adjustCreditsByAdmin,
   getRewardByType,
   listTransactionsForUser,
+  listRecentActivityForUser,
   getDashboardStats
 };

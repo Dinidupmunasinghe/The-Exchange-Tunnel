@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { Coins, ThumbsUp, MessageCircle, Share2, Activity, TrendingUp, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { StatsCard, type StatsAccent } from "../components/StatsCard";
@@ -41,12 +42,23 @@ const creditsData = [
   { name: "Jun", earned: 580, spent: 520 },
 ];
 
-const recentActivity = [
-  { action: "Earned 10 credits", post: "t.me/launch/42", time: "2 min ago", type: "like" },
-  { action: "Campaign started", post: "Product Launch Announcement", time: "15 min ago", type: "campaign" },
-  { action: "Earned 15 credits", post: "Social Media Strategy Guide", time: "1 hour ago", type: "comment" },
-  { action: "Earned 20 credits", post: "Growth Hacking Techniques", time: "2 hours ago", type: "share" },
-];
+type ActivityType = "like" | "comment" | "share" | "campaign";
+
+type RecentActivityItem = {
+  id: string;
+  action: string;
+  post: string;
+  at: string;
+  type: ActivityType;
+};
+
+function formatActivityTime(iso: string) {
+  try {
+    return formatDistanceToNow(new Date(iso), { addSuffix: true });
+  } catch {
+    return "";
+  }
+}
 
 const COLORS = {
   likes: "#059669",
@@ -152,6 +164,11 @@ export function Dashboard() {
       },
     ],
     [dashboard, profile],
+  );
+
+  const recentActivity = useMemo(
+    () => (dashboard?.recentActivity as RecentActivityItem[] | undefined) ?? [],
+    [dashboard],
   );
 
   return (
@@ -315,14 +332,23 @@ export function Dashboard() {
           <p className="text-sm text-muted-foreground">Your latest interactions</p>
         </CardHeader>
         <CardContent>
+          {recentActivity.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/15 px-6 py-12 text-center">
+              <Activity className="mb-3 h-10 w-10 text-muted-foreground/45" strokeWidth={1.75} />
+              <p className="font-medium text-foreground">No recent activity</p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Earn credits on tasks or start a campaign — your latest actions will show up here.
+              </p>
+            </div>
+          ) : (
           <div className="space-y-4">
-            {recentActivity.map((activity, index) => (
+            {recentActivity.map((activity) => (
               <div
-                key={index}
+                key={activity.id}
                 className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-4 transition-colors hover:bg-muted/35 dark:bg-card/40 dark:hover:bg-card/70"
               >
-                <div className="flex items-center gap-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset ${
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${
                     activity.type === 'like' ? 'bg-blue-500/10 ring-blue-600/22 dark:bg-blue-500/15 dark:ring-blue-400/25' :
                     activity.type === 'comment' ? 'bg-violet-500/10 ring-violet-600/22 dark:bg-violet-500/15 dark:ring-violet-400/25' :
                     activity.type === 'share' ? 'bg-emerald-500/10 ring-emerald-600/22 dark:bg-emerald-500/15 dark:ring-emerald-400/25' :
@@ -333,15 +359,18 @@ export function Dashboard() {
                     {activity.type === 'share' && <Share2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} />}
                     {activity.type === 'campaign' && <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400" strokeWidth={2.25} />}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium text-foreground">{activity.action}</p>
-                    <p className="text-sm text-muted-foreground">{activity.post}</p>
+                    <p className="truncate text-sm text-muted-foreground">{activity.post}</p>
                   </div>
                 </div>
-                <span className="text-sm text-muted-foreground">{activity.time}</span>
+                <span className="shrink-0 pl-3 text-sm text-muted-foreground tabular-nums">
+                  {formatActivityTime(activity.at)}
+                </span>
               </div>
             ))}
           </div>
+          )}
         </CardContent>
       </Card>
     </div>
