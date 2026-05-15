@@ -591,40 +591,28 @@ export function LandingApp() {
       </section>
 
       {/* CTA Section */}
-      <section className="relative overflow-x-hidden px-6 py-20">
+      <section className="landing-cta relative overflow-hidden bg-blue-800 px-6 py-20">
         <motion.div
           animate={{
-            scale: [1, 1.1, 1],
-            opacity: [0.3, 0.5, 0.3]
+            scale: [1, 1.08, 1],
+            opacity: [0.35, 0.55, 0.35],
           }}
           transition={{ duration: 5, repeat: Infinity }}
-          className="absolute inset-0 bg-blue-600"
+          className="pointer-events-none absolute inset-0 bg-blue-900"
         />
-        <div className="max-w-4xl mx-auto text-center relative z-10">
+        <div className="relative z-10 mx-auto max-w-4xl text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="bg-white/10 backdrop-blur-md rounded-3xl p-12 border border-white/20"
+            viewport={{ once: true, amount: 0.2 }}
+            className="overflow-visible rounded-3xl border border-white/15 bg-blue-950/30 p-8 backdrop-blur-md sm:p-12"
           >
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="text-4xl md:text-5xl font-bold mb-6 text-white"
-            >
+            <h2 className="mb-6 text-4xl font-bold leading-tight text-white md:text-5xl">
               Ready to grow your<br />Telegram presence?
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-              className="text-xl text-white/90 mb-8"
-            >
-              Join <span className="font-bold">50,000+ users</span> who are already growing with Exchange Tunnel
-            </motion.p>
+            </h2>
+            <p className="mb-8 text-xl text-white/90">
+              Join <span className="font-semibold text-white">50,000+ users</span> who are already growing with Exchange Tunnel
+            </p>
             <GetStartedLink
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -645,27 +633,28 @@ export function LandingApp() {
           </motion.div>
         </div>
 
-        {/* Floating particles */}
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            animate={{
-              y: [0, -30, 0],
-              x: [0, Math.random() * 20 - 10, 0],
-              opacity: [0, 1, 0]
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: i * 0.5
-            }}
-            className="absolute w-2 h-2 bg-white rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              bottom: 0
-            }}
-          />
-        ))}
+        {/* Floating particles — clipped by section overflow-hidden */}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          {[0, 18, 36, 54, 72, 88].map((left, i) => (
+            <motion.div
+              key={i}
+              animate={{
+                y: [0, -24, 0],
+                opacity: [0.15, 0.85, 0.15],
+              }}
+              transition={{
+                duration: 3 + i * 0.35,
+                repeat: Infinity,
+                delay: i * 0.45,
+              }}
+              className="absolute bottom-8 h-2 w-2 rounded-full bg-white/80"
+              style={{ left: `${left}%` }}
+            />
+          ))}
+        </motion.div>
       </section>
 
       {/* Footer */}

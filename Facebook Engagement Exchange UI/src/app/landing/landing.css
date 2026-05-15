@@ -20,9 +20,14 @@ html.landing-route body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Headings on white sections only — CTA uses .landing-cta with white text. */
 #landing-scroll h1,
-#landing-scroll h2,
 #landing-scroll h3,
 #landing-scroll h4 {
   color: #0f172a;
+}
+
+#landing-scroll .landing-cta h2,
+#landing-scroll .landing-cta p {
+  color: #ffffff;
 }
