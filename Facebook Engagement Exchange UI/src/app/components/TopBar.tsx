@@ -75,7 +75,7 @@ export function TopBar() {
       {/* Right Side */}
       <div className="flex items-center gap-2">
         {/* Credits Balance */}
-        <div className="flex h-9 items-center gap-1.5 rounded-full border border-border bg-card pl-2 pr-3 dark:bg-card/90">
+        <div className="flex h-9 items-center gap-1.5 rounded-full border border-border bg-card pl-1 pr-3 dark:bg-card/90">
           <span
             className={cn(
               "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
