@@ -755,7 +755,7 @@ async function getAvailableTasks(req, res) {
             model: db.User,
             as: "owner",
             required: false,
-            attributes: ["id", "name", "telegramUserId"]
+            attributes: ["id", "name", "telegramUserId", "profilePhotoUrl"]
           }
         ]
       }
@@ -785,9 +785,14 @@ async function getAvailableTasks(req, res) {
     if (o.campaign) {
       o.campaign.soundcloudPostUrl = o.campaign.messageUrl;
       o.campaign.soundcloudPostId = o.campaign.messageKey;
-      if (o.campaign.owner?.telegramUserId) {
-        o.campaign.owner.avatarUrl =
-          avatarByTelegramId.get(String(o.campaign.owner.telegramUserId)) || null;
+      if (o.campaign.owner) {
+        const storedPhoto = o.campaign.owner.profilePhotoUrl
+          ? String(o.campaign.owner.profilePhotoUrl).trim()
+          : "";
+        const tgPhoto = o.campaign.owner.telegramUserId
+          ? avatarByTelegramId.get(String(o.campaign.owner.telegramUserId)) || null
+          : null;
+        o.campaign.owner.avatarUrl = storedPhoto || tgPhoto || null;
       }
     }
     return o;

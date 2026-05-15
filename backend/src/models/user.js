@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
       email: { type: DataTypes.STRING(120), allowNull: false, unique: true },
       passwordHash: { type: DataTypes.STRING(255), allowNull: false },
       name: { type: DataTypes.STRING(120), allowNull: true },
+      profilePhotoUrl: { type: DataTypes.TEXT, allowNull: true },
       telegramUserId: { type: DataTypes.STRING(80), allowNull: true, field: "facebookUserId" },
       userOAuthTokenEncrypted: {
         type: DataTypes.TEXT,

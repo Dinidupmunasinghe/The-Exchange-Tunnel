@@ -33,6 +33,7 @@ type TaskRow = {
       id?: number;
       name?: string | null;
       telegramUserId?: string | null;
+      profilePhotoUrl?: string | null;
       avatarUrl?: string | null;
     };
   };
@@ -142,6 +143,15 @@ function hasCompletedTask(tasks: TaskRow[]): boolean {
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/** High-contrast credit pill on filled (primary) action buttons. */
+const rewardBadgeOnFilled =
+  "ml-2 rounded-full border-0 bg-white/20 px-2 text-xs font-semibold text-white hover:bg-white/20";
+/** High-contrast credit pill on outline action buttons. */
+const rewardBadgeOnOutline =
+  "ml-2 rounded-full border border-border bg-background px-2 text-xs font-semibold text-foreground hover:bg-background";
+/** Task type chip in card header (not on blue). */
+const taskTypeBadgeClass = "border-border bg-muted text-foreground hover:bg-muted";
 
 export function EarnCredits() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
@@ -510,6 +520,7 @@ export function EarnCredits() {
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
           const ownerUsername = usernameFromOwnerName(ownerName);
           const avatarUrl =
+            campaign.owner?.profilePhotoUrl ||
             campaign.owner?.avatarUrl ||
             telegramUserpicUrlFromUsername(ownerUsername || avatarUsername) ||
             fallbackAvatarUrl(ownerName || initials);
@@ -562,7 +573,7 @@ export function EarnCredits() {
                     <div className="flex items-start gap-2">
                       <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2 py-1">
                         <span className="text-xs text-muted-foreground">Associated tasks</span>
-                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                        <Badge variant="outline" className={taskTypeBadgeClass}>
                           {isSubscribeCampaign ? "Subscribe" : getEngagementLabel(et)}
                         </Badge>
                       </div>
@@ -612,7 +623,7 @@ export function EarnCredits() {
                         : subscribed
                           ? "Unsubscribe"
                           : "Subscribe"}
-                    <Badge className="ml-2 rounded-full bg-primary/15 px-2 text-primary hover:bg-primary/15">
+                    <Badge className={subscribed ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
                       +{reward}
                     </Badge>
                   </Button>
@@ -670,7 +681,7 @@ export function EarnCredits() {
                       : liked
                         ? "Unlike"
                         : "Like"}
-                  <Badge className="ml-2 rounded-full bg-amber-500/15 px-2 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15">
+                  <Badge className={liked ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
                     +{reward}
                   </Badge>
                 </Button>
@@ -781,7 +792,7 @@ export function EarnCredits() {
                     >
                       <MessageCircle className="mr-2 h-4 w-4" />
                       Comment
-                      <Badge className="ml-2 rounded-full bg-blue-500/15 px-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/15">
+                      <Badge className={rewardBadgeOnOutline}>
                         +{reward}
                       </Badge>
                     </Button>

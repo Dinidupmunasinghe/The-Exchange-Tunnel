@@ -19,6 +19,7 @@ async function getProfile(req, res) {
       "telegramActingChannelId",
       "telegramActingChannelTitle",
       "userActingTokenEncrypted",
+      "profilePhotoUrl",
       "createdAt"
     ]
   });
@@ -58,8 +59,37 @@ function profileUserPayload(user) {
     email: user.email,
     name: user.name,
     credits: user.credits,
-    telegramUserId: user.telegramUserId
+    telegramUserId: user.telegramUserId,
+    profilePhotoUrl: user.profilePhotoUrl || null
   };
+}
+
+function isAllowedProfilePhotoUrl(value) {
+  if (value == null || value === "") return true;
+  const s = String(value).trim();
+  if (s.length > 600_000) return false;
+  if (s.startsWith("https://") || s.startsWith("http://")) return true;
+  if (/^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(s)) return true;
+  return false;
+}
+
+async function updateProfilePhoto(req, res) {
+  const raw = req.body?.profilePhotoUrl;
+  if (raw !== null && raw !== undefined && typeof raw !== "string") {
+    return res.status(400).json({ message: "profilePhotoUrl must be a string or null" });
+  }
+  const profilePhotoUrl = raw === null || raw === undefined ? null : String(raw).trim() || null;
+  if (!isAllowedProfilePhotoUrl(profilePhotoUrl)) {
+    return res.status(400).json({
+      message: "Use an https image URL or upload a JPEG/PNG/WebP image under 500 KB"
+    });
+  }
+
+  const user = await db.User.findByPk(req.user.id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  user.profilePhotoUrl = profilePhotoUrl;
+  await user.save();
+  return res.json({ message: "Profile photo updated", user: profileUserPayload(user) });
 }
 
 /** Link Telegram Login Widget to the signed-in Exchange Tunnel account. */
@@ -80,7 +110,8 @@ async function linkTelegram(req, res) {
       id: d.id,
       first_name: d.first_name,
       last_name: d.last_name,
-      username: d.username
+      username: d.username,
+      photo_url: d.photo_url
     });
     return res.json({ message: "Telegram connected", user: profileUserPayload(user) });
   } catch (error) {
@@ -163,6 +194,7 @@ async function unlinkTelegram(req, res) {
 module.exports = {
   getProfile,
   getDashboard,
+  updateProfilePhoto,
   linkTelegram,
   linkTelegramDeeplinkStart,
   linkTelegramDeeplinkPoll,

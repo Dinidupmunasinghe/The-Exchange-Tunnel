@@ -243,8 +243,16 @@ export async function unlinkTelegramFromAccount() {
   });
 }
 
+export async function updateProfilePhoto(profilePhotoUrl: string | null) {
+  return authRequest<{ message: string; user: unknown }>("/users/me/profile-photo", {
+    method: "PATCH",
+    body: JSON.stringify({ profilePhotoUrl }),
+  });
+}
+
 export const api = {
   getProfile: () => authRequest("/users/me") as Promise<{ user: any }>,
+  updateProfilePhoto,
   getDashboard: () => authRequest("/users/dashboard") as Promise<{ stats: any }>,
   unlinkTelegram: () => unlinkTelegramFromAccount(),
   connectTelegramChannel: (channel: string) =>

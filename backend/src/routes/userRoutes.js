@@ -3,6 +3,7 @@ const { body } = require("express-validator");
 const {
   getProfile,
   getDashboard,
+  updateProfilePhoto,
   linkTelegram,
   linkTelegramDeeplinkStart,
   linkTelegramDeeplinkPoll,
@@ -15,6 +16,7 @@ const router = express.Router();
 
 router.get("/me", getProfile);
 router.get("/dashboard", getDashboard);
+router.patch("/me/profile-photo", authLimiter, updateProfilePhoto);
 
 router.post(
   "/me/telegram/link",

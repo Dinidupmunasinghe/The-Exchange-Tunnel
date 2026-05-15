@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -50,6 +50,7 @@ type Profile = {
   hasMtprotoSession?: boolean;
   email?: string;
   name?: string;
+  profilePhotoUrl?: string | null;
 };
 
 type ManagedPage = {
@@ -103,6 +104,8 @@ export function Settings() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [settingsNav, setSettingsNav] = useState<SettingsNavId>("general");
   const [unlinkingTelegram, setUnlinkingTelegram] = useState(false);
+  const [savingProfilePhoto, setSavingProfilePhoto] = useState(false);
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
   const refreshProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -115,6 +118,48 @@ export function Settings() {
       setLoadingProfile(false);
     }
   }, []);
+
+  const handleProfilePhotoFile = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (JPEG, PNG, or WebP).");
+      return;
+    }
+    if (file.size > 500 * 1024) {
+      toast.error("Image must be 500 KB or smaller.");
+      return;
+    }
+    setSavingProfilePhoto(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Could not read image"));
+        reader.readAsDataURL(file);
+      });
+      await api.updateProfilePhoto(dataUrl);
+      toast.success("Profile photo updated");
+      await refreshProfile();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not update profile photo");
+    } finally {
+      setSavingProfilePhoto(false);
+      if (profilePhotoInputRef.current) profilePhotoInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveProfilePhoto = async () => {
+    setSavingProfilePhoto(true);
+    try {
+      await api.updateProfilePhoto(null);
+      toast.success("Profile photo removed");
+      await refreshProfile();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not remove profile photo");
+    } finally {
+      setSavingProfilePhoto(false);
+    }
+  };
 
   const refreshPages = useCallback(async () => {
     setLoadingPages(true);
@@ -452,11 +497,55 @@ export function Settings() {
                     <p className="mt-1 text-sm text-muted-foreground">What we store for your account.</p>
                   </div>
                   <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-                    <Avatar className="h-20 w-20 shrink-0 border border-border">
-                      <AvatarFallback className="bg-muted text-lg font-medium text-foreground">
-                        {profileInitials}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="flex flex-col items-center gap-3 sm:items-start">
+                      <Label className="text-sm font-medium text-foreground">Profile photo</Label>
+                      <Avatar className="h-20 w-20 shrink-0 border border-border">
+                        <AvatarImage
+                          src={profile?.profilePhotoUrl || undefined}
+                          alt={displayName}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="bg-muted text-lg font-medium text-foreground">
+                          {profileInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                        <input
+                          ref={profilePhotoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(e) => void handleProfilePhotoFile(e.target.files?.[0] ?? null)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={savingProfilePhoto || loadingProfile}
+                          onClick={() => profilePhotoInputRef.current?.click()}
+                        >
+                          {savingProfilePhoto ? (
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                          ) : null}
+                          {profile?.profilePhotoUrl ? "Change photo" : "Upload photo"}
+                        </Button>
+                        {profile?.profilePhotoUrl ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground"
+                            disabled={savingProfilePhoto}
+                            onClick={() => void handleRemoveProfilePhoto()}
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                      <p className="max-w-[12rem] text-center text-xs text-muted-foreground sm:text-left">
+                        Shown on your campaigns in the earn feed. Max 500 KB.
+                      </p>
+                    </div>
                     <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="settings-display-name">Name</Label>

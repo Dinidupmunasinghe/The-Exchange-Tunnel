@@ -38,6 +38,10 @@ async function ensureDevSchema() {
     type: db.sequelize.Sequelize.STRING(16),
     allowNull: true
   });
+  await addColumnIfMissing(qi, "users", "profilePhotoUrl", {
+    type: db.sequelize.Sequelize.TEXT,
+    allowNull: true
+  });
 }
 
 async function ensureActionKindColumnCompatibility() {

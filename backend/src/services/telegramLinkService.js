@@ -10,7 +10,7 @@ function isPlaceholderTelegramEmail(email) {
 /**
  * Attach a verified Telegram identity to an existing Exchange Tunnel user.
  * @param {import("../models").User} user
- * @param {{ id: string|number, first_name?: string, last_name?: string, username?: string }} from
+ * @param {{ id: string|number, first_name?: string, last_name?: string, username?: string, photo_url?: string }} from
  */
 async function attachTelegramIdentityToUser(user, from) {
   const tgId = from?.id != null ? String(from.id) : "";
@@ -53,6 +53,10 @@ async function attachTelegramIdentityToUser(user, from) {
   user.telegramUserId = tgId;
   if (nameBase && (!user.name || isPlaceholderTelegramEmail(user.email))) {
     user.name = nameBase;
+  }
+  const photoUrl = from.photo_url ? String(from.photo_url).trim() : "";
+  if (photoUrl && photoUrl.startsWith("http")) {
+    user.profilePhotoUrl = photoUrl;
   }
   await user.save();
   return user;
