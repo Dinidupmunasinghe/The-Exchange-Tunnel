@@ -96,7 +96,7 @@ function TelegramDeeplinkLogin() {
             setToken((result as { status: "ok"; token: string; user: unknown }).token);
             setState("done");
             toast.success("Signed in with Telegram!");
-            navigate("/", { replace: true });
+            navigate("/dashboard", { replace: true });
           } else if (result.status === "expired") {
             stopPolling();
             setState("error");
@@ -200,7 +200,7 @@ function EmailLogin() {
         await registerWithEmail(email, password, name || undefined);
         toast.success("Account created & signed in!");
       }
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -318,7 +318,7 @@ export function Login() {
       try {
         await loginWithTelegram(user as Record<string, string | number | undefined>);
         toast.success("Signed in with Telegram");
-        navigate("/", { replace: true });
+        navigate("/dashboard", { replace: true });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Login failed";
         toast.error(msg);
@@ -365,7 +365,7 @@ export function Login() {
                   type="button"
                   variant="default"
                   className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={() => navigate("/", { replace: true })}
+                  onClick={() => navigate("/dashboard", { replace: true })}
                 >
                   Go to dashboard
                 </Button>

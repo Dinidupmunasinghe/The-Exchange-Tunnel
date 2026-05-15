@@ -17,7 +17,7 @@ import { Button } from "./ui/button";
 import { clearToken } from "../services/api";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Earn Credits", href: "/earn", icon: Sparkles },
   { name: "Launch Campaigns", href: "/submit", icon: Upload },
   { name: "My Campaigns", href: "/campaigns", icon: FolderOpen },

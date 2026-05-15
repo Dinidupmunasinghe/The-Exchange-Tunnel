@@ -15,13 +15,13 @@ export function NotFound() {
         </div>
         <div className="flex items-center justify-center gap-3">
           <Button asChild variant="outline">
-            <Link to="/">
+            <Link to="/dashboard">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Go Back
             </Link>
           </Button>
           <Button asChild>
-            <Link to="/">
+            <Link to="/dashboard">
               <Home className="mr-2 h-4 w-4" />
               Home
             </Link>

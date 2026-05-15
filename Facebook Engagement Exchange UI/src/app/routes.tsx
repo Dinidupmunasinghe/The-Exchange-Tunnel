@@ -31,6 +31,7 @@ import { AdminTasks } from "./pages/admin/Tasks";
 import { AdminEngagements } from "./pages/admin/Engagements";
 import { AdminTelegram } from "./pages/admin/Telegram";
 import { AdminAuditLogs } from "./pages/admin/AuditLogs";
+import { Landing } from "./pages/Landing";
 
 export const router = createBrowserRouter([
   { path: "/login", Component: Login },
@@ -71,20 +72,25 @@ export const router = createBrowserRouter([
   { path: "/data-deletion", Component: DataDeletion },
   {
     path: "/",
-    Component: ProtectedRoute,
     children: [
+      { index: true, Component: Landing },
       {
-        Component: Layout,
+        Component: ProtectedRoute,
         children: [
-          { index: true, Component: Dashboard },
-          { path: "earn", Component: EarnCredits },
-          { path: "submit", Component: SubmitPost },
-          { path: "campaigns", Component: Campaigns },
-          { path: "repost", Component: RepostRequests },
-          { path: "analytics", Component: Analytics },
-          { path: "wallet", Component: Wallet },
-          { path: "settings", Component: Settings },
-          { path: "*", Component: NotFound },
+          {
+            Component: Layout,
+            children: [
+              { path: "dashboard", Component: Dashboard },
+              { path: "earn", Component: EarnCredits },
+              { path: "submit", Component: SubmitPost },
+              { path: "campaigns", Component: Campaigns },
+              { path: "repost", Component: RepostRequests },
+              { path: "analytics", Component: Analytics },
+              { path: "wallet", Component: Wallet },
+              { path: "settings", Component: Settings },
+              { path: "*", Component: NotFound },
+            ],
+          },
         ],
       },
     ],
