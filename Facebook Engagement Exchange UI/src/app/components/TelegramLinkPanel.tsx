@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Bot, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { cn } from "./ui/utils";
@@ -238,7 +238,7 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
       </div>
     ) : (
       <Button type="button" size="lg" className={connectBotBtnClass} onClick={() => void startBotLink()}>
-        <TelegramBrandIcon size={22} />
+        <Bot className="size-[22px] text-white" aria-hidden />
         Connect via bot
       </Button>
     )
@@ -265,7 +265,7 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
     </div>
   ) : (
     <Button type="button" variant="outline" className="w-full gap-2" onClick={() => void startBotLink()}>
-      <TelegramBrandIcon size={20} />
+      <Bot className="size-5 shrink-0" aria-hidden />
       Connect via bot
     </Button>
   );
