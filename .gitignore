@@ -8,3 +8,4 @@ Facebook Engagement Exchange UI/.env
 
 backend/mysql-data/
 Facebook Engagement Exchange UI/dist/
+.vercel
