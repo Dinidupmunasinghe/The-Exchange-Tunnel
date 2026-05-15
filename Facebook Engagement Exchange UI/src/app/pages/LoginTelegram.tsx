@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Send, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { TelegramBrandIcon } from "../components/TelegramBrandIcon";
 import { toast } from "sonner";
 import {
   loginWithTelegram,
@@ -121,11 +122,12 @@ function TelegramDeeplinkLogin() {
   return (
     <Button
       type="button"
-      className="w-full gap-2"
+      variant="outline"
+      className="w-full gap-3 border-[#229ED9]/35 bg-[#2AABEE]/10 py-2.5 font-semibold hover:bg-[#2AABEE]/18 hover:border-[#229ED9]/55"
       onClick={startLogin}
       disabled={!BOT}
     >
-      <Send className="h-4 w-4" />
+      <TelegramBrandIcon size={22} />
       Open Telegram Bot to Sign In
     </Button>
   );
@@ -172,7 +174,10 @@ export function LoginTelegram() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-border bg-card shadow-lg">
-        <CardHeader className="space-y-1 text-center">
+        <CardHeader className="space-y-3 text-center">
+          <div className="mx-auto">
+            <TelegramBrandIcon size={56} />
+          </div>
           <CardTitle className="text-2xl">Sign in with Telegram</CardTitle>
           <CardDescription>For accounts created with Telegram only.</CardDescription>
         </CardHeader>
