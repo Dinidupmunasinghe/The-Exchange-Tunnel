@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from "./ui/avatar";
 import { ThemeToggle } from "./theme/ThemeToggle";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { api, clearToken } from "../services/api";
+import { cn } from "./ui/utils";
 
 export function TopBar() {
   const navigate = useNavigate();
@@ -74,8 +75,20 @@ export function TopBar() {
       {/* Right Side */}
       <div className="flex items-center gap-2">
         {/* Credits Balance */}
-        <div className="flex h-9 items-center gap-2 rounded-full border border-border bg-card px-4">
-          <Coins className="h-4 w-4 text-foreground" />
+        <div className="flex h-9 items-center gap-2 rounded-full border border-border bg-card px-3 pr-4 dark:bg-card/90">
+          <span
+            className={cn(
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+              "bg-amber-500/15 ring-1 ring-inset ring-amber-600/25",
+              "dark:bg-brand/15 dark:ring-brand/30",
+            )}
+            aria-hidden
+          >
+            <Coins
+              className="h-4 w-4 text-amber-700 dark:text-brand"
+              strokeWidth={2.25}
+            />
+          </span>
           <span className="text-xs text-muted-foreground">Balance</span>
           <span className="text-sm font-semibold tabular-nums text-foreground">
             {profile?.credits ?? "—"}
