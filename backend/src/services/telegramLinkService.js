@@ -22,9 +22,20 @@ async function attachTelegramIdentityToUser(user, from) {
 
   const conflict = await db.User.findOne({ where: { telegramUserId: tgId } });
   if (conflict && conflict.id !== user.id) {
-    const err = new Error("This Telegram account is already linked to another Exchange Tunnel account");
-    err.status = 409;
-    throw err;
+    // Telegram-only ghost from "Sign in with Telegram" — let the real email account claim it.
+    if (isPlaceholderTelegramEmail(conflict.email)) {
+      conflict.telegramUserId = null;
+      if (typeof conflict.clearActingTelegramChannel === "function") {
+        conflict.clearActingTelegramChannel();
+      }
+      await conflict.save();
+    } else {
+      const err = new Error(
+        "This Telegram account is already linked to another Exchange Tunnel account. Sign in with that email, or contact support."
+      );
+      err.status = 409;
+      throw err;
+    }
   }
 
   if (user.telegramUserId && user.telegramUserId !== tgId) {
