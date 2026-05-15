@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
-import { TelegramBrandIcon, TelegramPlaneWhite } from "./TelegramBrandIcon";
+import { cn } from "./ui/utils";
+import { TelegramBrandIcon } from "./TelegramBrandIcon";
 import {
   linkTelegramToAccount,
   pollTelegramLinkDeeplink,
@@ -11,8 +12,9 @@ import {
 
 const BOT = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "").trim();
 
-const CONNECT_PILL =
-  "flex h-12 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-[#37AEE2] to-[#1E96C8] text-sm font-semibold text-white shadow-lg shadow-[#2AABEE]/25 transition-all hover:brightness-105 active:scale-[0.99] disabled:opacity-70";
+/** Fully hide Telegram's default iframe button; keep it clickable. */
+const WIDGET_IFRAME_HIDE =
+  "[&_iframe]:!pointer-events-auto [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!m-0 [&_iframe]:!h-full [&_iframe]:!w-full [&_iframe]:!max-w-none [&_iframe]:!border-0 [&_iframe]:!opacity-0 [&_iframe]:!cursor-pointer";
 
 type Props = {
   onLinked?: () => void;
@@ -27,6 +29,7 @@ declare global {
 
 export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
   const isConnect = variant === "connect";
+  const widgetMountId = useId().replace(/:/g, "");
   const [widgetBusy, setWidgetBusy] = useState(false);
   const [deeplinkState, setDeeplinkState] = useState<"idle" | "waiting" | "done" | "error">("idle");
   const [deeplinkUrl, setDeeplinkUrl] = useState<string | null>(null);
@@ -61,9 +64,21 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
 
   useEffect(() => {
     if (!BOT) return;
-    const mountId = "telegram-link-widget-mount";
-    const el = document.getElementById(mountId);
+    const el = document.getElementById(widgetMountId);
     if (!el) return;
+
+    const hideWidgetIframe = () => {
+      el.querySelectorAll("iframe").forEach((iframe) => {
+        iframe.style.opacity = "0";
+        iframe.style.position = "absolute";
+        iframe.style.inset = "0";
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        iframe.style.border = "0";
+        iframe.style.cursor = "pointer";
+      });
+    };
+
     el.innerHTML = "";
     const s = document.createElement("script");
     s.async = true;
@@ -74,13 +89,19 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
     s.setAttribute("data-userpic", "false");
     s.setAttribute("data-request-access", "write");
     if (isConnect) {
-      s.setAttribute("data-radius", "20");
+      s.setAttribute("data-radius", "8");
     }
     el.appendChild(s);
+
+    const observer = new MutationObserver(hideWidgetIframe);
+    observer.observe(el, { childList: true, subtree: true });
+    hideWidgetIframe();
+
     return () => {
+      observer.disconnect();
       el.innerHTML = "";
     };
-  }, [isConnect]);
+  }, [isConnect, widgetMountId]);
 
   const startBotLink = async () => {
     setDeeplinkState("waiting");
@@ -146,31 +167,39 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
     );
   }
 
-  const widgetButton = (
-    <div className="relative h-12 w-full">
+  const connectBotBtnClass =
+    "w-full gap-2.5 border-0 bg-[#2AABEE] text-white shadow-md hover:bg-[#229ED9] focus-visible:ring-[#2AABEE]/40";
+  const connectLoginBtnClass =
+    "w-full gap-2.5 border-border bg-muted/60 text-foreground shadow-sm hover:bg-muted dark:bg-muted/80 dark:hover:bg-muted";
+
+  const widgetButton = isConnect ? (
+    <div className="relative w-full">
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className={cn("pointer-events-none relative z-0", connectLoginBtnClass)}
+        tabIndex={-1}
+        aria-hidden
+      >
+        <TelegramBrandIcon size={22} />
+        Log in with Telegram
+      </Button>
       <div
-        id="telegram-link-widget-mount"
-        className={
-          isConnect
-            ? "absolute inset-0 z-20 overflow-hidden rounded-full opacity-[0.02] [&_iframe]:!h-12 [&_iframe]:!min-h-[48px] [&_iframe]:!w-full"
-            : "flex min-h-[44px] flex-col items-center justify-center"
-        }
+        id={widgetMountId}
+        className={cn("absolute inset-0 z-10 size-full overflow-hidden rounded-lg", WIDGET_IFRAME_HIDE)}
         aria-label="Log in with Telegram"
       />
-      {isConnect ? (
-        <>
-          <div className={`pointer-events-none relative z-10 ${CONNECT_PILL}`} aria-hidden>
-            <TelegramPlaneWhite size={20} />
-            Log in with Telegram
-          </div>
-          {widgetBusy ? (
-            <div className={`absolute inset-0 z-30 ${CONNECT_PILL}`}>
-              <Loader2 className="h-5 w-5 animate-spin text-white" />
-            </div>
-          ) : null}
-        </>
+      {widgetBusy ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg border border-border bg-muted/80 backdrop-blur-[1px]">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
       ) : null}
-      {!isConnect && widgetBusy ? (
+    </div>
+  ) : (
+    <div className="w-full">
+      <div id={widgetMountId} className="flex min-h-[44px] flex-col items-center justify-center" />
+      {widgetBusy ? (
         <p className="mt-2 text-center text-sm text-muted-foreground">
           <Loader2 className="mr-1 inline h-4 w-4 animate-spin" />
           Connecting…
@@ -181,22 +210,23 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
 
   const botButton = isConnect ? (
     deeplinkState === "waiting" ? (
-      <div className={`${CONNECT_PILL} h-auto min-h-12 flex-col gap-2 py-3`}>
-        <Loader2 className="h-5 w-5 animate-spin text-white" />
-        <p className="text-xs font-normal text-white/90">Tap START in Telegram, then return here</p>
+      <div className="flex w-full flex-col items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-4 text-center dark:bg-muted/30">
+        <Loader2 className="h-5 w-5 animate-spin text-[#2AABEE]" />
+        <p className="text-sm text-muted-foreground">Tap START in Telegram, then return here</p>
         {deeplinkUrl ? (
           <a
             href={deeplinkUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-xs font-medium text-white underline underline-offset-2"
+            className="text-xs font-medium text-[#2AABEE] underline underline-offset-2"
           >
             Open Telegram again
           </a>
         ) : null}
-        <button
+        <Button
           type="button"
-          className="text-xs text-white/80 underline underline-offset-2"
+          variant="ghost"
+          size="sm"
           onClick={() => {
             stopPolling();
             setDeeplinkState("idle");
@@ -204,13 +234,13 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
           }}
         >
           Cancel
-        </button>
+        </Button>
       </div>
     ) : (
-      <button type="button" className={CONNECT_PILL} onClick={() => void startBotLink()}>
+      <Button type="button" size="lg" className={connectBotBtnClass} onClick={() => void startBotLink()}>
         <TelegramBrandIcon size={22} />
         Connect via bot
-      </button>
+      </Button>
     )
   ) : deeplinkState === "waiting" ? (
     <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card/50 py-4 text-center">
