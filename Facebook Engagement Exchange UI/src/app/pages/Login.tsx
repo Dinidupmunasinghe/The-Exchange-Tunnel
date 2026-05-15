@@ -17,7 +17,7 @@ import {
 export function Login() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [mode, setMode] = useState<"login" | "register">("register");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -148,9 +148,15 @@ export function Login() {
           </form>
 
           <p className="text-center text-xs text-muted-foreground">
+            <Link to="/login/telegram" className="text-primary underline underline-offset-2">
+              Sign in with Telegram instead
+            </Link>
+          </p>
+
+          <p className="text-center text-xs text-muted-foreground">
             {mode === "login" ? (
               <>
-                No account?{" "}
+                Don&apos;t have an account?{" "}
                 <button
                   type="button"
                   onClick={() => setMode("register")}
@@ -171,12 +177,6 @@ export function Login() {
                 </button>
               </>
             )}
-          </p>
-
-          <p className="text-center text-xs text-muted-foreground">
-            <Link to="/login/telegram" className="text-primary underline underline-offset-2">
-              Sign in with Telegram instead
-            </Link>
           </p>
 
           <p className="text-center text-xs text-muted-foreground">
