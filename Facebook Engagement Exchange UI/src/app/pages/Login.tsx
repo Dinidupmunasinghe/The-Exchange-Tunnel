@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Send, Mail, Eye, EyeOff, Loader2 } from "lucide-react";
-import { TelegramLoginButton } from "../components/TelegramLoginButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -174,13 +173,11 @@ export function Login() {
             )}
           </p>
 
-          <div className="relative flex items-center gap-3 py-1">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">or</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          <TelegramLoginButton label="Continue with Telegram" />
+          <p className="text-center text-xs text-muted-foreground">
+            <Link to="/login/telegram" className="text-primary underline underline-offset-2">
+              Sign in with Telegram instead
+            </Link>
+          </p>
 
           <p className="text-center text-xs text-muted-foreground">
             By continuing, you agree to our{" "}

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import { TelegramBrandIcon, TelegramPlaneWhite } from "./TelegramBrandIcon";
 import {
   linkTelegramToAccount,
   pollTelegramLinkDeeplink,
@@ -12,8 +13,8 @@ const BOT = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "").trim();
 
 type Props = {
   onLinked?: () => void;
-  /** Hide outer card title when parent page already explains the step. */
-  compact?: boolean;
+  /** Welcome / connect-telegram screen layout (two styled options). */
+  variant?: "default" | "connect";
 };
 
 declare global {
@@ -22,7 +23,8 @@ declare global {
   }
 }
 
-export function TelegramLinkPanel({ onLinked, compact }: Props) {
+export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
+  const isConnect = variant === "connect";
   const [widgetBusy, setWidgetBusy] = useState(false);
   const [deeplinkState, setDeeplinkState] = useState<"idle" | "waiting" | "done" | "error">("idle");
   const [deeplinkUrl, setDeeplinkUrl] = useState<string | null>(null);
@@ -67,13 +69,16 @@ export function TelegramLinkPanel({ onLinked, compact }: Props) {
     s.setAttribute("data-telegram-login", BOT);
     s.setAttribute("data-size", "large");
     s.setAttribute("data-onauth", "onTelegramLink(user)");
-    s.setAttribute("data-userpic", "true");
+    s.setAttribute("data-userpic", "false");
     s.setAttribute("data-request-access", "write");
+    if (isConnect) {
+      s.setAttribute("data-radius", "20");
+    }
     el.appendChild(s);
     return () => {
       el.innerHTML = "";
     };
-  }, []);
+  }, [isConnect]);
 
   const startBotLink = async () => {
     setDeeplinkState("waiting");
@@ -139,62 +144,111 @@ export function TelegramLinkPanel({ onLinked, compact }: Props) {
     );
   }
 
-  const content = (
-    <>
-      {!compact ? (
-        <div>
-          <p className="font-medium text-foreground">Connect Telegram</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Required to complete tasks and run campaigns. Use the same Telegram account you manage channels with.
-          </p>
-        </div>
-      ) : null}
-      <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">Option 1 — Telegram button</p>
+  const option1 = (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">Option 1 — Telegram button</p>
+      <div className="relative h-11 w-full">
         <div
           id="telegram-link-widget-mount"
-          className="flex min-h-[44px] flex-col items-center justify-center"
-          aria-label="Connect Telegram"
+          className={
+            isConnect
+              ? "absolute inset-0 z-20 overflow-hidden rounded-full opacity-[0.02] [&_iframe]:!h-11 [&_iframe]:!min-h-[44px] [&_iframe]:!w-full"
+              : "flex min-h-[44px] flex-col items-center justify-center"
+          }
+          aria-label="Log in with Telegram"
         />
-        {widgetBusy ? (
-          <p className="text-center text-sm text-muted-foreground">
+        {isConnect ? (
+          <>
+            <div
+              className="pointer-events-none relative z-10 flex h-11 w-full items-center justify-center gap-2.5 rounded-full bg-[#2AABEE] text-sm font-semibold text-white shadow-md shadow-[#2AABEE]/30"
+              aria-hidden
+            >
+              <TelegramPlaneWhite size={20} />
+              Log in with Telegram
+            </div>
+            {widgetBusy ? (
+              <div className="absolute inset-0 z-30 flex items-center justify-center rounded-full bg-[#2AABEE]/90">
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+        {!isConnect && widgetBusy ? (
+          <p className="mt-2 text-center text-sm text-muted-foreground">
             <Loader2 className="mr-1 inline h-4 w-4 animate-spin" />
             Connecting…
           </p>
         ) : null}
       </div>
-      <div className={compact ? "space-y-2" : "space-y-2 border-t border-border pt-4"}>
-        <p className="text-xs text-muted-foreground">Option 2 — Open our bot in Telegram</p>
+    </div>
+  );
+
+  const option2 = (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">Option 2 — Open our bot in Telegram</p>
+      {deeplinkState === "waiting" ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card/50 py-4 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-[#2AABEE]" />
+          <p className="text-sm text-muted-foreground">Confirm in Telegram, then return here.</p>
+          {deeplinkUrl ? (
+            <a
+              href={deeplinkUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-medium text-[#2AABEE] underline underline-offset-2"
+            >
+              Open Telegram again
+            </a>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              stopPolling();
+              setDeeplinkState("idle");
+              setDeeplinkUrl(null);
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : (
         <Button
           type="button"
           variant="outline"
-          className="w-full gap-2"
-          disabled={deeplinkState === "waiting"}
+          className={
+            isConnect
+              ? "h-11 w-full gap-2.5 rounded-lg border-border bg-card/40 font-semibold text-foreground hover:bg-muted/50"
+              : "w-full gap-2"
+          }
           onClick={() => void startBotLink()}
         >
-          {deeplinkState === "waiting" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-          {deeplinkState === "waiting" ? "Waiting for Telegram…" : "Connect via bot"}
+          <TelegramBrandIcon size={20} />
+          Connect via bot
         </Button>
-        {deeplinkUrl && deeplinkState === "waiting" ? (
-          <Button type="button" variant="ghost" size="sm" className="w-full" asChild>
-            <a href={deeplinkUrl} target="_blank" rel="noreferrer">
-              Open Telegram again
-            </a>
-          </Button>
-        ) : null}
-      </div>
-    </>
+      )}
+    </div>
   );
 
-  if (compact) {
-    return <div className="space-y-4">{content}</div>;
+  if (isConnect) {
+    return (
+      <div className="space-y-5">
+        {option1}
+        {option2}
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">{content}</div>
+    <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+      <div>
+        <p className="font-medium text-foreground">Connect Telegram</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Required to complete tasks and run campaigns. Use the same Telegram account you manage channels with.
+        </p>
+      </div>
+      {option1}
+      <div className="border-t border-border pt-4">{option2}</div>
+    </div>
   );
 }
