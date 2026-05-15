@@ -7,9 +7,11 @@ export type StatsAccent = "blue" | "emerald" | "amber" | "rose";
 interface StatsCardProps {
   title: string;
   value: string;
+  /** Short caption next to the value (e.g. period or status), not a fake trend. */
   change: string;
   icon: LucideIcon;
-  trend?: "up" | "down";
+  /** When up/down, shows an arrow; use neutral for status-only captions. */
+  trend?: "up" | "down" | "neutral";
   accent?: StatsAccent;
 }
 
@@ -33,9 +35,11 @@ const accentGlow: Record<StatsAccent, string> = {
   rose: "dark:hover:shadow-[inset_0_0_0_1px_rgba(244,63,94,0.18),0_12px_32px_-10px_rgba(244,63,94,0.22)]",
 };
 
-const trendPill: Record<"up" | "down", string> = {
+const trendPill: Record<"up" | "down" | "neutral", string> = {
   up: "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-600/22 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/25",
   down: "bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-600/22 dark:bg-rose-500/15 dark:text-rose-400 dark:ring-rose-400/25",
+  neutral:
+    "bg-muted/55 text-muted-foreground ring-1 ring-inset ring-border/70 dark:bg-muted/25 dark:text-muted-foreground dark:ring-border/55",
 };
 
 export function StatsCard({
@@ -43,7 +47,7 @@ export function StatsCard({
   value,
   change,
   icon: Icon,
-  trend = "up",
+  trend = "neutral",
   accent = "blue",
 }: StatsCardProps) {
   return (
@@ -71,7 +75,9 @@ export function StatsCard({
                   trendPill[trend],
                 )}
               >
-                <ArrowUpRight className={cn("h-2.5 w-2.5", trend === "down" && "rotate-180")} />
+                {trend !== "neutral" && (
+                  <ArrowUpRight className={cn("h-2.5 w-2.5", trend === "down" && "rotate-180")} />
+                )}
                 {change}
               </span>
             </div>

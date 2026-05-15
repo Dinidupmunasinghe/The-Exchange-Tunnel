@@ -121,37 +121,37 @@ export function Dashboard() {
       {
         title: "Total Credits",
         value: String(profile?.credits ?? 0),
-        change: "live",
+        change: "Available",
         icon: Coins,
-        trend: "up" as const,
+        trend: "neutral" as const,
         accent: "blue" as StatsAccent,
       },
       {
         title: "Credits Earned (30d)",
         value: String(dashboard?.creditsEarned30d ?? 0),
-        change: "live",
+        change: "Last 30 days",
         icon: TrendingUp,
-        trend: "up" as const,
+        trend: "neutral" as const,
         accent: "emerald" as StatsAccent,
       },
       {
         title: "Active Campaigns",
         value: String(dashboard?.activeCampaigns ?? 0),
-        change: "live",
+        change: "Open",
         icon: Activity,
-        trend: "up" as const,
+        trend: "neutral" as const,
         accent: "amber" as StatsAccent,
       },
       {
         title: "Credits Spent (30d)",
         value: String(dashboard?.creditsSpent30d ?? 0),
-        change: "live",
+        change: "Last 30 days",
         icon: Wallet,
-        trend: "up" as const,
+        trend: "neutral" as const,
         accent: "rose" as StatsAccent,
-      }
+      },
     ],
-    [dashboard, profile]
+    [dashboard, profile],
   );
 
   return (
