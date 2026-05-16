@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { clearToken } from "../services/api";
+import { prefetchEarnFeed } from "../lib/prefetchEarnFeed";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -93,6 +94,8 @@ export function Sidebar({ onClose }: SidebarProps) {
                 <Link
                   to={item.href}
                   onClick={onClose}
+                  onMouseEnter={item.href === "/earn" ? () => void prefetchEarnFeed() : undefined}
+                  onFocus={item.href === "/earn" ? () => void prefetchEarnFeed() : undefined}
                   className={`group flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors ${
                     isActive
                       ? "bg-sidebar-accent text-foreground font-medium"

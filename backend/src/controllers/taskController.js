@@ -738,7 +738,13 @@ async function submitTaskCompletion(req, res) {
 async function getAvailableTasks(req, res) {
   const fastFeed = String(req.query.fast || "") === "1";
   const engagementsOnly = String(req.query.engagementsOnly || "") === "1";
-  const taskLimit = engagementsOnly ? 25 : env.lowMemoryHost ? 40 : 200;
+  const requestedLimit = Number.parseInt(String(req.query.limit || ""), 10);
+  const defaultLimit = engagementsOnly ? 25 : fastFeed ? 12 : env.lowMemoryHost ? 40 : 200;
+  const taskLimit = Math.max(
+    1,
+    Math.min(Number.isFinite(requestedLimit) ? requestedLimit : defaultLimit, fastFeed ? 30 : 200)
+  );
+  const cursorId = Number.parseInt(String(req.query.cursor || ""), 10);
   const campaignVisibilityWhere = {
     userId: { [Op.ne]: req.user.id },
     [Op.or]: [
@@ -747,7 +753,7 @@ async function getAvailableTasks(req, res) {
       { status: "completed", engagementType: "share" }
     ]
   };
-  const tasks = await db.Task.findAll({
+  const taskRows = await db.Task.findAll({
     where: {
       [Op.or]: [
         {
@@ -755,7 +761,8 @@ async function getAvailableTasks(req, res) {
           [Op.or]: [{ assignedUserId: null }, { assignedUserId: req.user.id }]
         },
         { status: "completed", assignedUserId: req.user.id }
-      ]
+      ],
+      ...(Number.isFinite(cursorId) && cursorId > 0 ? { id: { [Op.lt]: cursorId } } : {})
     },
     include: [
       {
@@ -778,7 +785,7 @@ async function getAvailableTasks(req, res) {
               "createdAt",
               "maxEngagements"
             ],
-        ...(!engagementsOnly
+        ...(!engagementsOnly && !fastFeed
           ? {
               include: [
                 {
@@ -793,12 +800,12 @@ async function getAvailableTasks(req, res) {
       }
     ],
     subQuery: false,
-    limit: taskLimit,
-    order: [
-      ["createdAt", "DESC"],
-      ["id", "DESC"]
-    ]
+    limit: taskLimit + 1,
+    order: [["id", "DESC"]]
   });
+  const hasMore = taskRows.length > taskLimit;
+  const tasks = hasMore ? taskRows.slice(0, taskLimit) : taskRows;
+  const nextCursor = hasMore ? Number(tasks[tasks.length - 1]?.id || 0) : null;
   const avatarByTelegramId = new Map();
   if (!fastFeed && !engagementsOnly) {
     const ownerTelegramIds = [
@@ -1055,7 +1062,9 @@ async function getAvailableTasks(req, res) {
 
   return res.json({
     tasks: serialized,
-    myEngagements: engagementsPayload
+    myEngagements: engagementsPayload,
+    hasMore,
+    nextCursor
   });
 }
 

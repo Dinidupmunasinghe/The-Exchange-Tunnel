@@ -15,6 +15,7 @@ import {
   bundleAllowsAction,
   getEngagementLabel
 } from "../lib/engagement";
+import { isEarnFeedCacheFresh, readEarnFeedCache, writeEarnFeedCache } from "../lib/earnFeedCache";
 
 type TaskRow = {
   id: number;
@@ -166,6 +167,46 @@ function withoutEngagement(
 }
 
 const EARN_FEED_POLL_MS = 60_000;
+const EARN_CACHE_STALE_MS = 60_000;
+const EARN_PAGE_SIZE = 12;
+
+function mergeTasksById(current: TaskRow[], incoming: TaskRow[]): TaskRow[] {
+  const map = new Map<number, TaskRow>();
+  for (const task of current) map.set(task.id, task);
+  for (const task of incoming) map.set(task.id, task);
+  return [...map.values()].sort((a, b) => b.id - a.id);
+}
+
+function mergeEngagements(current: MyEngagementRow[], incoming: MyEngagementRow[]): MyEngagementRow[] {
+  const map = new Map<string, MyEngagementRow>();
+  for (const row of current) map.set(`${row.campaignId}:${row.actionKind}:${row.id}`, row);
+  for (const row of incoming) map.set(`${row.campaignId}:${row.actionKind}:${row.id}`, row);
+  return [...map.values()];
+}
+
+function readCachedEarnState() {
+  const cached = readEarnFeedCache();
+  if (!cached) {
+    return {
+      tasks: [] as TaskRow[],
+      myEngagements: [] as MyEngagementRow[],
+      hasTelegram: null as boolean | null,
+      hasMtprotoSession: null as boolean | null,
+      hasMore: false,
+      nextCursor: null as number | null,
+      hasCache: false
+    };
+  }
+  return {
+    tasks: cached.tasks as TaskRow[],
+    myEngagements: cached.myEngagements as MyEngagementRow[],
+    hasTelegram: cached.hasTelegram,
+    hasMtprotoSession: cached.hasMtprotoSession,
+    hasMore: Boolean(cached.hasMore),
+    nextCursor: typeof cached.nextCursor === "number" ? cached.nextCursor : null,
+    hasCache: cached.tasks.length > 0 || cached.myEngagements.length > 0
+  };
+}
 
 /** High-contrast credit pill on filled (primary) action buttons. */
 const rewardBadgeOnFilled =
@@ -177,37 +218,70 @@ const rewardBadgeOnOutline =
 const taskTypeBadgeClass = "border-border bg-muted text-foreground hover:bg-muted";
 
 export function EarnCredits() {
-  const [tasks, setTasks] = useState<TaskRow[]>([]);
-  const [myEngagements, setMyEngagements] = useState<MyEngagementRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initial = readCachedEarnState();
+  const [tasks, setTasks] = useState<TaskRow[]>(initial.tasks);
+  const [myEngagements, setMyEngagements] = useState<MyEngagementRow[]>(initial.myEngagements);
+  const [loading, setLoading] = useState(!initial.hasCache);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(initial.hasMore);
+  const [nextCursor, setNextCursor] = useState<number | null>(initial.nextCursor);
   const [busy, setBusy] = useState<string | null>(null);
-  const [hasTelegram, setHasTelegram] = useState<boolean | null>(null);
-  const [hasMtprotoSession, setHasMtprotoSession] = useState<boolean | null>(null);
+  const [hasTelegram, setHasTelegram] = useState<boolean | null>(initial.hasTelegram);
+  const [hasMtprotoSession, setHasMtprotoSession] = useState<boolean | null>(initial.hasMtprotoSession);
   const [selectedReactionByCampaign, setSelectedReactionByCampaign] = useState<Record<number, string>>({});
   const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
   const [avatarLoadedByCampaign, setAvatarLoadedByCampaign] = useState<Record<number, boolean>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadProfileStatus = useCallback(async () => {
-    try {
-      const res = await api.getProfile();
-      const u = res.user as { telegramUserId?: string | null; hasMtprotoSession?: boolean };
-      setHasTelegram(Boolean(u?.telegramUserId));
-      setHasMtprotoSession(Boolean(u?.hasMtprotoSession));
-    } catch {
-      setHasTelegram(null);
-      setHasMtprotoSession(null);
-    }
-  }, []);
+  const applyFeedPayload = useCallback(
+    (
+      tasksRes: { tasks?: unknown; myEngagements?: unknown; hasMore?: unknown; nextCursor?: unknown },
+      profileUser?: { telegramUserId?: string | null; hasMtprotoSession?: boolean } | null,
+      mode: "replace" | "append" = "replace"
+    ) => {
+      const nextTasks = Array.isArray(tasksRes?.tasks) ? (tasksRes.tasks as TaskRow[]) : [];
+      const nextEngagements = Array.isArray(tasksRes?.myEngagements)
+        ? (tasksRes.myEngagements as MyEngagementRow[])
+        : [];
+      const responseHasMore = Boolean(tasksRes?.hasMore);
+      const responseNextCursor = typeof tasksRes?.nextCursor === "number" ? tasksRes.nextCursor : null;
+      const mergedTasks = mode === "append" ? mergeTasksById(tasks, nextTasks) : nextTasks;
+      const mergedEngagements =
+        mode === "append" ? mergeEngagements(myEngagements, nextEngagements) : nextEngagements;
+      setTasks(mergedTasks);
+      setMyEngagements(mergedEngagements);
+      setHasMore(responseHasMore);
+      setNextCursor(responseNextCursor);
+      const prevCache = readEarnFeedCache();
+      let cachedTelegram = prevCache?.hasTelegram ?? hasTelegram;
+      let cachedMtproto = prevCache?.hasMtprotoSession ?? hasMtprotoSession;
+      if (profileUser) {
+        cachedTelegram = Boolean(profileUser.telegramUserId);
+        cachedMtproto = Boolean(profileUser.hasMtprotoSession);
+        setHasTelegram(cachedTelegram);
+        setHasMtprotoSession(cachedMtproto);
+      }
+      writeEarnFeedCache({
+        tasks: mergedTasks,
+        myEngagements: mergedEngagements,
+        savedAt: Date.now(),
+        hasTelegram: cachedTelegram,
+        hasMtprotoSession: cachedMtproto,
+        hasMore: responseHasMore,
+        nextCursor: responseNextCursor
+      });
+      setLoadError(null);
+    },
+    [hasTelegram, hasMtprotoSession, myEngagements, tasks]
+  );
 
   const refreshTasksFast = useCallback(async () => {
-    const res = await api.getTasks({ fast: true });
-    setTasks(Array.isArray(res?.tasks) ? (res.tasks as TaskRow[]) : []);
-    setMyEngagements(Array.isArray(res?.myEngagements) ? res.myEngagements : []);
-    setLoadError(null);
+    const res = await api.getTasks({ fast: true, limit: EARN_PAGE_SIZE });
+    applyFeedPayload(res);
     return res;
-  }, []);
+  }, [applyFeedPayload]);
 
   const refreshFeed = useCallback(async () => {
     await refreshTasksFast();
@@ -230,39 +304,65 @@ export function EarnCredits() {
   const loadTasks = useCallback(
     async (opts?: { silent?: boolean }) => {
       const silent = opts?.silent ?? false;
-      if (!silent) setLoading(true);
+      const hasVisibleFeed = tasks.length > 0 || Boolean(readEarnFeedCache()?.tasks.length);
+      if (!silent && !hasVisibleFeed) setLoading(true);
+      else if (!silent) setIsRefreshing(true);
       try {
-        await refreshTasksFast();
+        const [profileRes, tasksRes] = await Promise.all([
+          api.getProfile().catch(() => null),
+          api.getTasks({ fast: true, limit: EARN_PAGE_SIZE })
+        ]);
+        const u = profileRes?.user as
+          | { telegramUserId?: string | null; hasMtprotoSession?: boolean }
+          | undefined;
+        applyFeedPayload(tasksRes, u ?? null);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Could not load tasks";
         setLoadError(message);
-        if (!silent) toast.error(message);
+        if (!silent && tasks.length === 0) toast.error(message);
       } finally {
-        if (!silent) setLoading(false);
+        if (!silent) {
+          setLoading(false);
+          setIsRefreshing(false);
+        }
       }
     },
-    [refreshTasksFast]
+    [applyFeedPayload, tasks.length]
   );
 
+  const loadMoreTasks = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await api.getTasks({ fast: true, limit: EARN_PAGE_SIZE, cursor: nextCursor });
+      applyFeedPayload(res, null, "append");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not load more tasks");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [applyFeedPayload, loadingMore, nextCursor]);
+
   useEffect(() => {
-    void loadProfileStatus();
-    void loadTasks({ silent: false });
-  }, [loadTasks, loadProfileStatus]);
+    void loadTasks({ silent: initial.hasCache });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        void refreshTasksFast();
-        void loadProfileStatus();
+      if (document.visibilityState === "visible" && !isEarnFeedCacheFresh(EARN_CACHE_STALE_MS)) {
+        void loadTasks({ silent: true });
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refreshTasksFast, loadProfileStatus]);
+  }, [loadTasks]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (busy === null) void refreshTasksFast();
+      if (busy === null && document.visibilityState === "visible") {
+        void refreshTasksFast().catch(() => undefined);
+      }
     }, EARN_FEED_POLL_MS);
     return () => window.clearInterval(id);
   }, [busy, refreshTasksFast]);
@@ -503,10 +603,10 @@ export function EarnCredits() {
           type="button"
           variant="outline"
           size="sm"
-          disabled={loading}
+          disabled={loading && tasks.length === 0}
           onClick={() => void loadTasks()}
         >
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading || isRefreshing ? "animate-spin" : ""}`} />
           Refresh feed
         </Button>
       </div>
@@ -542,12 +642,19 @@ export function EarnCredits() {
       ) : null}
 
       <div className="space-y-6">
+        {isRefreshing && tasks.length > 0 ? (
+          <p className="text-xs text-muted-foreground">Updating feed…</p>
+        ) : null}
         {loading && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Loading feed…</p>
         ) : null}
-        {!loading && loadError ? (
+        {loadError ? (
           <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">
-            Couldn't load feed: <span className="font-medium">{loadError}</span>
+            {tasks.length > 0 ? "Showing cached feed. " : ""}
+            Couldn&apos;t refresh: <span className="font-medium">{loadError}</span>
+            {tasks.length > 0 ? (
+              <span className="mt-1 block text-xs opacity-90">Tap Refresh feed when the backend is back online.</span>
+            ) : null}
           </div>
         ) : null}
         {!loading && !loadError && tasks.length === 0 ? (
@@ -889,6 +996,20 @@ export function EarnCredits() {
             </Card>
           );
         })}
+        {hasMore ? (
+          <div className="flex justify-center pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={loadingMore}
+              onClick={() => void loadMoreTasks()}
+            >
+              {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {loadingMore ? "Loading..." : "Load more"}
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

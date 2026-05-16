@@ -11,6 +11,13 @@ async function addColumnIfMissing(queryInterface, tableName, columnName, definit
   }
 }
 
+async function addIndexIfMissing(queryInterface, tableName, indexName, fields) {
+  const indexes = await queryInterface.showIndex(tableName);
+  if (!indexes.some((idx) => idx.name === indexName)) {
+    await queryInterface.addIndex(tableName, fields, { name: indexName });
+  }
+}
+
 /** Safe additive columns — runs in all environments (including production). */
 async function ensureSchemaPatches() {
   const qi = db.sequelize.getQueryInterface();
@@ -18,6 +25,22 @@ async function ensureSchemaPatches() {
     type: db.sequelize.Sequelize.TEXT,
     allowNull: true
   });
+  try {
+    await addIndexIfMissing(qi, "tasks", "idx_tasks_feed_cursor", ["status", "assignedUserId", "id"]);
+    await addIndexIfMissing(qi, "tasks", "idx_tasks_campaign_id", ["campaignId"]);
+    await addIndexIfMissing(qi, "campaigns", "idx_campaigns_feed_visibility", [
+      "status",
+      "userId",
+      "scheduledLaunchAt"
+    ]);
+    await addIndexIfMissing(qi, "engagements", "idx_engagements_user_campaign_status", [
+      "userId",
+      "campaignId",
+      "verificationStatus"
+    ]);
+  } catch {
+    // Best effort only; the cursor feed still works if a hosted DB blocks DDL.
+  }
 }
 
 async function ensureDevSchema() {

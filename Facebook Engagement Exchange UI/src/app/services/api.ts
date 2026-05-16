@@ -49,13 +49,34 @@ export function clearAdminToken() {
   localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 25_000;
+
 function mapNetworkError(e: unknown): Error {
+  if (e instanceof DOMException && e.name === "AbortError") {
+    return new Error(
+      "Request timed out. The server may be waking up — wait a moment and tap Refresh feed."
+    );
+  }
   if (e instanceof TypeError && (e.message === "Failed to fetch" || e.message.includes("fetch"))) {
     return new Error(
       "Cannot reach the backend right now. It may be restarting or asleep on the host (e.g. Render free tier). Please wait ~30s and refresh."
     );
   }
   return e instanceof Error ? e : new Error(String(e));
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 function extractApiErrorMessage(response: Response, payload: Json, rawText: string): string {
@@ -104,7 +125,7 @@ async function requestJson<T>(
   const token = getToken();
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -335,8 +356,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  getTasks: (opts?: { fast?: boolean }) =>
-    authRequest(`/tasks${opts?.fast ? "?fast=1&probe=0" : ""}`) as Promise<{
+  getTasks: (opts?: { fast?: boolean; limit?: number; cursor?: number | null }) => {
+    const params = new URLSearchParams();
+    if (opts?.fast) {
+      params.set("fast", "1");
+      params.set("probe", "0");
+    }
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.cursor) params.set("cursor", String(opts.cursor));
+    const query = params.toString();
+    return authRequest(`/tasks${query ? `?${query}` : ""}`) as Promise<{
       tasks: any[];
       myEngagements: {
         id: number;
@@ -348,7 +377,10 @@ export const api = {
         preExisting?: boolean;
         earned?: boolean;
       }[];
-    }>,
+      hasMore?: boolean;
+      nextCursor?: number | null;
+    }>;
+  },
   syncTelegramEngagementState: () =>
     authRequest("/tasks/sync-telegram-state") as Promise<{
       myEngagements: {

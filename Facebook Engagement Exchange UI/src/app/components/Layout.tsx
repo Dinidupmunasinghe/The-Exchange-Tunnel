@@ -1,5 +1,6 @@
 import { Outlet } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { prefetchEarnFeed } from "../lib/prefetchEarnFeed";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -10,6 +11,10 @@ import { Button } from "./ui/button";
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    void prefetchEarnFeed();
+  }, []);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
