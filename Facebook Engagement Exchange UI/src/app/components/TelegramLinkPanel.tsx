@@ -103,34 +103,22 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
     };
   }, [isConnect, widgetMountId]);
 
+  const openTelegramBotUrl = (url: string) => {
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      toast.info("Pop-up blocked. Tap «Open Telegram» below to continue.", { duration: 8000 });
+    }
+  };
+
   const startBotLink = async () => {
     setDeeplinkState("waiting");
-    let popup: Window | null = null;
-    try {
-      popup = window.open("about:blank", "_blank");
-    } catch {
-      popup = null;
-    }
+    setDeeplinkUrl(null);
 
     try {
       const { token } = await startTelegramLinkDeeplink();
       const url = `https://t.me/${BOT}?start=login_${token}`;
       setDeeplinkUrl(url);
-
-      if (popup && !popup.closed) {
-        try {
-          popup.location.href = url;
-        } catch {
-          try {
-            popup.close();
-          } catch {
-            // ignore
-          }
-          window.open(url, "_blank");
-        }
-      } else {
-        window.open(url, "_blank");
-      }
+      openTelegramBotUrl(url);
 
       stopPolling();
       pollRef.current = setInterval(async () => {
@@ -153,7 +141,9 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
         }
       }, 2000);
     } catch (e: unknown) {
-      setDeeplinkState("error");
+      stopPolling();
+      setDeeplinkState("idle");
+      setDeeplinkUrl(null);
       toast.error(e instanceof Error ? e.message : "Could not start Telegram link");
     }
   };
@@ -214,14 +204,14 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
         <Loader2 className="h-5 w-5 animate-spin text-[#2AABEE]" />
         <p className="text-sm text-muted-foreground">Tap START in Telegram, then return here</p>
         {deeplinkUrl ? (
-          <a
-            href={deeplinkUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-medium text-[#2AABEE] underline underline-offset-2"
+          <Button
+            type="button"
+            size="sm"
+            className={connectBotBtnClass}
+            onClick={() => openTelegramBotUrl(deeplinkUrl)}
           >
-            Open Telegram again
-          </a>
+            Open Telegram
+          </Button>
         ) : null}
         <Button
           type="button"

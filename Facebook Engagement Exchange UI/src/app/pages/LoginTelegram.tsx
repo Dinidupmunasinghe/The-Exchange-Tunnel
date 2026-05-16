@@ -35,34 +35,22 @@ function TelegramDeeplinkLogin() {
 
   useEffect(() => () => stopPolling(), []);
 
+  const openTelegramBotUrl = (url: string) => {
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      toast.info("Pop-up blocked. Tap «Open Telegram again» below to continue.", { duration: 8000 });
+    }
+  };
+
   const startLogin = async () => {
     setState("waiting");
-    let popup: Window | null = null;
-    try {
-      popup = window.open("about:blank", "_blank");
-    } catch {
-      popup = null;
-    }
+    setDeeplinkUrl(null);
 
     try {
       const { token, expiresInMs } = await startTelegramDeeplinkLogin();
       const url = `https://t.me/${BOT}?start=login_${token}`;
       setDeeplinkUrl(url);
-
-      if (popup && !popup.closed) {
-        try {
-          popup.location.href = url;
-        } catch {
-          try {
-            popup.close();
-          } catch {
-            // ignore
-          }
-          window.open(url, "_blank");
-        }
-      } else {
-        window.open(url, "_blank");
-      }
+      openTelegramBotUrl(url);
 
       const deadline = Date.now() + expiresInMs;
       pollRef.current = setInterval(async () => {
@@ -90,14 +78,9 @@ function TelegramDeeplinkLogin() {
         }
       }, 2000);
     } catch (e) {
-      if (popup && !popup.closed) {
-        try {
-          popup.close();
-        } catch {
-          // ignore
-        }
-      }
-      setState("error");
+      stopPolling();
+      setState("idle");
+      setDeeplinkUrl(null);
       toast.error(e instanceof Error ? e.message : "Failed to start login");
     }
   };
