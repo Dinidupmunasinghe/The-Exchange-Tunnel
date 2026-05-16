@@ -219,8 +219,8 @@ export function EarnCredits() {
 
   const refreshTasksFast = useCallback(async () => {
     const res = await api.getTasks({ fast: true });
-    setTasks(res.tasks as TaskRow[]);
-    setMyEngagements(res.myEngagements ?? []);
+    setTasks(Array.isArray(res?.tasks) ? (res.tasks as TaskRow[]) : []);
+    setMyEngagements(Array.isArray(res?.myEngagements) ? res.myEngagements : []);
     return res;
   }, []);
 
@@ -230,7 +230,7 @@ export function EarnCredits() {
     syncInFlightRef.current = true;
     try {
       const sync = await api.syncTelegramEngagementState();
-      if (sync?.myEngagements) setMyEngagements(sync.myEngagements);
+      if (Array.isArray(sync?.myEngagements)) setMyEngagements(sync.myEngagements);
       markTelegramSyncDone();
     } catch {
       // Background audit only — no UI blocking or banners.
@@ -292,7 +292,8 @@ export function EarnCredits() {
 
   const taskGroups = useMemo(() => {
     const map = new Map<number, TaskRow[]>();
-    for (const t of tasks) {
+    const list = Array.isArray(tasks) ? tasks : [];
+    for (const t of list) {
       const cid = t.campaign?.id ?? t.campaignId ?? 0;
       if (!map.has(cid)) map.set(cid, []);
       map.get(cid)!.push(t);
