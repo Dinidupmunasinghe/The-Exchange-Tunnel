@@ -2,14 +2,13 @@ const tg = require("./telegramService");
 const { runBridge } = require("./telegramMtprotoService");
 const { decrypt } = require("../utils/crypto");
 
-const MAX_SUBSCRIBE_PROBES = 16;
-const MAX_POST_PROBES = 16;
-const PROBE_CONCURRENCY = 4;
-const PROBE_CACHE_TTL_MS = 15 * 60 * 1000;
-const NORMAL_PROBE_BUDGET_MS = 12_000;
-const DEEP_PROBE_BUDGET_MS = 45_000;
-const LIKE_PROBE_EMOJIS = ["👍", "❤️", "🔥", "👏", "🤩", "🎉"];
-const MTPROTO_PROBE_TIMEOUT_MS = 12_000;
+const MAX_SUBSCRIBE_PROBES = 10;
+const MAX_POST_PROBES = 10;
+const PROBE_CONCURRENCY = 6;
+const PROBE_CACHE_TTL_MS = 20 * 60 * 1000;
+const NORMAL_PROBE_BUDGET_MS = 8_000;
+const DEEP_PROBE_BUDGET_MS = 18_000;
+const MTPROTO_PROBE_TIMEOUT_MS = 6_000;
 
 /** @type {Map<string, { value: unknown, expires: number }>} */
 const probeCache = new Map();
@@ -203,30 +202,6 @@ async function probeAnyLikeOnTelegram(creds, sessionString, messageUrl, channelI
       // try next chat ref
     }
   }
-
-  for (const chatRef of refs) {
-    for (const emoji of LIKE_PROBE_EMOJIS) {
-      try {
-        const out = await withTimeout(
-          runBridge("verify_reaction", {
-            apiId: creds.apiId,
-            apiHash: creds.apiHash,
-            proxy: creds.proxy || null,
-            sessionString,
-            chat: chatRef,
-            msgId: Number(parsed.messageId),
-            reaction: emoji
-          }),
-          MTPROTO_PROBE_TIMEOUT_MS
-        );
-        if (out?.known && out?.chosen) {
-          return { found: true, emoji };
-        }
-      } catch {
-        // try next
-      }
-    }
-  }
   return { found: false, emoji: null };
 }
 
@@ -382,21 +357,11 @@ async function probePreExistingEngagements({ worker, tasks, knownKeys, mode = "n
           results.set(`like:${target.postKey}`, cached);
           return;
         }
-        let channelId = null;
-        try {
-          const parsed = tg.parseTmeMessageUrl(target.messageUrl);
-          if (parsed) {
-            const resolved = await tg.resolveChannelChatIdFromTme(parsed, null);
-            channelId = resolved?.chatId ? String(resolved.chatId) : null;
-          }
-        } catch {
-          channelId = null;
-        }
         const state = await probeAnyLikeOnTelegram(
           creds,
           sessionString,
           target.messageUrl,
-          channelId
+          null
         );
         if (state.found) writeCache(userId, "post", cacheId, state);
         results.set(`like:${target.postKey}`, state);
@@ -411,17 +376,7 @@ async function probePreExistingEngagements({ worker, tasks, knownKeys, mode = "n
           results.set(`comment:${target.postKey}`, cached);
           return;
         }
-        let channelId = null;
-        try {
-          const parsed = tg.parseTmeMessageUrl(target.messageUrl);
-          if (parsed) {
-            const resolved = await tg.resolveChannelChatIdFromTme(parsed, null);
-            channelId = resolved?.chatId ? String(resolved.chatId) : null;
-          }
-        } catch {
-          channelId = null;
-        }
-        const found = await probeCommentOnTelegram(creds, sessionString, target.messageUrl, channelId);
+        const found = await probeCommentOnTelegram(creds, sessionString, target.messageUrl, null);
         writeCache(userId, "post", cacheId, found);
         results.set(`comment:${target.postKey}`, found);
       }

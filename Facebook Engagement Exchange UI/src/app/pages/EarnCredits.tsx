@@ -157,6 +157,28 @@ function hasCompletedTask(tasks: TaskRow[]): boolean {
   return tasks.some((t) => t.status === "completed");
 }
 
+const EARN_TELEGRAM_SYNC_KEY = "et_earn_telegram_sync_at";
+const EARN_TELEGRAM_SYNC_TTL_MS = 5 * 60 * 1000;
+const EARN_FEED_POLL_MS = 60_000;
+
+function shouldRunTelegramSync(force = false): boolean {
+  if (force) return true;
+  try {
+    const at = Number(sessionStorage.getItem(EARN_TELEGRAM_SYNC_KEY) || 0);
+    return Date.now() - at > EARN_TELEGRAM_SYNC_TTL_MS;
+  } catch {
+    return true;
+  }
+}
+
+function markTelegramSyncDone(): void {
+  try {
+    sessionStorage.setItem(EARN_TELEGRAM_SYNC_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -195,38 +217,50 @@ export function EarnCredits() {
     }
   }, []);
 
-  const syncTelegramState = useCallback(async () => {
+  const refreshTasksFast = useCallback(async () => {
+    const res = await api.getTasks({ fast: true });
+    setTasks(res.tasks as TaskRow[]);
+    setMyEngagements(res.myEngagements ?? []);
+    return res;
+  }, []);
+
+  const syncTelegramState = useCallback(async (opts?: { force?: boolean; quiet?: boolean }) => {
+    if (!shouldRunTelegramSync(opts?.force)) return;
     setSyncingTelegram(true);
     try {
       const sync = await api.syncTelegramEngagementState();
       if (sync?.myEngagements) setMyEngagements(sync.myEngagements);
+      markTelegramSyncDone();
     } catch (error: unknown) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not verify your existing Telegram actions. Check Settings → User Session."
-      );
+      if (!opts?.quiet) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not verify your existing Telegram actions. Check Settings → User Session."
+        );
+      }
     } finally {
       setSyncingTelegram(false);
     }
   }, []);
 
-  const refreshFeed = useCallback(async () => {
-    const res = await api.getTasks({ fast: true });
-    setTasks(res.tasks as TaskRow[]);
-    setMyEngagements(res.myEngagements ?? []);
-    await syncTelegramState();
-  }, [syncTelegramState]);
+  const refreshFeed = useCallback(
+    async (opts?: { forceSync?: boolean }) => {
+      await refreshTasksFast();
+      void syncTelegramState({ force: opts?.forceSync, quiet: true });
+    },
+    [refreshTasksFast, syncTelegramState]
+  );
 
   const loadTasks = useCallback(
-    async (silent = false) => {
+    async (opts?: { silent?: boolean; forceSync?: boolean }) => {
+      const silent = opts?.silent ?? false;
+      const forceSync = opts?.forceSync ?? false;
       if (!silent) setLoading(true);
       try {
-        const res = await api.getTasks({ fast: true });
-        setTasks(res.tasks as TaskRow[]);
-        setMyEngagements(res.myEngagements ?? []);
+        await refreshTasksFast();
         if (!silent) setLoading(false);
-        void syncTelegramState();
+        void syncTelegramState({ force: forceSync, quiet: !forceSync });
       } catch (error: unknown) {
         if (!silent) {
           toast.error(error instanceof Error ? error.message : "Could not load tasks");
@@ -235,31 +269,32 @@ export function EarnCredits() {
         if (!silent) setLoading(false);
       }
     },
-    [syncTelegramState]
+    [refreshTasksFast, syncTelegramState]
   );
 
   useEffect(() => {
-    void loadTasks(false);
     void loadProfileStatus();
+    void loadTasks({ silent: false, forceSync: true });
   }, [loadTasks, loadProfileStatus]);
 
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void loadTasks(true);
+        void refreshTasksFast();
         void loadProfileStatus();
+        void syncTelegramState({ quiet: true });
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [loadTasks, loadProfileStatus]);
+  }, [refreshTasksFast, loadProfileStatus, syncTelegramState]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (busy === null) void loadTasks(true);
-    }, 15000);
+      if (busy === null) void refreshTasksFast();
+    }, EARN_FEED_POLL_MS);
     return () => window.clearInterval(id);
-  }, [busy, loadTasks]);
+  }, [busy, refreshTasksFast]);
 
   const taskGroups = useMemo(() => {
     const map = new Map<number, TaskRow[]>();
@@ -501,8 +536,14 @@ export function EarnCredits() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Earn Credits</h1>
           <p className="mt-1 text-muted-foreground">One completion per button; subscribe in Telegram, then verify in app</p>
         </div>
-        <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void loadTasks()}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={loading || syncingTelegram}
+          onClick={() => void loadTasks({ forceSync: true })}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading || syncingTelegram ? "animate-spin" : ""}`} />
           Refresh feed
         </Button>
       </div>
@@ -542,7 +583,9 @@ export function EarnCredits() {
           <p className="text-sm text-muted-foreground">Loading feed…</p>
         ) : null}
         {!loading && syncingTelegram ? (
-          <p className="text-xs text-muted-foreground">Checking your Telegram actions on these campaigns…</p>
+          <p className="text-xs text-muted-foreground/80">
+            Updating button states from Telegram in the background…
+          </p>
         ) : null}
         {!loading && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -576,7 +619,7 @@ export function EarnCredits() {
           const likePreExisting = Boolean(getEngagement(myEngagements, cid, "like")?.preExisting);
           const commentPreExisting = Boolean(getEngagement(myEngagements, cid, "comment")?.preExisting);
           const isSubscribeCampaign = et === "subscribe";
-          const actionsLocked = syncingTelegram || busy !== null;
+          const actionsLocked = busy !== null;
           const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
           const ownerUsername = usernameFromOwnerName(ownerName);

@@ -735,6 +735,8 @@ async function submitTaskCompletion(req, res) {
 }
 
 async function getAvailableTasks(req, res) {
+  const fastFeed = String(req.query.fast || "") === "1";
+  const engagementsOnly = String(req.query.engagementsOnly || "") === "1";
   const campaignVisibilityWhere = {
     userId: { [Op.ne]: req.user.id },
     [Op.or]: [
@@ -790,23 +792,25 @@ async function getAvailableTasks(req, res) {
     ]
   });
   const avatarByTelegramId = new Map();
-  const ownerTelegramIds = [
-    ...new Set(
-      tasks
-        .filter((t) => {
-          const o = t?.campaign?.owner;
-          if (!o?.telegramUserId) return false;
-          return !String(o.profilePhotoUrl || "").trim();
-        })
-        .map((t) => String(t.campaign.owner.telegramUserId))
-    )
-  ];
-  await Promise.all(
-    ownerTelegramIds.map(async (tid) => {
-      const avatarUrl = await tg.getUserProfilePhotoUrl(tid).catch(() => null);
-      if (avatarUrl) avatarByTelegramId.set(tid, avatarUrl);
-    })
-  );
+  if (!fastFeed && !engagementsOnly) {
+    const ownerTelegramIds = [
+      ...new Set(
+        tasks
+          .filter((t) => {
+            const o = t?.campaign?.owner;
+            if (!o?.telegramUserId) return false;
+            return !String(o.profilePhotoUrl || "").trim();
+          })
+          .map((t) => String(t.campaign.owner.telegramUserId))
+      )
+    ];
+    await Promise.all(
+      ownerTelegramIds.map(async (tid) => {
+        const avatarUrl = await tg.getUserProfilePhotoUrl(tid).catch(() => null);
+        if (avatarUrl) avatarByTelegramId.set(tid, avatarUrl);
+      })
+    );
+  }
   const serialized = tasks.map((t) => {
     const o = t.toJSON();
     if (o.campaign) {
@@ -1023,32 +1027,28 @@ async function getAvailableTasks(req, res) {
     }
   }
   if (memoryUpserts.length) {
-    await Promise.all(memoryUpserts).catch(() => undefined);
+    if (engagementsOnly) {
+      void Promise.all(memoryUpserts).catch(() => undefined);
+    } else {
+      await Promise.all(memoryUpserts).catch(() => undefined);
+    }
+  }
+
+  const engagementsPayload = markEarnedFlags(myEngagements, earnedKeys);
+  if (engagementsOnly) {
+    return res.json({ myEngagements: engagementsPayload });
   }
 
   return res.json({
     tasks: serialized,
-    myEngagements: markEarnedFlags(myEngagements, earnedKeys)
+    myEngagements: engagementsPayload
   });
 }
 
-/** Deep Telegram probe for actions done before the campaign existed (subscribe / like / comment). */
+/** Lightweight deep probe — engagements only, no avatars or task payload. */
 async function syncPreexistingEngagements(req, res) {
-  const proxy = {
-    _code: 200,
-    status(code) {
-      proxy._code = code;
-      return proxy;
-    },
-    json(body) {
-      if (proxy._code >= 400) {
-        return res.status(proxy._code).json(body);
-      }
-      return res.json({ myEngagements: body.myEngagements || [] });
-    }
-  };
-  req.query = { ...req.query, fast: "0", probe: "deep" };
-  return getAvailableTasks(req, proxy);
+  req.query = { ...req.query, fast: "1", probe: "deep", engagementsOnly: "1" };
+  return getAvailableTasks(req, res);
 }
 
 async function startCommentDetection(req, res) {
