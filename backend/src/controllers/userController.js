@@ -123,7 +123,11 @@ async function linkTelegram(req, res) {
 /** Start bot deeplink to link Telegram while signed in. */
 async function linkTelegramDeeplinkStart(req, res) {
   if (req.user.telegramUserId) {
-    return res.status(400).json({ message: "Telegram is already connected to this account" });
+    return res.json({
+      alreadyLinked: true,
+      user: profileUserPayload(req.user),
+      expiresInMs: 0
+    });
   }
   const botName = env.telegram.botName;
   if (!botName) {

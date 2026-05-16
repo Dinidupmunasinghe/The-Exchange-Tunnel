@@ -1,14 +1,45 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { TelegramLinkPanel } from "../components/TelegramLinkPanel";
 import { TelegramBrandIcon } from "../components/TelegramBrandIcon";
-import { clearToken } from "../services/api";
+import { api, clearToken } from "../services/api";
 
 export function ConnectTelegram() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isWelcome = searchParams.get("welcome") === "1";
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getProfile()
+      .then((res) => {
+        if (cancelled) return;
+        if (res.user?.telegramUserId) {
+          navigate("/dashboard", { replace: true });
+          return;
+        }
+        setChecking(false);
+      })
+      .catch(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

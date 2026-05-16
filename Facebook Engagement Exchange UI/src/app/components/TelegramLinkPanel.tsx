@@ -46,6 +46,19 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
 
   useEffect(() => () => stopPolling(), []);
 
+  const finishIfAlreadyLinked = (message?: string) => {
+    toast.success(message || "Telegram is already connected to your account");
+    stopPolling();
+    setDeeplinkState("idle");
+    setDeeplinkUrl(null);
+    onLinked?.();
+  };
+
+  const isAlreadyLinkedError = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : "";
+    return msg.toLowerCase().includes("already connected");
+  };
+
   useEffect(() => {
     window.onTelegramLink = async (user) => {
       setWidgetBusy(true);
@@ -54,6 +67,10 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
         toast.success("Telegram connected to your account");
         onLinked?.();
       } catch (e: unknown) {
+        if (isAlreadyLinkedError(e)) {
+          finishIfAlreadyLinked();
+          return;
+        }
         toast.error(e instanceof Error ? e.message : "Could not connect Telegram");
       } finally {
         setWidgetBusy(false);
@@ -123,7 +140,12 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
     setDeeplinkUrl(null);
 
     try {
-      const { token } = await startTelegramLinkDeeplink();
+      const start = await startTelegramLinkDeeplink();
+      if (start.alreadyLinked) {
+        finishIfAlreadyLinked();
+        return;
+      }
+      const { token } = start;
       const url = `https://t.me/${BOT}?start=login_${token}`;
       setDeeplinkUrl(url);
       openTelegramBotUrl(url);
@@ -152,6 +174,10 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
       stopPolling();
       setDeeplinkState("idle");
       setDeeplinkUrl(null);
+      if (isAlreadyLinkedError(e)) {
+        finishIfAlreadyLinked();
+        return;
+      }
       toast.error(e instanceof Error ? e.message : "Could not start Telegram link");
     }
   };

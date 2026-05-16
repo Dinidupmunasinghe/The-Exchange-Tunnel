@@ -8,28 +8,26 @@ import { api } from "../services/api";
  */
 export function TelegramRequiredRoute() {
   const location = useLocation();
-  const [checked, setChecked] = useState(false);
-  const [hasTelegram, setHasTelegram] = useState(true);
+  const [check, setCheck] = useState<"loading" | "linked" | "unlinked">("loading");
 
   useEffect(() => {
     let cancelled = false;
     api
       .getProfile()
       .then((res) => {
-        if (!cancelled) setHasTelegram(Boolean(res.user?.telegramUserId));
+        if (cancelled) return;
+        setCheck(res.user?.telegramUserId ? "linked" : "unlinked");
       })
       .catch(() => {
-        if (!cancelled) setHasTelegram(false);
-      })
-      .finally(() => {
-        if (!cancelled) setChecked(true);
+        // Do not send users to connect-telegram when /users/me fails (e.g. transient DB errors).
+        if (!cancelled) setCheck("linked");
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (checked && !hasTelegram) {
+  if (check === "unlinked") {
     return <Navigate to="/connect-telegram" replace state={{ from: location }} />;
   }
 

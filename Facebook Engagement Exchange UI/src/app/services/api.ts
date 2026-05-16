@@ -228,8 +228,12 @@ export async function linkTelegramToAccount(auth: Record<string, string | number
   });
 }
 
+export type TelegramLinkDeeplinkStartResult =
+  | { alreadyLinked: true; user: unknown; expiresInMs: number }
+  | { alreadyLinked?: false; token: string; expiresInMs: number };
+
 export async function startTelegramLinkDeeplink() {
-  return authRequest<{ token: string; expiresInMs: number }>("/users/me/telegram/link-deeplink/start", {
+  return authRequest<TelegramLinkDeeplinkStartResult>("/users/me/telegram/link-deeplink/start", {
     method: "POST",
   });
 }
