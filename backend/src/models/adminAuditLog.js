@@ -2,7 +2,7 @@ module.exports = (sequelize, DataTypes) => {
   return sequelize.define(
     "AdminAuditLog",
     {
-      id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
+      id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
       adminEmail: { type: DataTypes.STRING(160), allowNull: false },
       action: { type: DataTypes.STRING(120), allowNull: false },
       targetType: { type: DataTypes.STRING(60), allowNull: true },

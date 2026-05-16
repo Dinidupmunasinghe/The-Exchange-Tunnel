@@ -2,11 +2,11 @@ module.exports = (sequelize, DataTypes) => {
   return sequelize.define(
     "Task",
     {
-      id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-      campaignId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
-      assignedUserId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+      id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+      campaignId: { type: DataTypes.INTEGER, allowNull: false },
+      assignedUserId: { type: DataTypes.INTEGER, allowNull: true },
       engagementType: { type: DataTypes.STRING(32), allowNull: false },
-      rewardCredits: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+      rewardCredits: { type: DataTypes.INTEGER, allowNull: false },
       status: {
         type: DataTypes.ENUM("open", "assigned", "completed", "cancelled"),
         allowNull: false,

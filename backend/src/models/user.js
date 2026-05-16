@@ -3,7 +3,7 @@ module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define(
     "User",
     {
-      id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
+      id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
       email: { type: DataTypes.STRING(120), allowNull: false, unique: true },
       passwordHash: { type: DataTypes.STRING(255), allowNull: false },
       name: { type: DataTypes.STRING(120), allowNull: true },
@@ -26,8 +26,8 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         field: "facebookPageAccessTokenEncrypted"
       },
-      credits: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
-      dailyEarnedCredits: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
+      credits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      dailyEarnedCredits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       dailyEarnedAt: { type: DataTypes.DATEONLY, allowNull: true },
       isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true }
     },

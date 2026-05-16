@@ -2,11 +2,11 @@ module.exports = (sequelize, DataTypes) => {
   return sequelize.define(
     "UserPostAction",
     {
-      id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-      userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+      id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+      userId: { type: DataTypes.INTEGER, allowNull: false },
       postKey: { type: DataTypes.STRING(255), allowNull: false },
       actionKind: { type: DataTypes.STRING(16), allowNull: false },
-      lastEngagementId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+      lastEngagementId: { type: DataTypes.INTEGER, allowNull: true },
       details: { type: DataTypes.TEXT, allowNull: true }
     },
     {

@@ -2,17 +2,17 @@ module.exports = (sequelize, DataTypes) => {
   return sequelize.define(
     "Campaign",
     {
-      id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-      userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+      id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+      userId: { type: DataTypes.INTEGER, allowNull: false },
       name: { type: DataTypes.STRING(160), allowNull: false, defaultValue: "Untitled campaign" },
       /** Stable key, e.g. t_username_5 or tc_internal_5 */
       messageKey: { type: DataTypes.STRING(255), allowNull: false, field: "facebookPostId" },
       messageUrl: { type: DataTypes.STRING(512), allowNull: false, field: "facebookPostUrl" },
       engagementType: { type: DataTypes.STRING(32), allowNull: false },
       scheduledLaunchAt: { type: DataTypes.DATE, allowNull: true },
-      creditsPerEngagement: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
-      maxEngagements: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
-      spentCredits: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
+      creditsPerEngagement: { type: DataTypes.INTEGER, allowNull: false },
+      maxEngagements: { type: DataTypes.INTEGER, allowNull: false },
+      spentCredits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       status: {
         type: DataTypes.ENUM("pending", "active", "paused", "completed"),
         allowNull: false,
