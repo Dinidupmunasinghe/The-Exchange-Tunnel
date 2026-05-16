@@ -541,14 +541,17 @@ export function EarnCredits() {
           const postedAgo = relativeCampaignTime(campaign.createdAt);
           const initials = campaignInitials(title);
           const cid = campaign.id;
-          const liked = hasEngagement(myEngagements, cid, "like");
           const likedEarned = isEngagementEarned(myEngagements, cid, "like", campaignTasks);
-          const commented = hasEngagement(myEngagements, cid, "comment");
+          const liked = hasEngagement(myEngagements, cid, "like") || likedEarned;
           const commentedEarned = isEngagementEarned(myEngagements, cid, "comment", campaignTasks);
-          const shared = hasEngagement(myEngagements, cid, "share") || (et === "share" && hasCompletedTask(campaignTasks));
+          const commented = hasEngagement(myEngagements, cid, "comment") || commentedEarned;
           const sharedEarned = isEngagementEarned(myEngagements, cid, "share", campaignTasks);
-          const subscribed = hasEngagement(myEngagements, cid, "subscribe");
+          const shared =
+            hasEngagement(myEngagements, cid, "share") ||
+            sharedEarned ||
+            (et === "share" && hasCompletedTask(campaignTasks));
           const subscribedEarned = isEngagementEarned(myEngagements, cid, "subscribe", campaignTasks);
+          const subscribed = hasEngagement(myEngagements, cid, "subscribe") || subscribedEarned;
           const isSubscribeCampaign = et === "subscribe";
           const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";

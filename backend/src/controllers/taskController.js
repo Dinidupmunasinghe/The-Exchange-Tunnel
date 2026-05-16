@@ -884,6 +884,47 @@ async function getAvailableTasks(req, res) {
     }
   }
 
+  const engagementRowKeys = new Set(
+    myEngagements.map((row) => engagementKey(row.campaignId, row.actionKind))
+  );
+  if (campaignIds.length > 0) {
+    const verifiedEngagements = await db.Engagement.findAll({
+      where: {
+        userId: req.user.id,
+        campaignId: { [Op.in]: campaignIds },
+        verificationStatus: "verified"
+      },
+      attributes: [
+        "id",
+        "campaignId",
+        "taskId",
+        "actionKind",
+        "engagementType",
+        "verificationDetails",
+        "metaEngagementId"
+      ]
+    });
+    for (const row of verifiedEngagements) {
+      const actionKind =
+        row.actionKind || (row.engagementType === "subscribe" ? "subscribe" : String(row.engagementType || ""));
+      if (!actionKind) continue;
+      const key = engagementKey(row.campaignId, actionKind);
+      if (engagementRowKeys.has(key)) continue;
+      engagementRowKeys.add(key);
+      myEngagements.push({
+        id: Number(row.id),
+        campaignId: Number(row.campaignId),
+        taskId: Number(row.taskId || 0),
+        actionKind,
+        verificationDetails: row.verificationDetails || null,
+        metaEngagementId: row.metaEngagementId || null,
+        source: "engagement",
+        preExisting: false,
+        earned: false
+      });
+    }
+  }
+
   const knownKeys = new Set(
     myEngagements.map((row) => engagementKey(row.campaignId, row.actionKind))
   );
