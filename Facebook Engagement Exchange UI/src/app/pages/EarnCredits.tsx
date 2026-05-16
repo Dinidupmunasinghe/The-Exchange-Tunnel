@@ -199,11 +199,14 @@ export function EarnCredits() {
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") void loadTasks(true);
+      if (document.visibilityState === "visible") {
+        void loadTasks(true);
+        void loadProfileStatus();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [loadTasks]);
+  }, [loadTasks, loadProfileStatus]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -449,6 +452,8 @@ export function EarnCredits() {
     }
   };
 
+  const earnSetupReady = hasTelegram === true && hasMtprotoSession === true;
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -462,15 +467,17 @@ export function EarnCredits() {
         </Button>
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-        <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          <span className="font-medium text-foreground">Connect Telegram</span> in Settings and connect a user session
-          so we can act on your behalf. For post campaigns, Telegram usually requires you to join the channel before you
-          can like or comment; if you are not a member yet, the app will try to join the channel automatically when you
-          tap Like or Comment (same as subscribe campaigns).
-        </p>
-      </div>
+      {!earnSetupReady ? (
+        <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+          <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            <span className="font-medium text-foreground">Connect Telegram</span> in Settings and connect a user session
+            so we can act on your behalf. For post campaigns, Telegram usually requires you to join the channel before you
+            can like or comment; if you are not a member yet, the app will try to join the channel automatically when you
+            tap Like or Comment (same as subscribe campaigns).
+          </p>
+        </div>
+      ) : null}
       {hasTelegram === false ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
           Sign in with Telegram on{" "}
