@@ -61,7 +61,7 @@ async function auditSubscribeEngagements() {
       }
     ],
     order: [["id", "DESC"]],
-    limit: 500
+    limit: Number(process.env.AUDIT_BATCH_SIZE || 25)
   });
 
   let reversed = 0;
@@ -155,7 +155,7 @@ async function auditSubscriptionMemory() {
   const rows = await db.UserSubscriptionMemory.findAll({
     include: [{ model: db.User, as: "user", required: true, attributes: ["id", "telegramUserId"] }],
     order: [["id", "DESC"]],
-    limit: 1000
+    limit: Number(process.env.AUDIT_BATCH_SIZE || 25)
   });
 
   let cleared = 0;

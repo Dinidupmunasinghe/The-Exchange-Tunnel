@@ -79,8 +79,14 @@ async function ensureActionKindColumnCompatibility() {
   }
 }
 
-const AUDIT_INTERVAL_MS = Number(process.env.AUDIT_INTERVAL_MS || 5 * 60 * 1000);
-const AUDITS_ENABLED = String(process.env.AUDITS_ENABLED || "true").toLowerCase() !== "false";
+const AUDIT_INTERVAL_MS = Number(process.env.AUDIT_INTERVAL_MS || 10 * 60 * 1000);
+// On constrained hosts the per-audit Python (Telethon) spawns can OOM the
+// service. Default OFF in production; users can opt in by setting
+// AUDITS_ENABLED=true. Audits are not required for normal operation — the
+// pre-existing detection probes run on demand when users open /earn.
+const AUDITS_ENABLED =
+  String(process.env.AUDITS_ENABLED || (env.nodeEnv === "production" ? "false" : "true"))
+    .toLowerCase() === "true";
 
 function staggerInterval(fn, intervalMs, offsetMs) {
   setTimeout(() => {

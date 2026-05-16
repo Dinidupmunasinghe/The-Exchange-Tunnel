@@ -72,7 +72,7 @@ async function auditCommentDeletions() {
       }
     ],
     order: [["id", "DESC"]],
-    limit: 500
+    limit: Number(process.env.AUDIT_BATCH_SIZE || 25)
   });
 
   let reversed = 0;
