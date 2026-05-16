@@ -203,6 +203,7 @@ export function EarnCredits() {
   const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
   const [avatarLoadedByCampaign, setAvatarLoadedByCampaign] = useState<Record<number, boolean>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
   const syncInFlightRef = useRef(false);
 
   const loadProfileStatus = useCallback(async () => {
@@ -221,6 +222,7 @@ export function EarnCredits() {
     const res = await api.getTasks({ fast: true });
     setTasks(Array.isArray(res?.tasks) ? (res.tasks as TaskRow[]) : []);
     setMyEngagements(Array.isArray(res?.myEngagements) ? res.myEngagements : []);
+    setLoadError(null);
     return res;
   }, []);
 
@@ -256,9 +258,9 @@ export function EarnCredits() {
         await refreshTasksFast();
         void syncTelegramState({ force: forceSync });
       } catch (error: unknown) {
-        if (!silent) {
-          toast.error(error instanceof Error ? error.message : "Could not load tasks");
-        }
+        const message = error instanceof Error ? error.message : "Could not load tasks";
+        setLoadError(message);
+        if (!silent) toast.error(message);
       } finally {
         if (!silent) setLoading(false);
       }
@@ -577,9 +579,15 @@ export function EarnCredits() {
         {loading && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Loading feed…</p>
         ) : null}
-        {!loading && tasks.length === 0 ? (
+        {!loading && loadError ? (
+          <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">
+            Couldn't load feed: <span className="font-medium">{loadError}</span>
+          </div>
+        ) : null}
+        {!loading && !loadError && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No tasks in your feed. Try Refresh, or wait for an active campaign from another member.
+            No tasks in your feed. This usually means there are no open campaigns from other members right now, or your
+            own campaigns are filtered out. Try Refresh, or wait for an active campaign from another member.
           </p>
         ) : null}
 
