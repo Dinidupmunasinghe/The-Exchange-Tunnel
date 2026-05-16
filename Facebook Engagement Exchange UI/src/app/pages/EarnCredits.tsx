@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus, Loader2, SendHorizontal, Trash2, Repeat2 } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
@@ -203,7 +203,7 @@ export function EarnCredits() {
   const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
   const [avatarLoadedByCampaign, setAvatarLoadedByCampaign] = useState<Record<number, boolean>>({});
-  const [syncingTelegram, setSyncingTelegram] = useState(false);
+  const syncInFlightRef = useRef(false);
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -224,30 +224,25 @@ export function EarnCredits() {
     return res;
   }, []);
 
-  const syncTelegramState = useCallback(async (opts?: { force?: boolean; quiet?: boolean }) => {
+  const syncTelegramState = useCallback(async (opts?: { force?: boolean }) => {
     if (!shouldRunTelegramSync(opts?.force)) return;
-    setSyncingTelegram(true);
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
     try {
       const sync = await api.syncTelegramEngagementState();
       if (sync?.myEngagements) setMyEngagements(sync.myEngagements);
       markTelegramSyncDone();
-    } catch (error: unknown) {
-      if (!opts?.quiet) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not verify your existing Telegram actions. Check Settings → User Session."
-        );
-      }
+    } catch {
+      // Background audit only — no UI blocking or banners.
     } finally {
-      setSyncingTelegram(false);
+      syncInFlightRef.current = false;
     }
   }, []);
 
   const refreshFeed = useCallback(
     async (opts?: { forceSync?: boolean }) => {
       await refreshTasksFast();
-      void syncTelegramState({ force: opts?.forceSync, quiet: true });
+      void syncTelegramState({ force: opts?.forceSync });
     },
     [refreshTasksFast, syncTelegramState]
   );
@@ -259,8 +254,7 @@ export function EarnCredits() {
       if (!silent) setLoading(true);
       try {
         await refreshTasksFast();
-        if (!silent) setLoading(false);
-        void syncTelegramState({ force: forceSync, quiet: !forceSync });
+        void syncTelegramState({ force: forceSync });
       } catch (error: unknown) {
         if (!silent) {
           toast.error(error instanceof Error ? error.message : "Could not load tasks");
@@ -282,7 +276,7 @@ export function EarnCredits() {
       if (document.visibilityState === "visible") {
         void refreshTasksFast();
         void loadProfileStatus();
-        void syncTelegramState({ quiet: true });
+        void syncTelegramState();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -540,10 +534,10 @@ export function EarnCredits() {
           type="button"
           variant="outline"
           size="sm"
-          disabled={loading || syncingTelegram}
+          disabled={loading}
           onClick={() => void loadTasks({ forceSync: true })}
         >
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading || syncingTelegram ? "animate-spin" : ""}`} />
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh feed
         </Button>
       </div>
@@ -581,11 +575,6 @@ export function EarnCredits() {
       <div className="space-y-6">
         {loading && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Loading feed…</p>
-        ) : null}
-        {!loading && syncingTelegram ? (
-          <p className="text-xs text-muted-foreground/80">
-            Updating button states from Telegram in the background…
-          </p>
         ) : null}
         {!loading && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">
