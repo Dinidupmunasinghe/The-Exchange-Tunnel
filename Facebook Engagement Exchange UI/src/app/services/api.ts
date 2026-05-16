@@ -335,8 +335,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  getTasks: () =>
-    authRequest("/tasks") as Promise<{
+  getTasks: (opts?: { fast?: boolean }) =>
+    authRequest(`/tasks${opts?.fast ? "?fast=1" : ""}`) as Promise<{
       tasks: any[];
       myEngagements: {
         id: number;
@@ -345,6 +345,8 @@ export const api = {
         actionKind: string;
         verificationDetails?: string | null;
         metaEngagementId?: string | null;
+        preExisting?: boolean;
+        earned?: boolean;
       }[];
     }>,
   completeTask: (payload: {

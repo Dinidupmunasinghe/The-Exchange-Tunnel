@@ -197,7 +197,17 @@ export function EarnCredits() {
   const loadTasks = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await api.getTasks();
+      if (!silent) {
+        const quick = await api.getTasks({ fast: true });
+        setTasks(quick.tasks as TaskRow[]);
+        setMyEngagements(quick.myEngagements ?? []);
+        setLoading(false);
+        const full = await api.getTasks({ fast: false });
+        setTasks(full.tasks as TaskRow[]);
+        setMyEngagements(full.myEngagements ?? []);
+        return;
+      }
+      const res = await api.getTasks({ fast: true });
       setTasks(res.tasks as TaskRow[]);
       setMyEngagements(res.myEngagements ?? []);
     } catch (error: unknown) {

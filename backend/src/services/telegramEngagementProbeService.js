@@ -2,7 +2,14 @@ const tg = require("./telegramService");
 const { runBridge } = require("./telegramMtprotoService");
 const { decrypt } = require("../utils/crypto");
 
-const MAX_PROBES_PER_FEED = 48;
+const MAX_SUBSCRIBE_PROBES = 12;
+const PROBE_CONCURRENCY = 4;
+const PROBE_CACHE_TTL_MS = 10 * 60 * 1000;
+const PROBE_GLOBAL_BUDGET_MS = 9000;
+const MTPROTO_PROBE_TIMEOUT_MS = 6000;
+
+/** @type {Map<string, { isMember: boolean, expires: number }>} */
+const subscribeProbeCache = new Map();
 
 function parseTmeChannelUsername(url) {
   try {
@@ -49,11 +56,40 @@ function engagementKey(campaignId, actionKind) {
   return `${Number(campaignId)}:${String(actionKind)}`;
 }
 
-/**
- * Detect channel membership via bot API, then fall back to the worker's MTProto
- * session (same account used for earn actions — catches subscriptions from before
- * the campaign existed).
- */
+function cacheKey(userId, channelKey) {
+  return `${userId}:${channelKey}`;
+}
+
+function readCache(userId, channelKey) {
+  const row = subscribeProbeCache.get(cacheKey(userId, channelKey));
+  if (!row) return null;
+  if (row.expires < Date.now()) {
+    subscribeProbeCache.delete(cacheKey(userId, channelKey));
+    return null;
+  }
+  return row.isMember;
+}
+
+function writeCache(userId, channelKey, isMember) {
+  subscribeProbeCache.set(cacheKey(userId, channelKey), {
+    isMember: Boolean(isMember),
+    expires: Date.now() + PROBE_CACHE_TTL_MS
+  });
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        const err = new Error("probe timeout");
+        err.code = "PROBE_TIMEOUT";
+        reject(err);
+      }, ms);
+    })
+  ]);
+}
+
 async function probeSubscribeOnTelegram(telegramUserId, messageUrl, messageKey, creds, sessionString) {
   if (!telegramUserId) return false;
 
@@ -63,9 +99,6 @@ async function probeSubscribeOnTelegram(telegramUserId, messageUrl, messageKey, 
   if (!channelChatId && username) {
     const chat = await tg.getChat(`@${username}`).catch(() => null);
     if (chat?.id != null) channelChatId = String(chat.id);
-  }
-  if (!username && messageUrl) {
-    username = parseTmeChannelUsername(messageUrl);
   }
 
   if (tg.isConfigured() && channelChatId) {
@@ -77,13 +110,16 @@ async function probeSubscribeOnTelegram(telegramUserId, messageUrl, messageKey, 
     const channelRef = username ? `@${username}` : channelChatId;
     if (!channelRef) return false;
     try {
-      const out = await runBridge("check_channel_member", {
-        apiId: creds.apiId,
-        apiHash: creds.apiHash,
-        proxy: creds.proxy || null,
-        sessionString,
-        channel: channelRef
-      });
+      const out = await withTimeout(
+        runBridge("check_channel_member", {
+          apiId: creds.apiId,
+          apiHash: creds.apiHash,
+          proxy: creds.proxy || null,
+          sessionString,
+          channel: channelRef
+        }),
+        MTPROTO_PROBE_TIMEOUT_MS
+      );
       return Boolean(out?.isMember);
     } catch {
       return false;
@@ -93,115 +129,106 @@ async function probeSubscribeOnTelegram(telegramUserId, messageUrl, messageKey, 
   return false;
 }
 
-async function probeLikeOnTelegram(creds, sessionString, messageUrl, reaction = "👍") {
-  if (!creds || !sessionString) return { chosen: false, known: false };
-  const parsedMessage = tg.parseTmeMessageUrl(String(messageUrl || ""));
-  if (!parsedMessage?.messageId) return { chosen: false, known: false };
-
-  const chatCandidates = [];
-  if (parsedMessage.kind === "public" && parsedMessage.username) {
-    chatCandidates.push(`@${String(parsedMessage.username).replace(/^@/, "")}`);
-  }
-  try {
-    const resolved = await tg.resolveChannelChatIdFromTme(parsedMessage, null);
-    if (resolved?.chatId) chatCandidates.push(String(resolved.chatId));
-  } catch {
-    // ignore
-  }
-
-  for (const chatRef of chatCandidates) {
-    try {
-      const out = await runBridge("verify_reaction", {
-        apiId: creds.apiId,
-        apiHash: creds.apiHash,
-        proxy: creds.proxy || null,
-        sessionString,
-        chat: chatRef,
-        msgId: Number(parsedMessage.messageId),
-        reaction
-      });
-      return { chosen: Boolean(out?.chosen), known: Boolean(out?.known) };
-    } catch {
-      // try next chat ref
+async function mapPool(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let index = 0;
+  async function worker() {
+    while (index < items.length) {
+      const i = index;
+      index += 1;
+      results[i] = await mapper(items[i], i);
     }
   }
-  return { chosen: false, known: false };
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
 /**
- * Live Telegram checks for earn-feed cards: detect actions the worker already
- * performed outside this campaign (no credits until they complete a task).
+ * Collect unique subscribe channels that still need a live Telegram check.
+ */
+function collectSubscribeProbeTargets(tasks, knownKeys) {
+  const byChannelKey = new Map();
+  for (const task of tasks) {
+    const campaign = task?.campaign;
+    if (!campaign || campaign.engagementType !== "subscribe") continue;
+    const campaignId = Number(campaign.id);
+    const key = engagementKey(campaignId, "subscribe");
+    if (knownKeys.has(key)) continue;
+    const channelKey = String(campaign.messageKey || `sub_${campaignId}`);
+    if (byChannelKey.has(channelKey)) continue;
+    byChannelKey.set(channelKey, {
+      channelKey,
+      messageUrl: String(campaign.messageUrl || campaign.soundcloudPostUrl || ""),
+      messageKey: String(campaign.messageKey || ""),
+      campaignId
+    });
+    if (byChannelKey.size >= MAX_SUBSCRIBE_PROBES) break;
+  }
+  return [...byChannelKey.values()];
+}
+
+/**
+ * Live Telegram subscribe checks (earn feed). Like/repost pre-checks are skipped here
+ * because MTProto bridge calls are too slow for page load.
  */
 async function probePreExistingEngagements({ worker, tasks, knownKeys }) {
-  const additions = [];
-  if (!worker?.telegramUserId) return additions;
+  if (!worker?.telegramUserId) return [];
 
+  const userId = Number(worker.id);
   const tUid = String(worker.telegramUserId);
   const creds = parseStoredMtprotoCredentials(worker);
   const sessionString = parseStoredSessionString(worker);
-  const seenSubscribeKeys = new Set();
-  const seenLikePostKeys = new Set();
-  let probes = 0;
+  const targets = collectSubscribeProbeTargets(tasks, knownKeys);
+  if (targets.length === 0) return [];
 
-  for (const task of tasks) {
-    if (probes >= MAX_PROBES_PER_FEED) break;
-    const campaign = task?.campaign;
-    if (!campaign) continue;
-    const campaignId = Number(campaign.id);
-    const messageUrl = String(campaign.messageUrl || campaign.soundcloudPostUrl || "");
-    const messageKey = String(campaign.messageKey || "");
-    const engagementType = String(campaign.engagementType || "");
+  const runProbes = async () => {
+    const memberByChannelKey = new Map();
+    await mapPool(targets, PROBE_CONCURRENCY, async (target) => {
+      const cached = readCache(userId, target.channelKey);
+      if (cached != null) {
+        memberByChannelKey.set(target.channelKey, cached);
+        return;
+      }
+      const isMember = await probeSubscribeOnTelegram(
+        tUid,
+        target.messageUrl,
+        target.messageKey,
+        creds,
+        sessionString
+      );
+      writeCache(userId, target.channelKey, isMember);
+      memberByChannelKey.set(target.channelKey, isMember);
+    });
+    return memberByChannelKey;
+  };
 
-    if (engagementType === "subscribe") {
-      const key = engagementKey(campaignId, "subscribe");
-      if (knownKeys.has(key)) continue;
-      const channelKey = messageKey || `sub_${campaignId}`;
-      if (seenSubscribeKeys.has(channelKey)) continue;
-      seenSubscribeKeys.add(channelKey);
-      probes += 1;
-      const isMember = await probeSubscribeOnTelegram(tUid, messageUrl, messageKey, creds, sessionString);
-      if (!isMember) continue;
-      knownKeys.add(key);
-      additions.push({
-        id: 0,
-        campaignId,
-        taskId: 0,
-        actionKind: "subscribe",
-        verificationDetails: "Telegram: already subscribed before this campaign",
-        metaEngagementId: null,
-        source: "telegram",
-        preExisting: true,
-        earned: false
-      });
-      continue;
-    }
+  let memberByChannelKey;
+  try {
+    memberByChannelKey = await withTimeout(runProbes(), PROBE_GLOBAL_BUDGET_MS);
+  } catch {
+    return [];
+  }
 
-    if (engagementType !== "like" && engagementType !== "like_comment") continue;
-    const likeKey = engagementKey(campaignId, "like");
-    if (knownKeys.has(likeKey)) continue;
-    const postKey = messageKey;
-    if (!postKey || seenLikePostKeys.has(postKey)) continue;
-    if (!creds || !sessionString) continue;
-
-    seenLikePostKeys.add(postKey);
-    probes += 1;
-    const reactionState = await probeLikeOnTelegram(creds, sessionString, messageUrl, "👍");
-    if (!reactionState.known || !reactionState.chosen) continue;
-
-    knownKeys.add(likeKey);
+  const additions = [];
+  for (const target of targets) {
+    if (!memberByChannelKey.get(target.channelKey)) continue;
+    const key = engagementKey(target.campaignId, "subscribe");
+    if (knownKeys.has(key)) continue;
+    knownKeys.add(key);
     additions.push({
       id: 0,
-      campaignId,
+      campaignId: target.campaignId,
       taskId: 0,
-      actionKind: "like",
-      verificationDetails: "Telegram: reaction already on post before this campaign",
+      actionKind: "subscribe",
+      verificationDetails: "Telegram: already subscribed before this campaign",
       metaEngagementId: null,
       source: "telegram",
       preExisting: true,
-      earned: false
+      earned: false,
+      channelKey: target.channelKey
     });
   }
-
   return additions;
 }
 
@@ -221,6 +248,5 @@ module.exports = {
   probePreExistingEngagements,
   markEarnedFlags,
   engagementKey,
-  probeSubscribeOnTelegram,
-  probeLikeOnTelegram
+  probeSubscribeOnTelegram
 };

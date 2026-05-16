@@ -786,15 +786,20 @@ async function getAvailableTasks(req, res) {
   const ownerTelegramIds = [
     ...new Set(
       tasks
-        .map((t) => t?.campaign?.owner?.telegramUserId)
-        .filter((v) => v != null)
-        .map((v) => String(v))
+        .filter((t) => {
+          const o = t?.campaign?.owner;
+          if (!o?.telegramUserId) return false;
+          return !String(o.profilePhotoUrl || "").trim();
+        })
+        .map((t) => String(t.campaign.owner.telegramUserId))
     )
   ];
-  for (const tid of ownerTelegramIds) {
-    const avatarUrl = await tg.getUserProfilePhotoUrl(tid).catch(() => null);
-    if (avatarUrl) avatarByTelegramId.set(tid, avatarUrl);
-  }
+  await Promise.all(
+    ownerTelegramIds.map(async (tid) => {
+      const avatarUrl = await tg.getUserProfilePhotoUrl(tid).catch(() => null);
+      if (avatarUrl) avatarByTelegramId.set(tid, avatarUrl);
+    })
+  );
   const serialized = tasks.map((t) => {
     const o = t.toJSON();
     if (o.campaign) {
@@ -887,6 +892,7 @@ async function getAvailableTasks(req, res) {
   const engagementRowKeys = new Set(
     myEngagements.map((row) => engagementKey(row.campaignId, row.actionKind))
   );
+  const earnedKeys = new Set();
   if (campaignIds.length > 0) {
     const verifiedEngagements = await db.Engagement.findAll({
       where: {
@@ -902,13 +908,17 @@ async function getAvailableTasks(req, res) {
         "engagementType",
         "verificationDetails",
         "metaEngagementId"
-      ]
+      ],
+      include: [{ model: db.Task, as: "task", required: true, attributes: ["status"] }]
     });
     for (const row of verifiedEngagements) {
       const actionKind =
         row.actionKind || (row.engagementType === "subscribe" ? "subscribe" : String(row.engagementType || ""));
       if (!actionKind) continue;
       const key = engagementKey(row.campaignId, actionKind);
+      if (row.task?.status === "completed") {
+        earnedKeys.add(key);
+      }
       if (engagementRowKeys.has(key)) continue;
       engagementRowKeys.add(key);
       myEngagements.push({
@@ -928,19 +938,23 @@ async function getAvailableTasks(req, res) {
   const knownKeys = new Set(
     myEngagements.map((row) => engagementKey(row.campaignId, row.actionKind))
   );
-  const worker = await db.User.findByPk(req.user.id, {
-    attributes: [
-      "id",
-      "telegramUserId",
-      "userOAuthTokenEncrypted",
-      "userActingTokenEncrypted"
-    ]
-  });
-  const probedRaw = await probePreExistingEngagements({
-    worker,
-    tasks,
-    knownKeys
-  });
+  const skipProbe = String(req.query.probe || "") === "0" || String(req.query.fast || "") === "1";
+  let probedRaw = [];
+  if (!skipProbe) {
+    const worker = await db.User.findByPk(req.user.id, {
+      attributes: [
+        "id",
+        "telegramUserId",
+        "userOAuthTokenEncrypted",
+        "userActingTokenEncrypted"
+      ]
+    });
+    probedRaw = await probePreExistingEngagements({
+      worker,
+      tasks,
+      knownKeys
+    });
+  }
   const probed = [];
   for (const row of probedRaw) {
     if (row.actionKind === "subscribe") {
@@ -957,45 +971,22 @@ async function getAvailableTasks(req, res) {
       }
       continue;
     }
-    if (row.actionKind === "like") {
-      const camp = tasks.find((t) => Number(t.campaign?.id) === row.campaignId)?.campaign;
-      const postKey = String(camp?.messageKey || "");
-      const ids = campaignList.filter((c) => String(c.messageKey) === postKey).map((c) => Number(c.id));
-      for (const cid of ids.length ? ids : [row.campaignId]) {
-        const key = engagementKey(cid, "like");
-        if (knownKeys.has(key)) continue;
-        knownKeys.add(key);
-        probed.push({ ...row, campaignId: cid });
-      }
-      continue;
-    }
     probed.push(row);
   }
   myEngagements.push(...probed);
 
-  for (const row of probed) {
-    if (row.actionKind !== "subscribe" || !row.preExisting) continue;
-    const camp = tasks.find((t) => Number(t.campaign?.id) === row.campaignId)?.campaign;
-    const channelKey = String(camp?.messageKey || "");
-    if (!channelKey) continue;
-    await db.UserSubscriptionMemory.upsert({
-      userId: req.user.id,
-      channelKey,
-      lastEngagementId: null,
-      details: row.verificationDetails || "Telegram: already subscribed before this campaign"
-    });
-  }
-
-  const verifiedRows = await db.Engagement.findAll({
-    where: { userId: req.user.id, verificationStatus: "verified" },
-    attributes: ["campaignId", "actionKind", "engagementType"],
-    include: [{ model: db.Task, as: "task", required: true, where: { status: "completed" }, attributes: [] }]
-  });
-  const earnedKeys = new Set();
-  for (const row of verifiedRows) {
-    const kind =
-      row.actionKind || (row.engagementType === "subscribe" ? "subscribe" : String(row.engagementType || ""));
-    if (kind) earnedKeys.add(engagementKey(row.campaignId, kind));
+  const memoryUpserts = probed
+    .filter((row) => row.actionKind === "subscribe" && row.preExisting && row.channelKey)
+    .map((row) =>
+      db.UserSubscriptionMemory.upsert({
+        userId: req.user.id,
+        channelKey: String(row.channelKey),
+        lastEngagementId: null,
+        details: row.verificationDetails || "Telegram: already subscribed before this campaign"
+      })
+    );
+  if (memoryUpserts.length) {
+    void Promise.all(memoryUpserts).catch(() => undefined);
   }
 
   return res.json({
