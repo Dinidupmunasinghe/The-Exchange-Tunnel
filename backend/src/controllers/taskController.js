@@ -7,6 +7,12 @@ const { verifyEngagement } = require("../services/engagementVerification");
 const { earnCredits, refundCredits, reverseEarnCredits } = require("../services/creditService");
 const { ENGAGEMENT_TYPES, ACTION_KINDS, bundleAllowsAction } = require("../constants/engagement");
 const commentDetectionStore = require("../services/commentDetectionStore");
+const {
+  probePreExistingEngagements,
+  markEarnedFlags,
+  engagementKey,
+  probeLikeOnTelegram
+} = require("../services/telegramEngagementProbeService");
 const { decrypt } = require("../utils/crypto");
 const crypto = require("crypto");
 
@@ -427,6 +433,15 @@ async function submitTaskCompletion(req, res) {
           throw error;
         }
         const chosenReaction = typeof reaction === "string" && reaction.trim() ? reaction.trim() : "👍";
+        const msgUrlForLike = String(c.messageUrl || c.soundcloudPostUrl || "");
+        const priorLike = await probeLikeOnTelegram(creds, sessionString, msgUrlForLike, chosenReaction);
+        if (priorLike.known && priorLike.chosen) {
+          const error = new Error(
+            "Your Telegram account already has this reaction on the post. Remove it on Telegram first, then try again."
+          );
+          error.status = 400;
+          throw error;
+        }
         try {
           const chatCandidates = [];
           if (parsedMessage.kind === "public" && parsedMessage.username) {
@@ -839,7 +854,10 @@ async function getAvailableTasks(req, res) {
         taskId: 0,
         actionKind: String(row.actionKind),
         verificationDetails: row.details || null,
-        metaEngagementId: null
+        metaEngagementId: null,
+        source: "memory",
+        preExisting: false,
+        earned: false
       });
     }
   }
@@ -858,11 +876,78 @@ async function getAvailableTasks(req, res) {
         taskId: 0,
         actionKind: "subscribe",
         verificationDetails: row.details || null,
-        metaEngagementId: null
+        metaEngagementId: null,
+        source: "memory",
+        preExisting: false,
+        earned: false
       });
     }
   }
-  return res.json({ tasks: serialized, myEngagements });
+
+  const knownKeys = new Set(
+    myEngagements.map((row) => engagementKey(row.campaignId, row.actionKind))
+  );
+  const worker = await db.User.findByPk(req.user.id, {
+    attributes: [
+      "id",
+      "telegramUserId",
+      "userOAuthTokenEncrypted",
+      "userActingTokenEncrypted"
+    ]
+  });
+  const probedRaw = await probePreExistingEngagements({
+    worker,
+    tasks,
+    knownKeys
+  });
+  const probed = [];
+  for (const row of probedRaw) {
+    if (row.actionKind === "subscribe") {
+      const camp = tasks.find((t) => Number(t.campaign?.id) === row.campaignId)?.campaign;
+      const channelKey = String(camp?.messageKey || `sub_${row.campaignId}`);
+      const ids = subscribeCampaigns
+        .filter((c) => String(c.channelKey) === channelKey)
+        .map((c) => Number(c.id));
+      for (const cid of ids.length ? ids : [row.campaignId]) {
+        const key = engagementKey(cid, "subscribe");
+        if (knownKeys.has(key)) continue;
+        knownKeys.add(key);
+        probed.push({ ...row, campaignId: cid });
+      }
+      continue;
+    }
+    if (row.actionKind === "like") {
+      const camp = tasks.find((t) => Number(t.campaign?.id) === row.campaignId)?.campaign;
+      const postKey = String(camp?.messageKey || "");
+      const ids = campaignList.filter((c) => String(c.messageKey) === postKey).map((c) => Number(c.id));
+      for (const cid of ids.length ? ids : [row.campaignId]) {
+        const key = engagementKey(cid, "like");
+        if (knownKeys.has(key)) continue;
+        knownKeys.add(key);
+        probed.push({ ...row, campaignId: cid });
+      }
+      continue;
+    }
+    probed.push(row);
+  }
+  myEngagements.push(...probed);
+
+  const verifiedRows = await db.Engagement.findAll({
+    where: { userId: req.user.id, verificationStatus: "verified" },
+    attributes: ["campaignId", "actionKind", "engagementType"],
+    include: [{ model: db.Task, as: "task", required: true, where: { status: "completed" }, attributes: [] }]
+  });
+  const earnedKeys = new Set();
+  for (const row of verifiedRows) {
+    const kind =
+      row.actionKind || (row.engagementType === "subscribe" ? "subscribe" : String(row.engagementType || ""));
+    if (kind) earnedKeys.add(engagementKey(row.campaignId, kind));
+  }
+
+  return res.json({
+    tasks: serialized,
+    myEngagements: markEarnedFlags(myEngagements, earnedKeys)
+  });
 }
 
 async function startCommentDetection(req, res) {

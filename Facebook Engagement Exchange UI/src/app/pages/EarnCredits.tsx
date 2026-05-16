@@ -47,6 +47,9 @@ type MyEngagementRow = {
   actionKind: string;
   verificationDetails?: string | null;
   metaEngagementId?: string | null;
+  source?: "memory" | "telegram" | string;
+  preExisting?: boolean;
+  earned?: boolean;
 };
 const REACTION_CHOICES = ["👍", "🔥", "❤️", "👏", "🤩", "🎉"];
 function campaignInitials(title: string): string {
@@ -67,8 +70,22 @@ function relativeCampaignTime(iso: string | undefined): string {
   }
 }
 
+function getEngagement(rows: MyEngagementRow[], campaignId: number, kind: string): MyEngagementRow | undefined {
+  return rows.find((e) => e.campaignId === campaignId && e.actionKind === kind);
+}
+
 function hasEngagement(rows: MyEngagementRow[], campaignId: number, kind: string): boolean {
-  return rows.some((e) => e.campaignId === campaignId && e.actionKind === kind);
+  return Boolean(getEngagement(rows, campaignId, kind));
+}
+
+function isEngagementEarned(
+  rows: MyEngagementRow[],
+  campaignId: number,
+  kind: string,
+  campaignTasks: TaskRow[]
+): boolean {
+  if (kind === "subscribe" && hasCompletedTask(campaignTasks)) return true;
+  return Boolean(getEngagement(rows, campaignId, kind)?.earned);
 }
 
 function extractTelegramUsernameFromUrl(url: string | undefined): string | null {
@@ -244,10 +261,13 @@ export function EarnCredits() {
     if (!bundleAllowsAction(engagementType, action)) return;
     try {
       if (action === "subscribe") {
-        const subscribedAlready =
-          hasCompletedTask(campaignTasks) ||
-          myEngagements.some((e) => e.campaignId === campaignId && e.actionKind === "subscribe");
-        if (subscribedAlready) {
+        const subscribedAlready = hasEngagement(myEngagements, campaignId, "subscribe");
+        const subscribedEarned = isEngagementEarned(myEngagements, campaignId, "subscribe", campaignTasks);
+        if (subscribedAlready && !subscribedEarned) {
+          toast.info("You are already subscribed on Telegram. This campaign only rewards a new subscribe.");
+          return;
+        }
+        if (subscribedAlready && subscribedEarned) {
           const key = `${campaignId}-unsubscribe`;
           setBusy(key);
           const res = await api.revertEngagement({ campaignId, actionKind: "subscribe" });
@@ -330,7 +350,12 @@ export function EarnCredits() {
       }
       if (action === "like") {
         const likedAlready = hasEngagement(myEngagements, campaignId, "like");
-        if (likedAlready) {
+        const likedEarned = isEngagementEarned(myEngagements, campaignId, "like", campaignTasks);
+        if (likedAlready && !likedEarned) {
+          toast.info("You already liked this post on Telegram. Remove the reaction there to earn on a new slot.");
+          return;
+        }
+        if (likedAlready && likedEarned) {
           const key = `${campaignId}-unlike`;
           setBusy(key);
           const res = await api.revertEngagement({
@@ -517,11 +542,13 @@ export function EarnCredits() {
           const initials = campaignInitials(title);
           const cid = campaign.id;
           const liked = hasEngagement(myEngagements, cid, "like");
+          const likedEarned = isEngagementEarned(myEngagements, cid, "like", campaignTasks);
           const commented = hasEngagement(myEngagements, cid, "comment");
+          const commentedEarned = isEngagementEarned(myEngagements, cid, "comment", campaignTasks);
           const shared = hasEngagement(myEngagements, cid, "share") || (et === "share" && hasCompletedTask(campaignTasks));
-          const subscribed =
-            hasCompletedTask(campaignTasks) ||
-            myEngagements.some((e) => e.campaignId === cid && e.actionKind === "subscribe");
+          const sharedEarned = isEngagementEarned(myEngagements, cid, "share", campaignTasks);
+          const subscribed = hasEngagement(myEngagements, cid, "subscribe");
+          const subscribedEarned = isEngagementEarned(myEngagements, cid, "subscribe", campaignTasks);
           const isSubscribeCampaign = et === "subscribe";
           const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
@@ -616,7 +643,12 @@ export function EarnCredits() {
                     size="sm"
                     className="rounded-full pr-3"
                     onClick={() => void handleAction(cid, campaignTasks, et, "subscribe")}
-                    disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                    disabled={
+                      busy !== null ||
+                      hasTelegram === false ||
+                      hasMtprotoSession !== true ||
+                      (subscribed && !subscribedEarned)
+                    }
                   >
                     {busy === `${cid}-subscribe` || busy === `${cid}-unsubscribe` ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -628,11 +660,15 @@ export function EarnCredits() {
                       : busy === `${cid}-unsubscribe`
                         ? "Unsubscribing..."
                         : subscribed
-                          ? "Unsubscribe"
+                          ? subscribedEarned
+                            ? "Unsubscribe"
+                            : "Subscribed"
                           : "Subscribe"}
-                    <Badge className={subscribed ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
-                      +{reward}
-                    </Badge>
+                    {subscribed && !subscribedEarned ? null : (
+                      <Badge className={subscribed ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
+                        +{reward}
+                      </Badge>
+                    )}
                   </Button>
                 ) : null}
                 {!isSubscribeCampaign ? (
@@ -673,7 +709,8 @@ export function EarnCredits() {
                     !bundleAllowsAction(et, "like") ||
                     busy !== null ||
                     hasTelegram === false ||
-                    hasMtprotoSession !== true
+                    hasMtprotoSession !== true ||
+                    (liked && !likedEarned)
                   }
                 >
                   {busy === `${cid}-like` || busy === `${cid}-unlike` ? (
@@ -686,11 +723,15 @@ export function EarnCredits() {
                     : busy === `${cid}-unlike`
                       ? "Removing..."
                       : liked
-                        ? "Unlike"
+                        ? likedEarned
+                          ? "Unlike"
+                          : "Liked"
                         : "Like"}
-                  <Badge className={liked ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
-                    +{reward}
-                  </Badge>
+                  {liked && !likedEarned ? null : (
+                    <Badge className={liked ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
+                      +{reward}
+                    </Badge>
+                  )}
                 </Button>
                 </div>
                 ) : null}
@@ -749,7 +790,7 @@ export function EarnCredits() {
                         size="icon"
                         className="h-6 w-6 rounded-full"
                         onClick={() => void handleDeleteComment(cid)}
-                        disabled={busy !== null}
+                        disabled={busy !== null || !commentedEarned}
                       >
                         {busy === `${cid}-comment-delete` ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
