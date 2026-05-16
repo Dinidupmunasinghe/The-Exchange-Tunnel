@@ -16,6 +16,12 @@ import {
   getEngagementLabel
 } from "../lib/engagement";
 import { isEarnFeedCacheFresh, readEarnFeedCache, writeEarnFeedCache } from "../lib/earnFeedCache";
+import {
+  ownerAvatarInitials,
+  ownerAvatarUrl,
+  ownerExchangeDisplayName,
+  type CampaignOwner
+} from "../lib/ownerProfile";
 
 type TaskRow = {
   id: number;
@@ -30,12 +36,9 @@ type TaskRow = {
     messageUrl?: string;
     soundcloudPostUrl: string;
     createdAt?: string;
-    owner?: {
+    owner?: CampaignOwner & {
       id?: number;
-      name?: string | null;
       telegramUserId?: string | null;
-      profilePhotoUrl?: string | null;
-      avatarUrl?: string | null;
     };
   };
   campaignId?: number;
@@ -53,14 +56,6 @@ type MyEngagementRow = {
   earned?: boolean;
 };
 const REACTION_CHOICES = ["👍", "🔥", "❤️", "👏", "🤩", "🎉"];
-function campaignInitials(title: string): string {
-  const t = title.trim();
-  if (/^campaign\s*#\d+$/i.test(t)) return "CP";
-  const words = t.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  if (words[0]?.length >= 2) return words[0].slice(0, 2).toUpperCase();
-  return (words[0]?.[0] ?? "P").toUpperCase() + (words[0]?.[1] ?? "O").toUpperCase();
-}
 
 function relativeCampaignTime(iso: string | undefined): string {
   if (!iso) return "Recently added";
@@ -87,58 +82,6 @@ function isEngagementEarned(
 ): boolean {
   if (kind === "subscribe" && hasCompletedTask(campaignTasks)) return true;
   return Boolean(getEngagement(rows, campaignId, kind)?.earned);
-}
-
-function extractTelegramUsernameFromUrl(url: string | undefined): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    const host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
-    if (host !== "t.me") return null;
-    const parts = (u.pathname || "/").split("/").filter(Boolean);
-    if (!parts[0] || parts[0] === "c") return null;
-    return parts[0].replace(/^@/, "");
-  } catch {
-    return null;
-  }
-}
-
-function telegramUserpicUrlFromUsername(username: string | null): string | null {
-  if (!username) return null;
-  return `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg`;
-}
-
-function usernameFromOwnerName(ownerName: string): string | null {
-  const raw = String(ownerName || "").trim();
-  if (!raw.startsWith("@")) return null;
-  const u = raw.slice(1).trim();
-  return u || null;
-}
-
-function telegramProfileLink(owner: { name?: string | null; telegramUserId?: string | null } | undefined): string | null {
-  if (!owner) return null;
-  const name = String(owner.name || "").trim();
-  const maybeAt = name.startsWith("@") ? name.slice(1) : "";
-  if (maybeAt) return `https://t.me/${encodeURIComponent(maybeAt)}`;
-  const tgId = String(owner.telegramUserId || "").trim();
-  if (!tgId) return null;
-  return `tg://user?id=${encodeURIComponent(tgId)}`;
-}
-
-function ownerDisplayHandle(ownerName: string): string {
-  const raw = String(ownerName || "").trim();
-  if (!raw) return "@unknown";
-  if (raw.startsWith("@")) return raw;
-  const handle = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9_ ]/g, "")
-    .trim()
-    .replace(/\s+/g, "_");
-  return `@${handle || "unknown"}`;
-}
-
-function fallbackAvatarUrl(seed: string): string {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(seed || "ET")}&background=2a2a2a&color=ffffff&size=128&bold=true`;
 }
 
 function getCommentText(rows: MyEngagementRow[], campaignId: number): string {
@@ -232,7 +175,6 @@ export function EarnCredits() {
   const [selectedReactionByCampaign, setSelectedReactionByCampaign] = useState<Record<number, string>>({});
   const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
-  const [avatarLoadedByCampaign, setAvatarLoadedByCampaign] = useState<Record<number, boolean>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const applyFeedPayload = useCallback(
@@ -671,7 +613,6 @@ export function EarnCredits() {
           const nextOpen = firstOpenTask(campaignTasks);
           const reward = nextOpen?.rewardCredits ?? campaignTasks[0]?.rewardCredits ?? 0;
           const postedAgo = relativeCampaignTime(campaign.createdAt);
-          const initials = campaignInitials(title);
           const cid = campaign.id;
           const likedEarned = isEngagementEarned(myEngagements, cid, "like", campaignTasks);
           const liked = hasEngagement(myEngagements, cid, "like") || likedEarned;
@@ -691,16 +632,9 @@ export function EarnCredits() {
           const commentPreExisting = Boolean(getEngagement(myEngagements, cid, "comment")?.preExisting);
           const isSubscribeCampaign = et === "subscribe";
           const actionsLocked = busy !== null;
-          const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
-          const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
-          const ownerUsername = usernameFromOwnerName(ownerName);
-          const avatarUrl =
-            campaign.owner?.profilePhotoUrl ||
-            campaign.owner?.avatarUrl ||
-            telegramUserpicUrlFromUsername(ownerUsername || avatarUsername) ||
-            fallbackAvatarUrl(ownerName || initials);
-          const ownerDisplay = ownerDisplayHandle(ownerName);
-          const ownerLink = telegramProfileLink(campaign.owner);
+          const ownerLabel = ownerExchangeDisplayName(campaign.owner);
+          const avatarUrl = ownerAvatarUrl(campaign.owner, ownerLabel);
+          const ownerInitials = ownerAvatarInitials(campaign.owner);
 
           return (
             <Card
@@ -709,19 +643,9 @@ export function EarnCredits() {
             >
               <div className="flex gap-3 p-4 pb-3">
                 <Avatar className="h-11 w-11 shrink-0 border border-border">
-                  <AvatarImage
-                    src={avatarUrl}
-                    alt={title}
-                    className={avatarLoadedByCampaign[cid] ? "opacity-100" : "opacity-0"}
-                    onLoad={(e) => {
-                      const img = e.currentTarget as HTMLImageElement;
-                      const ok = img.naturalWidth > 8 && img.naturalHeight > 8;
-                      setAvatarLoadedByCampaign((prev) => ({ ...prev, [cid]: ok }));
-                    }}
-                    onError={() => setAvatarLoadedByCampaign((prev) => ({ ...prev, [cid]: false }))}
-                  />
-                  <AvatarFallback delayMs={0} className="bg-secondary text-sm font-semibold text-foreground">
-                    {initials}
+                  <AvatarImage src={avatarUrl} alt={ownerLabel} />
+                  <AvatarFallback delayMs={0} className="bg-primary/15 text-sm font-semibold text-foreground">
+                    {ownerInitials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
@@ -729,19 +653,7 @@ export function EarnCredits() {
                     <div className="min-w-0 flex-1">
                       <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">{title}</h2>
                       <p className="mt-0.5 text-sm text-muted-foreground">
-                        By{" "}
-                        {ownerLink ? (
-                          <a
-                            href={ownerLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline underline-offset-2 hover:text-foreground"
-                          >
-                            "{ownerDisplay}"
-                          </a>
-                        ) : (
-                          <span>"{ownerDisplay}"</span>
-                        )}
+                        By <span className="font-medium text-foreground/90">{ownerLabel}</span>
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">{postedAgo}</p>
                     </div>

@@ -27,6 +27,29 @@ function runnableCampaignWhere() {
   };
 }
 
+/** Exchange Tunnel display label — prefer account name/email, not Telegram @handle. */
+function buildExchangeDisplayName(owner) {
+  if (!owner) return "Exchange member";
+  const name = String(owner.name || "").trim();
+  const email = String(owner.email || "").trim();
+  if (name && !name.startsWith("@")) return name;
+  if (email.includes("@")) {
+    const local = email.split("@")[0].replace(/[._+-]+/g, " ").trim();
+    if (local) return local.charAt(0).toUpperCase() + local.slice(1);
+  }
+  return "Exchange member";
+}
+
+function attachOwnerPresentation(owner, avatarByTelegramId) {
+  if (!owner) return;
+  const storedPhoto = owner.profilePhotoUrl ? String(owner.profilePhotoUrl).trim() : "";
+  const tgPhoto = owner.telegramUserId
+    ? avatarByTelegramId.get(String(owner.telegramUserId)) || null
+    : null;
+  owner.exchangeDisplayName = buildExchangeDisplayName(owner);
+  owner.avatarUrl = storedPhoto || tgPhoto || null;
+}
+
 function requireWorkerTelegramId(user) {
   if (!user?.telegramUserId) {
     const error = new Error("Log in with Telegram to complete tasks");
@@ -785,18 +808,18 @@ async function getAvailableTasks(req, res) {
               "createdAt",
               "maxEngagements"
             ],
-        ...(!engagementsOnly && !fastFeed
-          ? {
+        ...(engagementsOnly
+          ? {}
+          : {
               include: [
                 {
                   model: db.User,
                   as: "owner",
                   required: false,
-                  attributes: ["id", "name", "telegramUserId", "profilePhotoUrl"]
+                  attributes: ["id", "name", "email", "telegramUserId", "profilePhotoUrl"]
                 }
               ]
-            }
-          : {})
+            })
       }
     ],
     subQuery: false,
@@ -832,13 +855,7 @@ async function getAvailableTasks(req, res) {
       o.campaign.soundcloudPostUrl = o.campaign.messageUrl;
       o.campaign.soundcloudPostId = o.campaign.messageKey;
       if (o.campaign.owner) {
-        const storedPhoto = o.campaign.owner.profilePhotoUrl
-          ? String(o.campaign.owner.profilePhotoUrl).trim()
-          : "";
-        const tgPhoto = o.campaign.owner.telegramUserId
-          ? avatarByTelegramId.get(String(o.campaign.owner.telegramUserId)) || null
-          : null;
-        o.campaign.owner.avatarUrl = storedPhoto || tgPhoto || null;
+        attachOwnerPresentation(o.campaign.owner, avatarByTelegramId);
       }
     }
     return o;
