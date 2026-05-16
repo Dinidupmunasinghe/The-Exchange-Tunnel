@@ -45,7 +45,6 @@ module.exports = (sequelize, DataTypes) => {
   User.prototype.clearActingTelegramChannel = function clearActingTelegramChannel() {
     this.telegramActingChannelId = null;
     this.telegramActingChannelTitle = null;
-    this.userActingTokenEncrypted = null;
   };
 
   return User;

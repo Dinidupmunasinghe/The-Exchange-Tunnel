@@ -760,25 +760,26 @@ export function Settings() {
                 </div>
 
 
-                <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Telegram User Session required for engagement</p>
-            <p className="text-xs text-muted-foreground">
-              Complete this once for likes, comments, reposts, and other earn actions. Then engagement works normally.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            type="button"
-            onClick={() => {
-              setSettingsNav("session");
-              window.location.hash = "user-session";
-            }}
-          >
-            Open User Session setup
-          </Button>
-        </div>
-
+                                {hasTelegramLogin && !profile?.hasMtprotoSession ? (
+                  <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Telegram User Session required for engagement</p>
+                      <p className="text-xs text-muted-foreground">
+                        Complete this once for likes, comments, reposts, and other earn actions. Then engagement works normally.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        setSettingsNav("session");
+                        window.location.hash = "user-session";
+                      }}
+                    >
+                      Open User Session setup
+                    </Button>
+                  </div>
+                ) : null}
 
               </>
             ) : null}

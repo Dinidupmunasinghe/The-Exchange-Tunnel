@@ -118,12 +118,21 @@ export function Dashboard() {
 
   const [profile, setProfile] = useState<any>(null);
   const [dashboard, setDashboard] = useState<any>(null);
+  const [hasConnectedChannel, setHasConnectedChannel] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const [profileRes, dashRes] = await Promise.all([api.getProfile(), api.getDashboard()]);
+      const [profileRes, dashRes, pagesRes] = await Promise.all([
+        api.getProfile(),
+        api.getDashboard(),
+        api.getManagedPages().catch(() => ({ pages: [] as { selected?: boolean }[] })),
+      ]);
       setProfile(profileRes.user);
       setDashboard(dashRes.stats);
+      const pages = pagesRes.pages || [];
+      setHasConnectedChannel(
+        Boolean(profileRes.user?.telegramActingChannelId) || pages.some((p) => p.selected),
+      );
     }
     load().catch(() => undefined);
   }, []);
@@ -180,7 +189,7 @@ export function Dashboard() {
       </div>
 
       <DashboardChannelHint
-        hasChannel={Boolean(profile?.telegramActingChannelId)}
+        hasChannel={hasConnectedChannel}
         telegramConnected={Boolean(profile?.telegramUserId)}
       />
 
