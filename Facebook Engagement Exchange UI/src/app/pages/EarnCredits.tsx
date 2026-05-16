@@ -487,7 +487,9 @@ export function EarnCredits() {
     }
   };
 
+  const profileReady = hasTelegram !== null && hasMtprotoSession !== null;
   const earnSetupReady = hasTelegram === true && hasMtprotoSession === true;
+  const showSetupHint = profileReady && !earnSetupReady;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-8">
@@ -502,7 +504,7 @@ export function EarnCredits() {
         </Button>
       </div>
 
-      {!earnSetupReady ? (
+      {showSetupHint ? (
         <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
           <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <p className="text-sm leading-relaxed text-muted-foreground">
@@ -513,7 +515,7 @@ export function EarnCredits() {
           </p>
         </div>
       ) : null}
-      {hasTelegram === false ? (
+      {profileReady && hasTelegram === false ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
           Sign in with Telegram on{" "}
           <Link to="/login" className="font-medium underline underline-offset-2">
@@ -522,7 +524,7 @@ export function EarnCredits() {
           first. The app checks your Telegram user id and channel subscription.
         </div>
       ) : null}
-      {hasTelegram && hasMtprotoSession === false ? (
+      {profileReady && hasTelegram && hasMtprotoSession === false ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
           Earn engagements (subscribe, like, comment, repost) require Telegram user session connection. Go to{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
