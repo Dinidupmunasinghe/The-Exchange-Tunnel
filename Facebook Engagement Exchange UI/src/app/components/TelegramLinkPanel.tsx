@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { cn } from "./ui/utils";
 import { TelegramBrandIcon } from "./TelegramBrandIcon";
 import {
+  getToken,
+  isAccessTokenValid,
   linkTelegramToAccount,
   pollTelegramLinkDeeplink,
   startTelegramLinkDeeplink,
@@ -111,6 +113,12 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
   };
 
   const startBotLink = async () => {
+    if (!isAccessTokenValid(getToken())) {
+      toast.error("Your session expired. Please sign in again.");
+      window.location.assign("/login?session=expired&returnTo=%2Fconnect-telegram");
+      return;
+    }
+
     setDeeplinkState("waiting");
     setDeeplinkUrl(null);
 

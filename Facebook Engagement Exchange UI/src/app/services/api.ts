@@ -119,7 +119,15 @@ async function requestJson<T>(
   const { payload, rawText } = await readJsonBody(response);
 
   if (!response.ok) {
-    throw new Error(extractApiErrorMessage(response, payload, rawText));
+    const message = extractApiErrorMessage(response, payload, rawText);
+    if (withBearer && response.status === 401) {
+      clearToken();
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.assign(`/login?session=expired&returnTo=${returnTo}`);
+      }
+    }
+    throw new Error(message);
   }
 
   return payload as T;

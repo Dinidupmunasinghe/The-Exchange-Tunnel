@@ -17,6 +17,15 @@ async function addColumnIfMissing(queryInterface, tableName, columnName, definit
   }
 }
 
+/** Safe additive columns — runs in all environments (including production). */
+async function ensureSchemaPatches() {
+  const qi = db.sequelize.getQueryInterface();
+  await addColumnIfMissing(qi, "users", "profilePhotoUrl", {
+    type: db.sequelize.Sequelize.TEXT,
+    allowNull: true
+  });
+}
+
 async function ensureDevSchema() {
   if (env.nodeEnv === "production") return;
 
@@ -36,10 +45,6 @@ async function ensureDevSchema() {
   });
   await addColumnIfMissing(qi, "engagements", "actionKind", {
     type: db.sequelize.Sequelize.STRING(16),
-    allowNull: true
-  });
-  await addColumnIfMissing(qi, "users", "profilePhotoUrl", {
-    type: db.sequelize.Sequelize.TEXT,
     allowNull: true
   });
 }
@@ -77,6 +82,7 @@ async function ensureActionKindColumnCompatibility() {
 async function bootstrap() {
   try {
     await db.sequelize.authenticate();
+    await ensureSchemaPatches();
     await ensureDevSchema();
     await ensureActionKindColumnCompatibility();
     await db.sequelize.sync(env.dbSyncAlter ? { alter: true } : undefined);
