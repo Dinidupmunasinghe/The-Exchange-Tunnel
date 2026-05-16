@@ -4,8 +4,51 @@ const env = require("../config/env");
 
 const SCRIPT_PATH = path.resolve(__dirname, "../scripts/telegram_mtproto_bridge.py");
 const BRIDGE_TIMEOUT_MS = 30_000;
+// Each Python bridge process loads Telethon (~70-100MB). On constrained
+// hosts (e.g. Render free 512MB) running many in parallel will OOM. Default
+// to 1 globally; override with MTPROTO_MAX_CONCURRENT in env.
+const MAX_CONCURRENT_BRIDGES = Math.max(1, Number(process.env.MTPROTO_MAX_CONCURRENT || 1));
+const MAX_BRIDGE_QUEUE = Math.max(8, Number(process.env.MTPROTO_MAX_QUEUE || 32));
 
-function runBridge(operation, payload) {
+let activeBridgeCount = 0;
+const bridgeQueue = [];
+
+function acquireSlot() {
+  return new Promise((resolve, reject) => {
+    if (activeBridgeCount < MAX_CONCURRENT_BRIDGES) {
+      activeBridgeCount += 1;
+      resolve();
+      return;
+    }
+    if (bridgeQueue.length >= MAX_BRIDGE_QUEUE) {
+      const err = new Error("Telegram bridge queue is full; please retry shortly.");
+      err.code = "BRIDGE_QUEUE_FULL";
+      reject(err);
+      return;
+    }
+    bridgeQueue.push(resolve);
+  });
+}
+
+function releaseSlot() {
+  const next = bridgeQueue.shift();
+  if (next) {
+    next();
+    return;
+  }
+  activeBridgeCount = Math.max(0, activeBridgeCount - 1);
+}
+
+async function runBridge(operation, payload) {
+  await acquireSlot();
+  try {
+    return await spawnBridge(operation, payload);
+  } finally {
+    releaseSlot();
+  }
+}
+
+function spawnBridge(operation, payload) {
   return new Promise((resolve, reject) => {
     const python = spawn(env.telegram.mtproto.pythonBinary, [SCRIPT_PATH, operation], {
       cwd: path.resolve(__dirname, ".."),

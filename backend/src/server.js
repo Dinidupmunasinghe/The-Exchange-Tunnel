@@ -79,6 +79,18 @@ async function ensureActionKindColumnCompatibility() {
   }
 }
 
+const AUDIT_INTERVAL_MS = Number(process.env.AUDIT_INTERVAL_MS || 5 * 60 * 1000);
+const AUDITS_ENABLED = String(process.env.AUDITS_ENABLED || "true").toLowerCase() !== "false";
+
+function staggerInterval(fn, intervalMs, offsetMs) {
+  setTimeout(() => {
+    fn().catch(() => undefined);
+    setInterval(() => {
+      fn().catch(() => undefined);
+    }, intervalMs);
+  }, offsetMs);
+}
+
 async function bootstrap() {
   try {
     await db.sequelize.authenticate();
@@ -86,34 +98,6 @@ async function bootstrap() {
     await ensureDevSchema();
     await ensureActionKindColumnCompatibility();
     await db.sequelize.sync(env.dbSyncAlter ? { alter: true } : undefined);
-    await activateDueCampaigns();
-    await auditSubscribeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
-    await auditSubscriptionMemory().catch(() => ({ scanned: 0, cleared: 0 }));
-    await auditCommentMembershipEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
-    await auditLikeEngagements().catch(() => ({ scanned: 0, reversed: 0 }));
-    await auditCommentDeletions().catch(() => ({ scanned: 0, reversed: 0 }));
-    await auditShareDeletions().catch(() => ({ scanned: 0, reversed: 0 }));
-    setInterval(() => {
-      activateDueCampaigns().catch(() => undefined);
-    }, 60 * 1000);
-    setInterval(() => {
-      auditSubscribeEngagements().catch(() => undefined);
-    }, 30 * 1000);
-    setInterval(() => {
-      auditSubscriptionMemory().catch(() => undefined);
-    }, 30 * 1000);
-    setInterval(() => {
-      auditCommentMembershipEngagements().catch(() => undefined);
-    }, 30 * 1000);
-    setInterval(() => {
-      auditLikeEngagements().catch(() => undefined);
-    }, 30 * 1000);
-    setInterval(() => {
-      auditCommentDeletions().catch(() => undefined);
-    }, 30 * 1000);
-    setInterval(() => {
-      auditShareDeletions().catch(() => undefined);
-    }, 30 * 1000);
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: { origin: env.corsOrigin, methods: ["GET", "POST"] }
@@ -127,6 +111,19 @@ async function bootstrap() {
       // eslint-disable-next-line no-console
       console.log(`Backend running on http://localhost:${env.port}`);
     });
+
+    setInterval(() => {
+      activateDueCampaigns().catch(() => undefined);
+    }, 60 * 1000);
+    activateDueCampaigns().catch(() => undefined);
+
+    if (!AUDITS_ENABLED) return;
+    staggerInterval(auditSubscribeEngagements, AUDIT_INTERVAL_MS, 30_000);
+    staggerInterval(auditSubscriptionMemory, AUDIT_INTERVAL_MS, 60_000);
+    staggerInterval(auditCommentMembershipEngagements, AUDIT_INTERVAL_MS, 90_000);
+    staggerInterval(auditLikeEngagements, AUDIT_INTERVAL_MS, 120_000);
+    staggerInterval(auditCommentDeletions, AUDIT_INTERVAL_MS, 150_000);
+    staggerInterval(auditShareDeletions, AUDIT_INTERVAL_MS, 180_000);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Failed to start server:", error.message);

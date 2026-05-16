@@ -2,10 +2,11 @@ const tg = require("./telegramService");
 const { runBridge } = require("./telegramMtprotoService");
 const { decrypt } = require("../utils/crypto");
 
-const MAX_SUBSCRIBE_PROBES = 10;
-const MAX_POST_PROBES = 10;
-const PROBE_CONCURRENCY = 6;
-const PROBE_CACHE_TTL_MS = 20 * 60 * 1000;
+const MAX_SUBSCRIBE_PROBES = 8;
+const MAX_POST_PROBES = 8;
+const PROBE_CONCURRENCY = 2;
+const PROBE_CACHE_TTL_MS = 30 * 60 * 1000;
+const PROBE_CACHE_MAX = 500;
 const NORMAL_PROBE_BUDGET_MS = 8_000;
 const DEEP_PROBE_BUDGET_MS = 18_000;
 const MTPROTO_PROBE_TIMEOUT_MS = 6_000;
@@ -78,6 +79,16 @@ function writeCache(userId, kind, id, value) {
     value,
     expires: Date.now() + PROBE_CACHE_TTL_MS
   });
+  // Bound the cache so memory cannot grow without limit on long-running servers.
+  if (probeCache.size > PROBE_CACHE_MAX) {
+    const overflow = probeCache.size - PROBE_CACHE_MAX;
+    let removed = 0;
+    for (const key of probeCache.keys()) {
+      probeCache.delete(key);
+      removed += 1;
+      if (removed >= overflow) break;
+    }
+  }
 }
 
 function withTimeout(promise, ms) {
