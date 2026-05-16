@@ -202,7 +202,7 @@ async function submitTaskCompletion(req, res) {
     const task = await db.Task.findByPk(taskId, {
       transaction,
       lock: true,
-      include: [{ model: db.Campaign, as: "campaign" }]
+      include: [{ model: db.Campaign, as: "campaign", required: true }]
     });
     if (!task || task.status === "completed" || task.status === "cancelled") {
       const error = new Error("Task is not available");
