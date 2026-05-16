@@ -973,6 +973,19 @@ async function getAvailableTasks(req, res) {
   }
   myEngagements.push(...probed);
 
+  for (const row of probed) {
+    if (row.actionKind !== "subscribe" || !row.preExisting) continue;
+    const camp = tasks.find((t) => Number(t.campaign?.id) === row.campaignId)?.campaign;
+    const channelKey = String(camp?.messageKey || "");
+    if (!channelKey) continue;
+    await db.UserSubscriptionMemory.upsert({
+      userId: req.user.id,
+      channelKey,
+      lastEngagementId: null,
+      details: row.verificationDetails || "Telegram: already subscribed before this campaign"
+    });
+  }
+
   const verifiedRows = await db.Engagement.findAll({
     where: { userId: req.user.id, verificationStatus: "verified" },
     attributes: ["campaignId", "actionKind", "engagementType"],

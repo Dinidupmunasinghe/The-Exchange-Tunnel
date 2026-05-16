@@ -11,6 +11,7 @@ from telethon.errors import (
     FloodWaitError,
     RPCError,
     SessionPasswordNeededError,
+    UserNotParticipantError,
 )
 from telethon.sessions import StringSession
 
@@ -242,6 +243,27 @@ class TelegramClientManager:
             ) from exc
         except RPCError as exc:
             raise TelegramClientManagerError(f"leave_channel failed: {exc}") from exc
+
+    async def is_member_of_channel(self, channel: str | types.TypeInputChannel) -> bool:
+        """True if the logged-in user session is subscribed to the channel."""
+        await self.connect()
+        try:
+            entity = await self._resolve_input_entity(channel)
+            await self._client(
+                functions.channels.GetParticipantRequest(
+                    channel=entity,
+                    participant=types.InputPeerSelf(),
+                )
+            )
+            return True
+        except UserNotParticipantError:
+            return False
+        except FloodWaitError as exc:
+            raise TelegramClientManagerError(
+                f"FLOOD_WAIT:{exc.seconds}:Too many requests. Retry after {exc.seconds} seconds."
+            ) from exc
+        except RPCError:
+            return False
 
     @staticmethod
     def _normalize_reaction_input(reaction: str) -> list[types.TypeReaction]:

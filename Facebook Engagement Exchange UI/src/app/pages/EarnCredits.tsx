@@ -665,7 +665,9 @@ export function EarnCredits() {
                         : subscribed
                           ? subscribedEarned
                             ? "Unsubscribe"
-                            : "Subscribed"
+                            : getEngagement(myEngagements, cid, "subscribe")?.preExisting
+                              ? "Already subscribed"
+                              : "Subscribed"
                           : "Subscribe"}
                     {subscribed && !subscribedEarned ? null : (
                       <Badge className={subscribed ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
