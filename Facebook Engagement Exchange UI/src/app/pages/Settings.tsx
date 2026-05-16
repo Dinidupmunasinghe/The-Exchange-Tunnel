@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { cn } from "../components/ui/utils";
 import { api } from "../services/api";
