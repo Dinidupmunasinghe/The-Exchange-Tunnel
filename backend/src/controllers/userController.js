@@ -64,12 +64,24 @@ function profileUserPayload(user) {
   };
 }
 
+const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
+
+function profilePhotoDataUrlByteLength(dataUrl) {
+  const m = String(dataUrl).match(/^data:image\/[^;]+;base64,(.+)$/i);
+  if (!m) return null;
+  const b64 = m[1].replace(/\s/g, "");
+  const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+  return Math.floor((b64.length * 3) / 4) - padding;
+}
+
 function isAllowedProfilePhotoUrl(value) {
   if (value == null || value === "") return true;
   const s = String(value).trim();
-  if (s.length > 600_000) return false;
   if (s.startsWith("https://") || s.startsWith("http://")) return true;
-  if (/^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(s)) return true;
+  if (/^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(s)) {
+    const bytes = profilePhotoDataUrlByteLength(s);
+    return bytes != null && bytes <= MAX_PROFILE_PHOTO_BYTES;
+  }
   return false;
 }
 
@@ -81,7 +93,7 @@ async function updateProfilePhoto(req, res) {
   const profilePhotoUrl = raw === null || raw === undefined ? null : String(raw).trim() || null;
   if (!isAllowedProfilePhotoUrl(profilePhotoUrl)) {
     return res.status(400).json({
-      message: "Use an https image URL or upload a JPEG/PNG/WebP image under 500 KB"
+      message: "Use an https image URL or upload a JPEG/PNG/WebP image under 5 MB"
     });
   }
 

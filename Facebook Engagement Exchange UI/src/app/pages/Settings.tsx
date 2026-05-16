@@ -125,8 +125,8 @@ export function Settings() {
       toast.error("Please choose an image file (JPEG, PNG, or WebP).");
       return;
     }
-    if (file.size > 500 * 1024) {
-      toast.error("Image must be 500 KB or smaller.");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be 5 MB or smaller.");
       return;
     }
     setSavingProfilePhoto(true);
@@ -543,7 +543,7 @@ export function Settings() {
                         ) : null}
                       </div>
                       <p className="max-w-[12rem] text-center text-xs text-muted-foreground sm:text-left">
-                        Shown on your campaigns in the earn feed. Max 500 KB.
+                        Shown on your campaigns in the earn feed. Max 5 MB.
                       </p>
                     </div>
                     <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2">
