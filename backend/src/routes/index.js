@@ -13,7 +13,11 @@ const adminAuthRoutes = require("./adminAuthRoutes");
 const router = express.Router();
 
 router.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "exchange-tunnel-backend" });
+  res.json({
+    status: "ok",
+    service: "exchange-tunnel-backend",
+    uptimeSec: Math.round(process.uptime())
+  });
 });
 
 router.use("/auth", authRoutes);

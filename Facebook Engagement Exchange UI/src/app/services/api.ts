@@ -52,7 +52,7 @@ export function clearAdminToken() {
 function mapNetworkError(e: unknown): Error {
   if (e instanceof TypeError && (e.message === "Failed to fetch" || e.message.includes("fetch"))) {
     return new Error(
-      "Cannot reach API. Start the backend (port 5000) and use VITE_API_BASE_URL=/api so Vite can proxy to it."
+      "Cannot reach the backend right now. It may be restarting or asleep on the host (e.g. Render free tier). Please wait ~30s and refresh."
     );
   }
   return e instanceof Error ? e : new Error(String(e));
