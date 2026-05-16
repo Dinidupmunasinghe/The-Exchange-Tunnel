@@ -157,6 +157,14 @@ function hasCompletedTask(tasks: TaskRow[]): boolean {
   return tasks.some((t) => t.status === "completed");
 }
 
+function withoutEngagement(
+  rows: MyEngagementRow[],
+  campaignId: number,
+  actionKind: string
+): MyEngagementRow[] {
+  return rows.filter((e) => !(e.campaignId === campaignId && e.actionKind === actionKind));
+}
+
 const EARN_FEED_POLL_MS = 60_000;
 
 /** High-contrast credit pill on filled (primary) action buttons. */
@@ -204,6 +212,20 @@ export function EarnCredits() {
   const refreshFeed = useCallback(async () => {
     await refreshTasksFast();
   }, [refreshTasksFast]);
+
+  /** Run action under busy key; always clears spinner even if follow-up refresh fails. */
+  const runWithBusy = async (busyKey: string, work: () => Promise<void>) => {
+    setBusy(busyKey);
+    try {
+      await work();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const refreshAfterEngagementChange = () => {
+    void refreshFeed().catch(() => undefined);
+  };
 
   const loadTasks = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -282,16 +304,16 @@ export function EarnCredits() {
           return;
         }
         if (subscribedAlready && subscribedEarned) {
-          const key = `${campaignId}-unsubscribe`;
-          setBusy(key);
-          const res = await api.revertEngagement({ campaignId, actionKind: "subscribe" });
-          if (res.fallback) {
-            toast.success(res.message || "Saved subscription cleared.");
-          } else {
-            toast.success("Unsubscribed and credits refunded.");
-          }
-          await refreshFeed();
-          setBusy(null);
+          await runWithBusy(`${campaignId}-unsubscribe`, async () => {
+            const res = await api.revertEngagement({ campaignId, actionKind: "subscribe" });
+            setMyEngagements((prev) => withoutEngagement(prev, campaignId, "subscribe"));
+            if (res.fallback) {
+              toast.success(res.message || "Saved subscription cleared.");
+            } else {
+              toast.success("Unsubscribed and credits refunded.");
+            }
+          });
+          refreshAfterEngagementChange();
           return;
         }
         const subscribeTask = firstOpenTask(campaignTasks);
@@ -299,26 +321,24 @@ export function EarnCredits() {
           toast.error("No open subscribe task right now — refresh and try again.");
           return;
         }
-        const key = `${campaignId}-subscribe`;
-        setBusy(key);
         if (hasMtprotoSession !== true) {
           toast.error("Subscribe requires Telegram user session auth first.", {
             description: "Opening Settings now. Complete User Session setup and try again.",
           });
-          setBusy(null);
           window.location.href = "/settings#user-session";
           return;
         }
-        await api.completeTask({
-          taskId: subscribeTask.id,
-          engagementType,
-          actionKind: "subscribe",
+        await runWithBusy(`${campaignId}-subscribe`, async () => {
+          await api.completeTask({
+            taskId: subscribeTask.id,
+            engagementType,
+            actionKind: "subscribe",
+          });
+          toast.success(`Earned ${subscribeTask.rewardCredits} credits`, {
+            description: `Recorded · subscribe · task #${subscribeTask.id}`,
+          });
         });
-        toast.success(`Earned ${subscribeTask.rewardCredits} credits`, {
-          description: `Recorded · subscribe · task #${subscribeTask.id}`,
-        });
-        await refreshFeed();
-        setBusy(null);
+        refreshAfterEngagementChange();
         return;
       }
 
@@ -339,21 +359,20 @@ export function EarnCredits() {
           toast.error("Type your comment first.");
           return;
         }
-        const key = `${campaignId}-comment-submit`;
-        setBusy(key);
-        await api.completeTask({
-          taskId: task.id,
-          engagementType,
-          actionKind: "comment",
-          proofText: commentText,
+        await runWithBusy(`${campaignId}-comment-submit`, async () => {
+          await api.completeTask({
+            taskId: task.id,
+            engagementType,
+            actionKind: "comment",
+            proofText: commentText,
+          });
+          toast.success(`Earned ${task.rewardCredits} credits`, {
+            description: `Recorded · comment · task #${task.id}`,
+          });
         });
-        toast.success(`Earned ${task.rewardCredits} credits`, {
-          description: `Recorded · comment · task #${task.id}`,
-        });
-        await refreshFeed();
         setCommentDraftByCampaign((prev) => ({ ...prev, [campaignId]: "" }));
         setActiveCommentCampaignId(null);
-        setBusy(null);
+        refreshAfterEngagementChange();
         return;
       }
       if (action === "like") {
@@ -364,83 +383,79 @@ export function EarnCredits() {
           return;
         }
         if (likedAlready && likedEarned) {
-          const key = `${campaignId}-unlike`;
-          setBusy(key);
-          const res = await api.revertEngagement({
-            campaignId,
-            actionKind: "like",
+          await runWithBusy(`${campaignId}-unlike`, async () => {
+            const res = await api.revertEngagement({
+              campaignId,
+              actionKind: "like",
+            });
+            setMyEngagements((prev) => withoutEngagement(prev, campaignId, "like"));
+            if (res.fallback) {
+              toast.success(res.message || "Saved like cleared.");
+            } else {
+              toast.success("Like removed and credits refunded.");
+            }
           });
-          if (res.fallback) {
-            toast.success(res.message || "Saved like cleared.");
-          } else {
-            toast.success("Like removed and credits refunded.");
-          }
-          await refreshFeed();
-          setBusy(null);
+          refreshAfterEngagementChange();
           return;
         }
-        const key = `${campaignId}-like`;
-        setBusy(key);
         if (hasMtprotoSession !== true) {
           toast.error("Engagement requires Telegram user session auth first.", {
             description: "Opening Settings now. Complete User Session setup and try again.",
           });
-          setBusy(null);
           window.location.href = "/settings#user-session";
           return;
         }
         const selectedReaction = selectedReactionByCampaign[campaignId] || "👍";
-        await api.completeTask({
-          taskId: task.id,
-          engagementType,
-          actionKind: "like",
-          reaction: selectedReaction,
+        await runWithBusy(`${campaignId}-like`, async () => {
+          await api.completeTask({
+            taskId: task.id,
+            engagementType,
+            actionKind: "like",
+            reaction: selectedReaction,
+          });
+          toast.success(`Earned ${task.rewardCredits} credits`, {
+            description: `Recorded · reaction ${selectedReaction} · task #${task.id}`,
+          });
         });
-        toast.success(`Earned ${task.rewardCredits} credits`, {
-          description: `Recorded · reaction ${selectedReaction} · task #${task.id}`,
-        });
-        await refreshFeed();
-        setBusy(null);
+        refreshAfterEngagementChange();
         return;
       }
       if (action === "share") {
         const sharedAlready = hasEngagement(myEngagements, campaignId, "share");
         if (sharedAlready) {
-          const key = `${campaignId}-share-delete`;
-          setBusy(key);
-          const res = await api.revertEngagement({
-            campaignId,
-            actionKind: "share"
+          await runWithBusy(`${campaignId}-share-delete`, async () => {
+            const res = await api.revertEngagement({
+              campaignId,
+              actionKind: "share",
+            });
+            setMyEngagements((prev) => withoutEngagement(prev, campaignId, "share"));
+            if (res.fallback) {
+              toast.success(res.message || "Saved repost cleared.");
+            } else {
+              toast.success("Repost removed and credits refunded.");
+            }
           });
-          if (res.fallback) {
-            toast.success(res.message || "Saved repost cleared.");
-          } else {
-            toast.success("Repost removed and credits refunded.");
-          }
-          await refreshFeed();
-          setBusy(null);
+          refreshAfterEngagementChange();
           return;
         }
-        const key = `${campaignId}-share`;
-        setBusy(key);
         if (hasMtprotoSession !== true) {
           toast.error("Share requires Telegram user session auth first.", {
-            description: "Opening Settings now. Complete User Session setup and try again."
+            description: "Opening Settings now. Complete User Session setup and try again.",
           });
-          setBusy(null);
           window.location.href = "/settings#user-session";
           return;
         }
-        await api.completeTask({
-          taskId: task.id,
-          engagementType,
-          actionKind: "share"
+        await runWithBusy(`${campaignId}-share`, async () => {
+          await api.completeTask({
+            taskId: task.id,
+            engagementType,
+            actionKind: "share",
+          });
+          toast.success(`Earned ${task.rewardCredits} credits`, {
+            description: `Recorded · repost · task #${task.id}`,
+          });
         });
-        toast.success(`Earned ${task.rewardCredits} credits`, {
-          description: `Recorded · repost · task #${task.id}`
-        });
-        await refreshFeed();
-        setBusy(null);
+        refreshAfterEngagementChange();
         return;
       }
     } catch (error: unknown) {
@@ -453,25 +468,23 @@ export function EarnCredits() {
         toast.info("Open Settings to connect Telegram User Session for engagement.");
         window.location.href = "/settings#user-session";
       }
-      setBusy(null);
     }
   };
 
   const handleDeleteComment = async (campaignId: number) => {
     try {
-      const key = `${campaignId}-comment-delete`;
-      setBusy(key);
-      const res = await api.revertEngagement({ campaignId, actionKind: "comment" });
-      if (res.fallback) {
-        toast.success(res.message || "Saved comment cleared.");
-      } else {
-        toast.success("Comment removed and credits refunded.");
-      }
-      await refreshFeed();
-      setBusy(null);
+      await runWithBusy(`${campaignId}-comment-delete`, async () => {
+        const res = await api.revertEngagement({ campaignId, actionKind: "comment" });
+        setMyEngagements((prev) => withoutEngagement(prev, campaignId, "comment"));
+        if (res.fallback) {
+          toast.success(res.message || "Saved comment cleared.");
+        } else {
+          toast.success("Comment removed and credits refunded.");
+        }
+      });
+      refreshAfterEngagementChange();
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not delete comment");
-      setBusy(null);
     }
   };
 
