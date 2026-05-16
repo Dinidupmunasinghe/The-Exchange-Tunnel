@@ -2,6 +2,7 @@ const express = require("express");
 const { body } = require("express-validator");
 const {
   getAvailableTasks,
+  syncPreexistingEngagements,
   submitTaskCompletion,
   revertEngagement,
   startCommentDetection,
@@ -14,6 +15,7 @@ const { ENGAGEMENT_TYPES, ACTION_KINDS } = require("../constants/engagement");
 const router = express.Router();
 
 router.get("/", getAvailableTasks);
+router.get("/sync-telegram-state", syncPreexistingEngagements);
 router.post(
   "/complete",
   taskSubmitLimiter,

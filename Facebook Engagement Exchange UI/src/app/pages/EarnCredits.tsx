@@ -181,6 +181,7 @@ export function EarnCredits() {
   const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
   const [avatarLoadedByCampaign, setAvatarLoadedByCampaign] = useState<Record<number, boolean>>({});
+  const [syncingTelegram, setSyncingTelegram] = useState(false);
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -194,30 +195,48 @@ export function EarnCredits() {
     }
   }, []);
 
-  const loadTasks = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+  const syncTelegramState = useCallback(async () => {
+    setSyncingTelegram(true);
     try {
-      if (!silent) {
-        const quick = await api.getTasks({ fast: true });
-        setTasks(quick.tasks as TaskRow[]);
-        setMyEngagements(quick.myEngagements ?? []);
-        setLoading(false);
-        const full = await api.getTasks({ fast: false });
-        setTasks(full.tasks as TaskRow[]);
-        setMyEngagements(full.myEngagements ?? []);
-        return;
-      }
-      const res = await api.getTasks({ fast: true });
-      setTasks(res.tasks as TaskRow[]);
-      setMyEngagements(res.myEngagements ?? []);
+      const sync = await api.syncTelegramEngagementState();
+      if (sync?.myEngagements) setMyEngagements(sync.myEngagements);
     } catch (error: unknown) {
-      if (!silent) {
-        toast.error(error instanceof Error ? error.message : "Could not load tasks");
-      }
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not verify your existing Telegram actions. Check Settings → User Session."
+      );
     } finally {
-      if (!silent) setLoading(false);
+      setSyncingTelegram(false);
     }
   }, []);
+
+  const refreshFeed = useCallback(async () => {
+    const res = await api.getTasks({ fast: true });
+    setTasks(res.tasks as TaskRow[]);
+    setMyEngagements(res.myEngagements ?? []);
+    await syncTelegramState();
+  }, [syncTelegramState]);
+
+  const loadTasks = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const res = await api.getTasks({ fast: true });
+        setTasks(res.tasks as TaskRow[]);
+        setMyEngagements(res.myEngagements ?? []);
+        if (!silent) setLoading(false);
+        void syncTelegramState();
+      } catch (error: unknown) {
+        if (!silent) {
+          toast.error(error instanceof Error ? error.message : "Could not load tasks");
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [syncTelegramState]
+  );
 
   useEffect(() => {
     void loadTasks(false);
@@ -286,9 +305,7 @@ export function EarnCredits() {
           } else {
             toast.success("Unsubscribed and credits refunded.");
           }
-          const refreshed = await api.getTasks();
-          setTasks(refreshed.tasks as TaskRow[]);
-          setMyEngagements(refreshed.myEngagements ?? []);
+          await refreshFeed();
           setBusy(null);
           return;
         }
@@ -315,9 +332,7 @@ export function EarnCredits() {
         toast.success(`Earned ${subscribeTask.rewardCredits} credits`, {
           description: `Recorded · subscribe · task #${subscribeTask.id}`,
         });
-        const refreshed = await api.getTasks();
-        setTasks(refreshed.tasks as TaskRow[]);
-        setMyEngagements(refreshed.myEngagements ?? []);
+        await refreshFeed();
         setBusy(null);
         return;
       }
@@ -350,9 +365,7 @@ export function EarnCredits() {
         toast.success(`Earned ${task.rewardCredits} credits`, {
           description: `Recorded · comment · task #${task.id}`,
         });
-        const refreshed = await api.getTasks();
-        setTasks(refreshed.tasks as TaskRow[]);
-        setMyEngagements(refreshed.myEngagements ?? []);
+        await refreshFeed();
         setCommentDraftByCampaign((prev) => ({ ...prev, [campaignId]: "" }));
         setActiveCommentCampaignId(null);
         setBusy(null);
@@ -377,9 +390,7 @@ export function EarnCredits() {
           } else {
             toast.success("Like removed and credits refunded.");
           }
-          const refreshed = await api.getTasks();
-          setTasks(refreshed.tasks as TaskRow[]);
-          setMyEngagements(refreshed.myEngagements ?? []);
+          await refreshFeed();
           setBusy(null);
           return;
         }
@@ -403,9 +414,7 @@ export function EarnCredits() {
         toast.success(`Earned ${task.rewardCredits} credits`, {
           description: `Recorded · reaction ${selectedReaction} · task #${task.id}`,
         });
-        const refreshed = await api.getTasks();
-        setTasks(refreshed.tasks as TaskRow[]);
-        setMyEngagements(refreshed.myEngagements ?? []);
+        await refreshFeed();
         setBusy(null);
         return;
       }
@@ -423,9 +432,7 @@ export function EarnCredits() {
           } else {
             toast.success("Repost removed and credits refunded.");
           }
-          const refreshed = await api.getTasks();
-          setTasks(refreshed.tasks as TaskRow[]);
-          setMyEngagements(refreshed.myEngagements ?? []);
+          await refreshFeed();
           setBusy(null);
           return;
         }
@@ -447,9 +454,7 @@ export function EarnCredits() {
         toast.success(`Earned ${task.rewardCredits} credits`, {
           description: `Recorded · repost · task #${task.id}`
         });
-        const refreshed = await api.getTasks();
-        setTasks(refreshed.tasks as TaskRow[]);
-        setMyEngagements(refreshed.myEngagements ?? []);
+        await refreshFeed();
         setBusy(null);
         return;
       }
@@ -477,9 +482,7 @@ export function EarnCredits() {
       } else {
         toast.success("Comment removed and credits refunded.");
       }
-      const refreshed = await api.getTasks();
-      setTasks(refreshed.tasks as TaskRow[]);
-      setMyEngagements(refreshed.myEngagements ?? []);
+      await refreshFeed();
       setBusy(null);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not delete comment");
@@ -538,6 +541,9 @@ export function EarnCredits() {
         {loading && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Loading feed…</p>
         ) : null}
+        {!loading && syncingTelegram ? (
+          <p className="text-xs text-muted-foreground">Checking your Telegram actions on these campaigns…</p>
+        ) : null}
         {!loading && tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No tasks in your feed. Try Refresh, or wait for an active campaign from another member.
@@ -564,7 +570,13 @@ export function EarnCredits() {
             (et === "share" && hasCompletedTask(campaignTasks));
           const subscribedEarned = isEngagementEarned(myEngagements, cid, "subscribe", campaignTasks);
           const subscribed = hasEngagement(myEngagements, cid, "subscribe") || subscribedEarned;
+          const subscribePreExisting = Boolean(
+            getEngagement(myEngagements, cid, "subscribe")?.preExisting
+          );
+          const likePreExisting = Boolean(getEngagement(myEngagements, cid, "like")?.preExisting);
+          const commentPreExisting = Boolean(getEngagement(myEngagements, cid, "comment")?.preExisting);
           const isSubscribeCampaign = et === "subscribe";
+          const actionsLocked = syncingTelegram || busy !== null;
           const avatarUsername = extractTelegramUsernameFromUrl(campaign.messageUrl || campaign.soundcloudPostUrl);
           const ownerName = String(campaign.owner?.name || "").trim() || "Unknown";
           const ownerUsername = usernameFromOwnerName(ownerName);
@@ -659,7 +671,7 @@ export function EarnCredits() {
                     className="rounded-full pr-3"
                     onClick={() => void handleAction(cid, campaignTasks, et, "subscribe")}
                     disabled={
-                      busy !== null ||
+                      actionsLocked ||
                       hasTelegram === false ||
                       hasMtprotoSession !== true ||
                       (subscribed && !subscribedEarned)
@@ -724,7 +736,7 @@ export function EarnCredits() {
                   onClick={() => void handleAction(cid, campaignTasks, et, "like")}
                   disabled={
                     !bundleAllowsAction(et, "like") ||
-                    busy !== null ||
+                    actionsLocked ||
                     hasTelegram === false ||
                     hasMtprotoSession !== true ||
                     (liked && !likedEarned)
@@ -742,7 +754,9 @@ export function EarnCredits() {
                       : liked
                         ? likedEarned
                           ? "Unlike"
-                          : "Liked"
+                          : likePreExisting
+                            ? "Already liked"
+                            : "Liked"
                         : "Like"}
                   {liked && !likedEarned ? null : (
                     <Badge className={liked ? rewardBadgeOnFilled : rewardBadgeOnOutline}>
@@ -799,7 +813,8 @@ export function EarnCredits() {
                     <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/25 bg-background/80 px-3 py-1.5">
                       <MessageCircle className="h-4 w-4 text-blue-500" />
                       <span className="max-w-[220px] truncate text-sm text-foreground">
-                        {getCommentText(myEngagements, cid) || "Comment sent"}
+                        {getCommentText(myEngagements, cid) ||
+                          (commentPreExisting ? "Already commented" : "Comment sent")}
                       </span>
                       <Button
                         type="button"
@@ -853,7 +868,7 @@ export function EarnCredits() {
                       size="sm"
                       className="rounded-full border-blue-500/25 bg-background/80 pr-3 hover:bg-blue-500/10"
                       onClick={() => setActiveCommentCampaignId(cid)}
-                      disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                      disabled={actionsLocked || hasTelegram === false || hasMtprotoSession !== true}
                     >
                       <MessageCircle className="mr-2 h-4 w-4" />
                       Comment

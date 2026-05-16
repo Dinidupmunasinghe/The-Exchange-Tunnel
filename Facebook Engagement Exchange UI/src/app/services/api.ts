@@ -336,7 +336,7 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getTasks: (opts?: { fast?: boolean }) =>
-    authRequest(`/tasks${opts?.fast ? "?fast=1" : ""}`) as Promise<{
+    authRequest(`/tasks${opts?.fast ? "?fast=1&probe=0" : ""}`) as Promise<{
       tasks: any[];
       myEngagements: {
         id: number;
@@ -345,6 +345,18 @@ export const api = {
         actionKind: string;
         verificationDetails?: string | null;
         metaEngagementId?: string | null;
+        preExisting?: boolean;
+        earned?: boolean;
+      }[];
+    }>,
+  syncTelegramEngagementState: () =>
+    authRequest("/tasks/sync-telegram-state") as Promise<{
+      myEngagements: {
+        id: number;
+        campaignId: number;
+        taskId: number;
+        actionKind: string;
+        verificationDetails?: string | null;
         preExisting?: boolean;
         earned?: boolean;
       }[];

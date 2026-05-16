@@ -88,6 +88,14 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
             is_member = await manager.is_member_of_channel(channel=str(payload["channel"]))
             return {"ok": True, "isMember": bool(is_member)}
 
+        if operation == "find_my_comment_on_post":
+            found = await manager.find_my_comment_on_channel_post(
+                channel_post_chat=str(payload["chat"]),
+                channel_msg_id=int(payload["msgId"]),
+                limit=int(payload.get("limit") or 40),
+            )
+            return {"ok": True, **found}
+
         if operation == "react":
             chosen = await manager.react_to_message(
                 chat=payload["chat"],
@@ -95,6 +103,13 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
                 reaction=str(payload["reaction"]),
             )
             return {"ok": True, "chosen": bool(chosen)}
+
+        if operation == "find_my_reaction_on_post":
+            found = await manager.find_my_reaction_on_message(
+                chat=payload["chat"],
+                msg_id=int(payload["msgId"]),
+            )
+            return {"ok": True, **found}
 
         if operation == "verify_reaction":
             chosen = await manager.verify_reaction_chosen(

@@ -244,6 +244,69 @@ class TelegramClientManager:
         except RPCError as exc:
             raise TelegramClientManagerError(f"leave_channel failed: {exc}") from exc
 
+    async def find_my_comment_on_channel_post(
+        self,
+        channel_post_chat: str | int | types.TypeInputPeer,
+        channel_msg_id: int,
+        limit: int = 40,
+    ) -> dict[str, Any]:
+        """Return whether the logged-in user already commented on a channel post (discussion thread)."""
+        await self.connect()
+        try:
+            channel = await self._resolve_input_entity(channel_post_chat)
+            discussion = await self._client(
+                functions.messages.GetDiscussionMessageRequest(
+                    peer=channel,
+                    msg_id=int(channel_msg_id),
+                )
+            )
+        except RPCError:
+            return {"found": False}
+
+        if not discussion or not getattr(discussion, "messages", None):
+            return {"found": False}
+        anchor = discussion.messages[0]
+        if not isinstance(anchor, types.Message):
+            return {"found": False}
+
+        try:
+            discussion_chat = await self._client.get_entity(anchor.peer_id)
+        except Exception:
+            return {"found": False}
+
+        discussion_msg_id = int(anchor.id)
+        async for message in self._client.iter_messages(
+            discussion_chat,
+            reply_to=discussion_msg_id,
+            from_user="me",
+            limit=max(1, min(int(limit), 80)),
+        ):
+            text = str(getattr(message, "message", "") or "").strip()
+            if not text:
+                continue
+            peer = getattr(message, "peer_id", None)
+            chat_id = None
+            access_hash = None
+            if isinstance(peer, types.PeerChannel):
+                chat_id = f"-100{peer.channel_id}"
+                try:
+                    entity = await self._client.get_entity(peer)
+                    access_hash = str(getattr(entity, "access_hash", "") or "")
+                except Exception:
+                    access_hash = None
+            elif isinstance(peer, types.PeerChat):
+                chat_id = f"-{peer.chat_id}"
+            elif isinstance(peer, types.PeerUser):
+                chat_id = str(peer.user_id)
+            return {
+                "found": True,
+                "text": text[:500],
+                "messageId": int(message.id),
+                "chatId": chat_id,
+                "chatAccessHash": access_hash or "",
+            }
+        return {"found": False}
+
     async def is_member_of_channel(self, channel: str | types.TypeInputChannel) -> bool:
         """True if the logged-in user session is subscribed to the channel."""
         await self.connect()
@@ -312,6 +375,38 @@ class TelegramClientManager:
             )
             return False
         return True
+
+    async def find_my_reaction_on_message(
+        self,
+        chat: str | int | types.TypeInputPeer,
+        msg_id: int,
+    ) -> dict[str, Any]:
+        """Return whether the logged-in user already reacted on this message (any emoji)."""
+        await self.connect()
+        message = await self._client.get_messages(chat, ids=msg_id)
+        if message is None or getattr(message, "reactions", None) is None:
+            return {"found": False, "emoji": None}
+
+        me = await self._client.get_me()
+        my_id = int(getattr(me, "id", 0) or 0)
+
+        recent = getattr(message.reactions, "recent_reactions", None) or []
+        for recent_item in recent:
+            peer = getattr(recent_item, "peer_id", None)
+            if isinstance(peer, types.PeerUser) and int(peer.user_id) == my_id:
+                reaction_obj = getattr(recent_item, "reaction", None)
+                if isinstance(reaction_obj, types.ReactionEmoji):
+                    return {"found": True, "emoji": str(reaction_obj.emoticon)}
+
+        for reaction_result in message.reactions.results:
+            reaction_obj = reaction_result.reaction
+            if not isinstance(reaction_obj, types.ReactionEmoji):
+                continue
+            chosen_attr = bool(getattr(reaction_result, "chosen", False))
+            if chosen_attr:
+                return {"found": True, "emoji": str(reaction_obj.emoticon)}
+
+        return {"found": False, "emoji": None}
 
     async def verify_reaction_chosen(
         self,

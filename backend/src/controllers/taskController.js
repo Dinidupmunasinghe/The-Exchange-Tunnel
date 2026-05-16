@@ -11,7 +11,8 @@ const {
   probePreExistingEngagements,
   markEarnedFlags,
   engagementKey,
-  probeLikeOnTelegram
+  probeLikeOnTelegram,
+  probeAnyLikeOnTelegram
 } = require("../services/telegramEngagementProbeService");
 const { decrypt } = require("../utils/crypto");
 const crypto = require("crypto");
@@ -434,10 +435,16 @@ async function submitTaskCompletion(req, res) {
         }
         const chosenReaction = typeof reaction === "string" && reaction.trim() ? reaction.trim() : "👍";
         const msgUrlForLike = String(c.messageUrl || c.soundcloudPostUrl || "");
-        const priorLike = await probeLikeOnTelegram(creds, sessionString, msgUrlForLike, chosenReaction);
-        if (priorLike.known && priorLike.chosen) {
+        let channelIdForLike = String(channelId);
+        const priorLike = await probeAnyLikeOnTelegram(
+          creds,
+          sessionString,
+          msgUrlForLike,
+          channelIdForLike
+        );
+        if (priorLike.found) {
           const error = new Error(
-            "Your Telegram account already has this reaction on the post. Remove it on Telegram first, then try again."
+            "Your Telegram account already reacted on this post. Remove your reaction on Telegram first, then try again."
           );
           error.status = 400;
           throw error;
@@ -820,8 +827,11 @@ async function getAvailableTasks(req, res) {
   const campaignIds = [...new Set(tasks.map((t) => t.campaignId))];
   const subscribeCampaigns = tasks
     .map((t) => t.campaign)
-    .filter((c) => c && c.engagementType === "subscribe" && c.messageKey)
-    .map((c) => ({ id: c.id, channelKey: c.messageKey }));
+    .filter((c) => c && c.engagementType === "subscribe")
+    .map((c) => ({
+      id: c.id,
+      channelKey: String(c.messageKey || `sub_${c.id}`)
+    }));
   const uniqueSubscribeKeys = [...new Set(subscribeCampaigns.map((c) => String(c.channelKey)))];
   const rememberedSubs =
     uniqueSubscribeKeys.length === 0
@@ -939,8 +949,10 @@ async function getAvailableTasks(req, res) {
     myEngagements.map((row) => engagementKey(row.campaignId, row.actionKind))
   );
   const skipProbe = String(req.query.probe || "") === "0" || String(req.query.fast || "") === "1";
+  const probeMode =
+    String(req.query.probe || "") === "deep" ? "deep" : skipProbe ? "off" : "normal";
   let probedRaw = [];
-  if (!skipProbe) {
+  if (probeMode !== "off") {
     const worker = await db.User.findByPk(req.user.id, {
       attributes: [
         "id",
@@ -952,14 +964,14 @@ async function getAvailableTasks(req, res) {
     probedRaw = await probePreExistingEngagements({
       worker,
       tasks,
-      knownKeys
+      knownKeys,
+      mode: probeMode
     });
   }
   const probed = [];
   for (const row of probedRaw) {
     if (row.actionKind === "subscribe") {
-      const camp = tasks.find((t) => Number(t.campaign?.id) === row.campaignId)?.campaign;
-      const channelKey = String(camp?.messageKey || `sub_${row.campaignId}`);
+      const channelKey = String(row.channelKey || "");
       const ids = subscribeCampaigns
         .filter((c) => String(c.channelKey) === channelKey)
         .map((c) => Number(c.id));
@@ -971,28 +983,72 @@ async function getAvailableTasks(req, res) {
       }
       continue;
     }
+    if (row.actionKind === "like" || row.actionKind === "comment") {
+      const postKey = String(row.postKey || "");
+      const ids = campaignList.filter((c) => String(c.messageKey) === postKey).map((c) => Number(c.id));
+      for (const cid of ids.length ? ids : [row.campaignId]) {
+        const key = engagementKey(cid, row.actionKind);
+        if (knownKeys.has(key)) continue;
+        knownKeys.add(key);
+        probed.push({ ...row, campaignId: cid });
+      }
+      continue;
+    }
     probed.push(row);
   }
   myEngagements.push(...probed);
 
-  const memoryUpserts = probed
-    .filter((row) => row.actionKind === "subscribe" && row.preExisting && row.channelKey)
-    .map((row) =>
-      db.UserSubscriptionMemory.upsert({
-        userId: req.user.id,
-        channelKey: String(row.channelKey),
-        lastEngagementId: null,
-        details: row.verificationDetails || "Telegram: already subscribed before this campaign"
-      })
-    );
+  const memoryUpserts = [];
+  for (const row of probed) {
+    if (!row.preExisting) continue;
+    if (row.actionKind === "subscribe" && row.channelKey) {
+      memoryUpserts.push(
+        db.UserSubscriptionMemory.upsert({
+          userId: req.user.id,
+          channelKey: String(row.channelKey),
+          lastEngagementId: null,
+          details: row.verificationDetails || "Telegram: already subscribed before this campaign"
+        })
+      );
+    } else if ((row.actionKind === "like" || row.actionKind === "comment") && row.postKey) {
+      memoryUpserts.push(
+        db.UserPostAction.upsert({
+          userId: req.user.id,
+          postKey: String(row.postKey),
+          actionKind: row.actionKind,
+          lastEngagementId: null,
+          details: row.verificationDetails || null
+        })
+      );
+    }
+  }
   if (memoryUpserts.length) {
-    void Promise.all(memoryUpserts).catch(() => undefined);
+    await Promise.all(memoryUpserts).catch(() => undefined);
   }
 
   return res.json({
     tasks: serialized,
     myEngagements: markEarnedFlags(myEngagements, earnedKeys)
   });
+}
+
+/** Deep Telegram probe for actions done before the campaign existed (subscribe / like / comment). */
+async function syncPreexistingEngagements(req, res) {
+  const proxy = {
+    _code: 200,
+    status(code) {
+      proxy._code = code;
+      return proxy;
+    },
+    json(body) {
+      if (proxy._code >= 400) {
+        return res.status(proxy._code).json(body);
+      }
+      return res.json({ myEngagements: body.myEngagements || [] });
+    }
+  };
+  req.query = { ...req.query, fast: "0", probe: "deep" };
+  return getAvailableTasks(req, proxy);
 }
 
 async function startCommentDetection(req, res) {
@@ -1444,6 +1500,7 @@ async function revertOrphanedMemory({ userId, campaignId, actionKind, transactio
 
 module.exports = {
   getAvailableTasks,
+  syncPreexistingEngagements,
   submitTaskCompletion,
   revertEngagement,
   startCommentDetection,
