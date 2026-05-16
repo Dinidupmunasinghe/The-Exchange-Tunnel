@@ -1,15 +1,19 @@
 const tg = require("./telegramService");
 const { runBridge } = require("./telegramMtprotoService");
 const { decrypt } = require("../utils/crypto");
+const env = require("../config/env");
 
-const MAX_SUBSCRIBE_PROBES = 8;
-const MAX_POST_PROBES = 8;
-const PROBE_CONCURRENCY = 2;
+/** On Render 512MB, each Python+Telethon child uses ~80–100MB. Keep probes tiny. */
+const LOW_MEM = env.lowMemoryHost && !env.telegramDeepSync;
+
+const MAX_SUBSCRIBE_PROBES = LOW_MEM ? 5 : 8;
+const MAX_POST_PROBES = LOW_MEM ? 2 : 8;
+const PROBE_CONCURRENCY = 1;
 const PROBE_CACHE_TTL_MS = 30 * 60 * 1000;
 const PROBE_CACHE_MAX = 500;
-const NORMAL_PROBE_BUDGET_MS = 8_000;
-const DEEP_PROBE_BUDGET_MS = 18_000;
-const MTPROTO_PROBE_TIMEOUT_MS = 6_000;
+const NORMAL_PROBE_BUDGET_MS = LOW_MEM ? 6_000 : 8_000;
+const DEEP_PROBE_BUDGET_MS = LOW_MEM ? 10_000 : 18_000;
+const MTPROTO_PROBE_TIMEOUT_MS = LOW_MEM ? 5_000 : 6_000;
 
 /** @type {Map<string, { value: unknown, expires: number }>} */
 const probeCache = new Map();
@@ -114,7 +118,14 @@ function chatCandidatesForPost(messageUrl, channelId) {
   return { parsed, refs };
 }
 
-async function probeSubscribeOnTelegram(telegramUserId, messageUrl, messageKey, creds, sessionString) {
+async function probeSubscribeOnTelegram(
+  telegramUserId,
+  messageUrl,
+  messageKey,
+  creds,
+  sessionString,
+  useMtproto = true
+) {
   if (!telegramUserId) return false;
 
   let channelChatId = channelIdFromMessageKey(messageKey);
@@ -127,7 +138,7 @@ async function probeSubscribeOnTelegram(telegramUserId, messageUrl, messageKey, 
 
   const channelRef = username ? `@${username}` : channelChatId;
 
-  if (creds && sessionString && channelRef) {
+  if (useMtproto && creds && sessionString && channelRef) {
     try {
       const out = await withTimeout(
         runBridge("check_channel_member", {
@@ -325,9 +336,10 @@ async function probePreExistingEngagements({ worker, tasks, knownKeys, mode = "n
   const budgetMs = deep ? DEEP_PROBE_BUDGET_MS : NORMAL_PROBE_BUDGET_MS;
 
   const subscribeTargets = collectSubscribeTargets(tasks, knownKeys);
-  const likeTargets = deep && creds && sessionString ? collectPostTargets(tasks, knownKeys, "like") : [];
-  const commentTargets =
-    deep && creds && sessionString ? collectPostTargets(tasks, knownKeys, "comment") : [];
+  const allowPostMtproto = deep && creds && sessionString && !LOW_MEM;
+  const likeTargets = allowPostMtproto ? collectPostTargets(tasks, knownKeys, "like") : [];
+  const commentTargets = allowPostMtproto ? collectPostTargets(tasks, knownKeys, "comment") : [];
+  const useMtprotoSubscribe = !LOW_MEM;
 
   const jobs = [
     ...subscribeTargets.map((t) => ({ type: "subscribe", target: t })),
@@ -353,7 +365,8 @@ async function probePreExistingEngagements({ worker, tasks, knownKeys, mode = "n
           target.messageUrl,
           target.messageKey,
           creds,
-          sessionString
+          sessionString,
+          useMtprotoSubscribe
         );
         if (isMember) writeCache(userId, "sub", cacheId, isMember);
         results.set(`subscribe:${cacheId}`, isMember);

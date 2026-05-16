@@ -10,8 +10,18 @@ const inferredDialect = explicitDialect
     ? "postgres"
     : "mysql";
 
+const nodeEnv = process.env.NODE_ENV || "development";
+const isProduction = nodeEnv === "production";
+
 const env = {
-  nodeEnv: process.env.NODE_ENV || "development",
+  nodeEnv,
+  isProduction,
+  /** Render free tier etc. — avoid spawning Python/Telethon on background probes. */
+  lowMemoryHost:
+    process.env.LOW_MEMORY_HOST === "true" ||
+    (isProduction && process.env.LOW_MEMORY_HOST !== "false"),
+  /** Like/comment pre-existing checks via MTProto (heavy). Off by default on low-memory hosts. */
+  telegramDeepSync: process.env.TELEGRAM_DEEP_SYNC === "true",
   port: Number(process.env.PORT || 5000),
   dbSyncAlter: process.env.DB_SYNC_ALTER === "true",
   db: {

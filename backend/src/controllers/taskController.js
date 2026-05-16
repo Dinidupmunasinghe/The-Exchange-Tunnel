@@ -15,6 +15,7 @@ const {
   probeAnyLikeOnTelegram
 } = require("../services/telegramEngagementProbeService");
 const { decrypt } = require("../utils/crypto");
+const env = require("../config/env");
 const crypto = require("crypto");
 
 function runnableCampaignWhere() {
@@ -737,6 +738,7 @@ async function submitTaskCompletion(req, res) {
 async function getAvailableTasks(req, res) {
   const fastFeed = String(req.query.fast || "") === "1";
   const engagementsOnly = String(req.query.engagementsOnly || "") === "1";
+  const taskLimit = env.lowMemoryHost ? 60 : 200;
   const campaignVisibilityWhere = {
     userId: { [Op.ne]: req.user.id },
     [Op.or]: [
@@ -785,7 +787,7 @@ async function getAvailableTasks(req, res) {
       }
     ],
     subQuery: false,
-    limit: 200,
+    limit: taskLimit,
     order: [
       ["createdAt", "DESC"],
       ["id", "DESC"]
@@ -1045,9 +1047,13 @@ async function getAvailableTasks(req, res) {
   });
 }
 
-/** Lightweight deep probe — engagements only, no avatars or task payload. */
+/** Background engagement sync — engagements only, no avatars or full task payload. */
 async function syncPreexistingEngagements(req, res) {
-  req.query = { ...req.query, fast: "1", probe: "deep", engagementsOnly: "1" };
+  const probe =
+    env.telegramDeepSync || !env.lowMemoryHost
+      ? "deep"
+      : "normal";
+  req.query = { ...req.query, fast: "1", probe, engagementsOnly: "1" };
   return getAvailableTasks(req, res);
 }
 

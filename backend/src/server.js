@@ -1,5 +1,4 @@
 const http = require("http");
-const { Server } = require("socket.io");
 const app = require("./app");
 const env = require("./config/env");
 const db = require("./models");
@@ -105,13 +104,16 @@ async function bootstrap() {
     await ensureActionKindColumnCompatibility();
     await db.sequelize.sync(env.dbSyncAlter ? { alter: true } : undefined);
     const server = http.createServer(app);
-    const io = new Server(server, {
-      cors: { origin: env.corsOrigin, methods: ["GET", "POST"] }
-    });
 
-    io.on("connection", (socket) => {
-      socket.emit("welcome", { message: "Connected to engagement exchange socket." });
-    });
+    if (!env.isProduction && process.env.SOCKET_IO_ENABLED === "true") {
+      const { Server } = require("socket.io");
+      const io = new Server(server, {
+        cors: { origin: env.corsOrigin, methods: ["GET", "POST"] }
+      });
+      io.on("connection", (socket) => {
+        socket.emit("welcome", { message: "Connected to engagement exchange socket." });
+      });
+    }
 
     server.listen(env.port, () => {
       // eslint-disable-next-line no-console

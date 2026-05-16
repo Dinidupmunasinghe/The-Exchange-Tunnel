@@ -158,7 +158,7 @@ function hasCompletedTask(tasks: TaskRow[]): boolean {
 }
 
 const EARN_TELEGRAM_SYNC_KEY = "et_earn_telegram_sync_at";
-const EARN_TELEGRAM_SYNC_TTL_MS = 5 * 60 * 1000;
+const EARN_TELEGRAM_SYNC_TTL_MS = 15 * 60 * 1000;
 const EARN_FEED_POLL_MS = 60_000;
 
 function shouldRunTelegramSync(force = false): boolean {
@@ -270,7 +270,7 @@ export function EarnCredits() {
 
   useEffect(() => {
     void loadProfileStatus();
-    void loadTasks({ silent: false, forceSync: true });
+    void loadTasks({ silent: false, forceSync: false });
   }, [loadTasks, loadProfileStatus]);
 
   useEffect(() => {
