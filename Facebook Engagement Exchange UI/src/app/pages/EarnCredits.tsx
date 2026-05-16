@@ -17,11 +17,13 @@ import {
 } from "../lib/engagement";
 import { isEarnFeedCacheFresh, readEarnFeedCache, writeEarnFeedCache } from "../lib/earnFeedCache";
 import {
+  campaignDisplayTitle,
   ownerAvatarInitials,
   ownerAvatarUrl,
   ownerExchangeDisplayName,
   type CampaignOwner
 } from "../lib/ownerProfile";
+import { withNetworkRetry } from "../services/api";
 
 type TaskRow = {
   id: number;
@@ -127,6 +129,22 @@ function mergeEngagements(current: MyEngagementRow[], incoming: MyEngagementRow[
   return [...map.values()];
 }
 
+/** Keep owner labels/avatars when a refresh returns tasks without nested owner (stale cache). */
+function mergeTasksPreserveOwner(current: TaskRow[], incoming: TaskRow[]): TaskRow[] {
+  const ownerByCampaignId = new Map<number, CampaignOwner>();
+  for (const t of current) {
+    const cid = t.campaign?.id;
+    if (cid && t.campaign?.owner) ownerByCampaignId.set(cid, t.campaign.owner);
+  }
+  return incoming.map((t) => {
+    if (t.campaign?.owner) return t;
+    const cid = t.campaign?.id;
+    const prevOwner = cid ? ownerByCampaignId.get(cid) : undefined;
+    if (!prevOwner || !t.campaign) return t;
+    return { ...t, campaign: { ...t.campaign, owner: prevOwner } };
+  });
+}
+
 function readCachedEarnState() {
   const cached = readEarnFeedCache();
   if (!cached) {
@@ -189,7 +207,8 @@ export function EarnCredits() {
         : [];
       const responseHasMore = Boolean(tasksRes?.hasMore);
       const responseNextCursor = typeof tasksRes?.nextCursor === "number" ? tasksRes.nextCursor : null;
-      const mergedTasks = mode === "append" ? mergeTasksById(tasks, nextTasks) : nextTasks;
+      const mergedTasks =
+        mode === "append" ? mergeTasksById(tasks, nextTasks) : mergeTasksPreserveOwner(tasks, nextTasks);
       const mergedEngagements =
         mode === "append" ? mergeEngagements(myEngagements, nextEngagements) : nextEngagements;
       setTasks(mergedTasks);
@@ -220,7 +239,9 @@ export function EarnCredits() {
   );
 
   const refreshTasksFast = useCallback(async () => {
-    const res = await api.getTasks({ fast: true, limit: EARN_PAGE_SIZE });
+    const res = await withNetworkRetry(() =>
+      api.getTasks({ fast: true, limit: EARN_PAGE_SIZE, skipSessionRedirect: true })
+    );
     applyFeedPayload(res);
     return res;
   }, [applyFeedPayload]);
@@ -251,8 +272,10 @@ export function EarnCredits() {
       else if (!silent) setIsRefreshing(true);
       try {
         const [profileRes, tasksRes] = await Promise.all([
-          api.getProfile().catch(() => null),
-          api.getTasks({ fast: true, limit: EARN_PAGE_SIZE })
+          api.getProfile({ skipSessionRedirect: true }).catch(() => null),
+          withNetworkRetry(() =>
+            api.getTasks({ fast: true, limit: EARN_PAGE_SIZE, skipSessionRedirect: true })
+          )
         ]);
         const u = profileRes?.user as
           | { telegramUserId?: string | null; hasMtprotoSession?: boolean }
@@ -593,10 +616,17 @@ export function EarnCredits() {
         {loadError ? (
           <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">
             {tasks.length > 0 ? "Showing cached feed. " : ""}
-            Couldn&apos;t refresh: <span className="font-medium">{loadError}</span>
-            {tasks.length > 0 ? (
-              <span className="mt-1 block text-xs opacity-90">Tap Refresh feed when the backend is back online.</span>
-            ) : null}
+            Couldn&apos;t reach the API: <span className="font-medium">{loadError}</span>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" variant="outline" disabled={isRefreshing} onClick={() => void loadTasks()}>
+                {isRefreshing ? "Retrying…" : "Retry now"}
+              </Button>
+              <span className="text-xs opacity-90">
+                {tasks.length > 0
+                  ? "Your feed may be outdated until the backend responds."
+                  : "The server may be waking up — retry in a few seconds."}
+              </span>
+            </div>
           </div>
         ) : null}
         {!loading && !loadError && tasks.length === 0 ? (
@@ -609,7 +639,7 @@ export function EarnCredits() {
         {taskGroups.map(({ campaign, tasks: campaignTasks }) => {
           if (!campaign) return null;
           const et = String(campaignTasks[0]?.engagementType ?? "");
-          const title = campaign.name ? campaign.name : `Campaign #${campaign.id}`;
+          const title = campaignDisplayTitle(campaign);
           const nextOpen = firstOpenTask(campaignTasks);
           const reward = nextOpen?.rewardCredits ?? campaignTasks[0]?.rewardCredits ?? 0;
           const postedAgo = relativeCampaignTime(campaign.createdAt);

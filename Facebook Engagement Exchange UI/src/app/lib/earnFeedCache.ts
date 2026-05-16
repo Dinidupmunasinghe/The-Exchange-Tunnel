@@ -8,7 +8,7 @@ export type EarnFeedCache = {
   nextCursor?: number | null;
 };
 
-const CACHE_KEY = "et_earn_feed_v1";
+const CACHE_KEY = "et_earn_feed_v2";
 
 export function readEarnFeedCache(): EarnFeedCache | null {
   try {

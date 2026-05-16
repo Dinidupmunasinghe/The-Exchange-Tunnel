@@ -4,5 +4,11 @@
   "buildCommand": "cd \"Facebook Engagement Exchange UI\" && npm run build",
   "outputDirectory": "Facebook Engagement Exchange UI/dist",
   "framework": "vite",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://the-exchange-tunnel.onrender.com/api/:path*"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

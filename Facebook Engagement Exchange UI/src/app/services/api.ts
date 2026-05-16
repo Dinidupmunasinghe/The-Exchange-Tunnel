@@ -10,7 +10,39 @@ function cacheProfileFromAuthUser(user: unknown) {
   });
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (import.meta.env.PROD) {
+    return "/api";
+  }
+  return "/api";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+/** Retry transient network / cold-start failures (e.g. Render waking up). */
+export async function withNetworkRetry<T>(
+  fn: () => Promise<T>,
+  opts?: { attempts?: number; baseDelayMs?: number }
+): Promise<T> {
+  const attempts = opts?.attempts ?? 3;
+  const baseDelayMs = opts?.baseDelayMs ?? 2500;
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      const retryable =
+        /failed to fetch|timed out|502|503|unavailable|asleep|restarting/i.test(msg);
+      if (!retryable || i >= attempts - 1) throw e;
+      await new Promise((r) => setTimeout(r, baseDelayMs * (i + 1)));
+    }
+  }
+  throw last;
+}
 const TOKEN_KEY = "exchange_token";
 const ADMIN_TOKEN_KEY = "exchange_admin_token";
 

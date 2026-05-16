@@ -1,4 +1,4 @@
-import { api, getToken } from "../services/api";
+import { api, getToken, withNetworkRetry } from "../services/api";
 import { writeEarnFeedCache } from "./earnFeedCache";
 
 let inflight: Promise<void> | null = null;
@@ -12,9 +12,9 @@ export function prefetchEarnFeed(): Promise<void> {
     try {
       const [profileRes, tasksRes] = await Promise.all([
         api.getProfile({ skipSessionRedirect: true }).catch(() => null),
-        api
-          .getTasks({ fast: true, limit: 12, skipSessionRedirect: true })
-          .catch(() => null),
+        withNetworkRetry(() =>
+          api.getTasks({ fast: true, limit: 12, skipSessionRedirect: true })
+        ).catch(() => null),
       ]);
       if (!tasksRes) return;
       const u = profileRes?.user as

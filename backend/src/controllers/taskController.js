@@ -816,7 +816,14 @@ async function getAvailableTasks(req, res) {
                   model: db.User,
                   as: "owner",
                   required: false,
-                  attributes: ["id", "name", "email", "telegramUserId", "profilePhotoUrl"]
+                  attributes: [
+                    "id",
+                    "name",
+                    "email",
+                    "telegramUserId",
+                    "profilePhotoUrl",
+                    "telegramActingChannelTitle"
+                  ]
                 }
               ]
             })

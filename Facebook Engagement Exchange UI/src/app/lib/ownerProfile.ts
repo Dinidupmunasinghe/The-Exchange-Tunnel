@@ -4,7 +4,21 @@ export type CampaignOwner = {
   exchangeDisplayName?: string | null;
   profilePhotoUrl?: string | null;
   avatarUrl?: string | null;
+  telegramActingChannelTitle?: string | null;
 };
+
+export function campaignDisplayTitle(campaign: {
+  id?: number;
+  name?: string | null;
+  owner?: CampaignOwner | null;
+} | null | undefined): string {
+  if (!campaign) return "Campaign";
+  const name = String(campaign.name || "").trim();
+  if (name && name.toLowerCase() !== "untitled campaign") return name;
+  const channel = String(campaign.owner?.telegramActingChannelTitle || "").trim();
+  if (channel) return channel;
+  return `Campaign #${campaign.id ?? ""}`;
+}
 
 export function ownerExchangeDisplayName(owner: CampaignOwner | undefined | null): string {
   if (!owner) return "Exchange member";
