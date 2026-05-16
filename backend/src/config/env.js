@@ -22,6 +22,9 @@ const env = {
     (isProduction && process.env.LOW_MEMORY_HOST !== "false"),
   /** Like/comment pre-existing checks via MTProto (heavy). Off by default on low-memory hosts. */
   telegramDeepSync: process.env.TELEGRAM_DEEP_SYNC === "true",
+  auditsEnabled:
+    String(process.env.AUDITS_ENABLED || (isProduction ? "false" : "true")).toLowerCase() ===
+    "true",
   port: Number(process.env.PORT || 5000),
   dbSyncAlter: process.env.DB_SYNC_ALTER === "true",
   db: {

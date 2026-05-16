@@ -738,7 +738,7 @@ async function submitTaskCompletion(req, res) {
 async function getAvailableTasks(req, res) {
   const fastFeed = String(req.query.fast || "") === "1";
   const engagementsOnly = String(req.query.engagementsOnly || "") === "1";
-  const taskLimit = env.lowMemoryHost ? 60 : 200;
+  const taskLimit = engagementsOnly ? 25 : env.lowMemoryHost ? 40 : 200;
   const campaignVisibilityWhere = {
     userId: { [Op.ne]: req.user.id },
     [Op.or]: [
@@ -763,27 +763,33 @@ async function getAvailableTasks(req, res) {
         as: "campaign",
         required: true,
         where: campaignVisibilityWhere,
-        attributes: [
-          "id",
-          "name",
-          "messageUrl",
-          "messageKey",
-          "engagementType",
-          "creditsPerEngagement",
-          "userId",
-          "scheduledLaunchAt",
-          "status",
-          "createdAt",
-          "maxEngagements"
-        ],
-        include: [
-          {
-            model: db.User,
-            as: "owner",
-            required: false,
-            attributes: ["id", "name", "telegramUserId", "profilePhotoUrl"]
-          }
-        ]
+        attributes: engagementsOnly
+          ? ["id", "messageKey", "engagementType", "messageUrl"]
+          : [
+              "id",
+              "name",
+              "messageUrl",
+              "messageKey",
+              "engagementType",
+              "creditsPerEngagement",
+              "userId",
+              "scheduledLaunchAt",
+              "status",
+              "createdAt",
+              "maxEngagements"
+            ],
+        ...(!engagementsOnly
+          ? {
+              include: [
+                {
+                  model: db.User,
+                  as: "owner",
+                  required: false,
+                  attributes: ["id", "name", "telegramUserId", "profilePhotoUrl"]
+                }
+              ]
+            }
+          : {})
       }
     ],
     subQuery: false,
@@ -954,9 +960,15 @@ async function getAvailableTasks(req, res) {
   const knownKeys = new Set(
     myEngagements.map((row) => engagementKey(row.campaignId, row.actionKind))
   );
-  const skipProbe = String(req.query.probe || "") === "0" || String(req.query.fast || "") === "1";
-  const probeMode =
-    String(req.query.probe || "") === "deep" ? "deep" : skipProbe ? "off" : "normal";
+  const wantDeepProbe =
+    String(req.query.probe || "") === "deep" && env.telegramDeepSync && !env.lowMemoryHost;
+  const skipProbe =
+    !wantDeepProbe &&
+    (env.lowMemoryHost ||
+      String(req.query.probe || "") === "0" ||
+      String(req.query.fast || "") === "1" ||
+      engagementsOnly);
+  const probeMode = wantDeepProbe ? "deep" : skipProbe ? "off" : "normal";
   let probedRaw = [];
   if (probeMode !== "off") {
     const worker = await db.User.findByPk(req.user.id, {
@@ -1047,12 +1059,16 @@ async function getAvailableTasks(req, res) {
   });
 }
 
-/** Background engagement sync — engagements only, no avatars or full task payload. */
+/**
+ * Background engagement sync. On low-memory hosts this is DB-only (no Telegram
+ * probes) — the fast /tasks feed already returns the same engagement memory.
+ */
 async function syncPreexistingEngagements(req, res) {
-  const probe =
-    env.telegramDeepSync || !env.lowMemoryHost
-      ? "deep"
-      : "normal";
+  if (env.lowMemoryHost && !env.telegramDeepSync) {
+    req.query = { ...req.query, fast: "1", probe: "0", engagementsOnly: "1" };
+    return getAvailableTasks(req, res);
+  }
+  const probe = env.telegramDeepSync ? "deep" : "normal";
   req.query = { ...req.query, fast: "1", probe, engagementsOnly: "1" };
   return getAvailableTasks(req, res);
 }

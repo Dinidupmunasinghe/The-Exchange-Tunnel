@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ThumbsUp, MessageCircle, ExternalLink, Coins, RefreshCw, BellPlus, Loader2, SendHorizontal, Trash2, Repeat2 } from "lucide-react";
 import { TelegramMessageMedia } from "../components/TelegramMessageMedia";
@@ -157,31 +157,7 @@ function hasCompletedTask(tasks: TaskRow[]): boolean {
   return tasks.some((t) => t.status === "completed");
 }
 
-const EARN_TELEGRAM_SYNC_KEY = "et_earn_telegram_sync_at";
-const EARN_TELEGRAM_SYNC_TTL_MS = 15 * 60 * 1000;
 const EARN_FEED_POLL_MS = 60_000;
-
-function shouldRunTelegramSync(force = false): boolean {
-  if (force) return true;
-  try {
-    const at = Number(sessionStorage.getItem(EARN_TELEGRAM_SYNC_KEY) || 0);
-    return Date.now() - at > EARN_TELEGRAM_SYNC_TTL_MS;
-  } catch {
-    return true;
-  }
-}
-
-function markTelegramSyncDone(): void {
-  try {
-    sessionStorage.setItem(EARN_TELEGRAM_SYNC_KEY, String(Date.now()));
-  } catch {
-    // ignore
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /** High-contrast credit pill on filled (primary) action buttons. */
 const rewardBadgeOnFilled =
@@ -204,7 +180,6 @@ export function EarnCredits() {
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
   const [avatarLoadedByCampaign, setAvatarLoadedByCampaign] = useState<Record<number, boolean>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
-  const syncInFlightRef = useRef(false);
 
   const loadProfileStatus = useCallback(async () => {
     try {
@@ -226,37 +201,16 @@ export function EarnCredits() {
     return res;
   }, []);
 
-  const syncTelegramState = useCallback(async (opts?: { force?: boolean }) => {
-    if (!shouldRunTelegramSync(opts?.force)) return;
-    if (syncInFlightRef.current) return;
-    syncInFlightRef.current = true;
-    try {
-      const sync = await api.syncTelegramEngagementState();
-      if (Array.isArray(sync?.myEngagements)) setMyEngagements(sync.myEngagements);
-      markTelegramSyncDone();
-    } catch {
-      // Background audit only — no UI blocking or banners.
-    } finally {
-      syncInFlightRef.current = false;
-    }
-  }, []);
-
-  const refreshFeed = useCallback(
-    async (opts?: { forceSync?: boolean }) => {
-      await refreshTasksFast();
-      void syncTelegramState({ force: opts?.forceSync });
-    },
-    [refreshTasksFast, syncTelegramState]
-  );
+  const refreshFeed = useCallback(async () => {
+    await refreshTasksFast();
+  }, [refreshTasksFast]);
 
   const loadTasks = useCallback(
-    async (opts?: { silent?: boolean; forceSync?: boolean }) => {
+    async (opts?: { silent?: boolean }) => {
       const silent = opts?.silent ?? false;
-      const forceSync = opts?.forceSync ?? false;
       if (!silent) setLoading(true);
       try {
         await refreshTasksFast();
-        void syncTelegramState({ force: forceSync });
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Could not load tasks";
         setLoadError(message);
@@ -265,12 +219,12 @@ export function EarnCredits() {
         if (!silent) setLoading(false);
       }
     },
-    [refreshTasksFast, syncTelegramState]
+    [refreshTasksFast]
   );
 
   useEffect(() => {
     void loadProfileStatus();
-    void loadTasks({ silent: false, forceSync: false });
+    void loadTasks({ silent: false });
   }, [loadTasks, loadProfileStatus]);
 
   useEffect(() => {
@@ -278,12 +232,11 @@ export function EarnCredits() {
       if (document.visibilityState === "visible") {
         void refreshTasksFast();
         void loadProfileStatus();
-        void syncTelegramState();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refreshTasksFast, loadProfileStatus, syncTelegramState]);
+  }, [refreshTasksFast, loadProfileStatus]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -538,7 +491,7 @@ export function EarnCredits() {
           variant="outline"
           size="sm"
           disabled={loading}
-          onClick={() => void loadTasks({ forceSync: true })}
+          onClick={() => void loadTasks()}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh feed

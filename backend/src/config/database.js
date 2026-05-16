@@ -12,6 +12,9 @@ const sslRejectUnauthorized = explicitReject != null
 const baseOptions = {
   dialect: env.db.dialect,
   logging: false,
+  pool: env.lowMemoryHost
+    ? { max: 3, min: 0, acquire: 20000, idle: 10000 }
+    : { max: 10, min: 0, acquire: 30000, idle: 10000 },
   dialectOptions: env.db.ssl
     ? {
         ssl: {

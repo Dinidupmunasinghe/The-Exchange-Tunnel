@@ -1,0 +1,22 @@
+# Render Blueprint — tuned for free tier (512MB). Upgrade instance RAM before enabling
+# TELEGRAM_DEEP_SYNC or AUDITS_ENABLED.
+services:
+  - type: web
+    name: exchange-tunnel-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOW_MEMORY_HOST
+        value: "true"
+      - key: AUDITS_ENABLED
+        value: "false"
+      - key: TELEGRAM_DEEP_SYNC
+        value: "false"
+      - key: MTPROTO_MAX_CONCURRENT
+        value: "1"
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=384

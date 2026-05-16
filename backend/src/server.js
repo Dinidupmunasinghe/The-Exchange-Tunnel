@@ -3,11 +3,6 @@ const app = require("./app");
 const env = require("./config/env");
 const db = require("./models");
 const { activateDueCampaigns } = require("./services/campaignScheduler");
-const { auditSubscribeEngagements, auditSubscriptionMemory } = require("./services/subscriptionAuditService");
-const { auditCommentMembershipEngagements } = require("./services/commentMembershipAuditService");
-const { auditLikeEngagements } = require("./services/likeEngagementAuditService");
-const { auditCommentDeletions } = require("./services/commentDeletionAuditService");
-const { auditShareDeletions } = require("./services/shareDeletionAuditService");
 
 async function addColumnIfMissing(queryInterface, tableName, columnName, definition) {
   const columns = await queryInterface.describeTable(tableName);
@@ -79,13 +74,6 @@ async function ensureActionKindColumnCompatibility() {
 }
 
 const AUDIT_INTERVAL_MS = Number(process.env.AUDIT_INTERVAL_MS || 10 * 60 * 1000);
-// On constrained hosts the per-audit Python (Telethon) spawns can OOM the
-// service. Default OFF in production; users can opt in by setting
-// AUDITS_ENABLED=true. Audits are not required for normal operation — the
-// pre-existing detection probes run on demand when users open /earn.
-const AUDITS_ENABLED =
-  String(process.env.AUDITS_ENABLED || (env.nodeEnv === "production" ? "false" : "true"))
-    .toLowerCase() === "true";
 
 function staggerInterval(fn, intervalMs, offsetMs) {
   setTimeout(() => {
@@ -125,7 +113,12 @@ async function bootstrap() {
     }, 60 * 1000);
     activateDueCampaigns().catch(() => undefined);
 
-    if (!AUDITS_ENABLED) return;
+    if (!env.auditsEnabled) return;
+    const { auditSubscribeEngagements, auditSubscriptionMemory } = require("./services/subscriptionAuditService");
+    const { auditCommentMembershipEngagements } = require("./services/commentMembershipAuditService");
+    const { auditLikeEngagements } = require("./services/likeEngagementAuditService");
+    const { auditCommentDeletions } = require("./services/commentDeletionAuditService");
+    const { auditShareDeletions } = require("./services/shareDeletionAuditService");
     staggerInterval(auditSubscribeEngagements, AUDIT_INTERVAL_MS, 30_000);
     staggerInterval(auditSubscriptionMemory, AUDIT_INTERVAL_MS, 60_000);
     staggerInterval(auditCommentMembershipEngagements, AUDIT_INTERVAL_MS, 90_000);

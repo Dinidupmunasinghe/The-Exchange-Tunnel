@@ -12,11 +12,21 @@ const adminAuthRoutes = require("./adminAuthRoutes");
 
 const router = express.Router();
 
+const env = require("../config/env");
+
 router.get("/health", (req, res) => {
+  const mem = process.memoryUsage();
   res.json({
     status: "ok",
     service: "exchange-tunnel-backend",
-    uptimeSec: Math.round(process.uptime())
+    uptimeSec: Math.round(process.uptime()),
+    memoryMb: {
+      rss: Math.round(mem.rss / 1024 / 1024),
+      heapUsed: Math.round(mem.heapUsed / 1024 / 1024)
+    },
+    lowMemoryHost: env.lowMemoryHost,
+    auditsEnabled: env.auditsEnabled,
+    telegramDeepSync: env.telegramDeepSync
   });
 });
 
