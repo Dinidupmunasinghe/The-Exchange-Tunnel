@@ -1,6 +1,23 @@
+import { clearProfileCache, writeProfileCache } from "../lib/profileCache";
+
+function cacheProfileFromAuthUser(user: unknown) {
+  const u = user as { name?: string; email?: string; credits?: number } | null;
+  if (!u) return;
+  writeProfileCache({
+    name: u.name,
+    email: u.email,
+    credits: u.credits,
+  });
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const TOKEN_KEY = "exchange_token";
 const ADMIN_TOKEN_KEY = "exchange_admin_token";
+
+type SessionRequestOpts = {
+  /** Background polls/prefetch: do not redirect the whole app on 401. */
+  skipSessionRedirect?: boolean;
+};
 
 type Json = Record<string, unknown>;
 
@@ -35,6 +52,7 @@ export function setToken(token: string) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  clearProfileCache();
 }
 
 export function getAdminToken() {
@@ -120,7 +138,8 @@ async function readJsonBody(response: Response): Promise<{ payload: Json; rawTex
 async function requestJson<T>(
   path: string,
   options: RequestInit,
-  withBearer: boolean
+  withBearer: boolean,
+  sessionOpts?: SessionRequestOpts
 ): Promise<T> {
   const token = getToken();
   let response: Response;
@@ -143,7 +162,11 @@ async function requestJson<T>(
     const message = extractApiErrorMessage(response, payload, rawText);
     if (withBearer && response.status === 401) {
       clearToken();
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      if (
+        !sessionOpts?.skipSessionRedirect &&
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+      ) {
         const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
         window.location.assign(`/login?session=expired&returnTo=${returnTo}`);
       }
@@ -154,19 +177,27 @@ async function requestJson<T>(
   return payload as T;
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  return requestJson<T>(path, options, true);
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  sessionOpts?: SessionRequestOpts
+): Promise<T> {
+  return requestJson<T>(path, options, true, sessionOpts);
 }
 
 async function requestWithoutAuth<T>(path: string, options: RequestInit = {}): Promise<T> {
   return requestJson<T>(path, options, false);
 }
 
-async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function authRequest<T>(
+  path: string,
+  options: RequestInit = {},
+  sessionOpts?: SessionRequestOpts
+): Promise<T> {
   if (!getToken()) {
     throw new Error("Not authenticated");
   }
-  return request<T>(path, options);
+  return request<T>(path, options, sessionOpts);
 }
 
 async function adminRequestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -199,6 +230,7 @@ export async function loginWithTelegram(auth: Record<string, string | number | u
     body: JSON.stringify(auth),
   });
   setToken(data.token);
+  cacheProfileFromAuthUser(data.user);
   return data;
 }
 
@@ -209,6 +241,7 @@ export async function loginWithEmail(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   });
   setToken(data.token);
+  cacheProfileFromAuthUser(data.user);
   return data;
 }
 
@@ -219,6 +252,7 @@ export async function registerWithEmail(email: string, password: string, name?: 
     body: JSON.stringify({ email, password, name }),
   });
   setToken(data.token);
+  cacheProfileFromAuthUser(data.user);
   return data;
 }
 
@@ -284,7 +318,8 @@ export async function updateProfilePhoto(profilePhotoUrl: string | null) {
 }
 
 export const api = {
-  getProfile: () => authRequest("/users/me") as Promise<{ user: any }>,
+  getProfile: (opts?: SessionRequestOpts) =>
+    authRequest("/users/me", {}, opts) as Promise<{ user: any }>,
   updateProfilePhoto,
   getDashboard: () => authRequest("/users/dashboard") as Promise<{ stats: any }>,
   unlinkTelegram: () => unlinkTelegramFromAccount(),
@@ -356,7 +391,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  getTasks: (opts?: { fast?: boolean; limit?: number; cursor?: number | null }) => {
+  getTasks: (opts?: {
+    fast?: boolean;
+    limit?: number;
+    cursor?: number | null;
+    skipSessionRedirect?: boolean;
+  }) => {
     const params = new URLSearchParams();
     if (opts?.fast) {
       params.set("fast", "1");
@@ -365,7 +405,11 @@ export const api = {
     if (opts?.limit) params.set("limit", String(opts.limit));
     if (opts?.cursor) params.set("cursor", String(opts.cursor));
     const query = params.toString();
-    return authRequest(`/tasks${query ? `?${query}` : ""}`) as Promise<{
+    return authRequest(
+      `/tasks${query ? `?${query}` : ""}`,
+      {},
+      { skipSessionRedirect: opts?.skipSessionRedirect }
+    ) as Promise<{
       tasks: any[];
       myEngagements: {
         id: number;

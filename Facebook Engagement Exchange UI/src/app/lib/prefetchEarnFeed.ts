@@ -11,9 +11,12 @@ export function prefetchEarnFeed(): Promise<void> {
   inflight = (async () => {
     try {
       const [profileRes, tasksRes] = await Promise.all([
-        api.getProfile().catch(() => null),
-        api.getTasks({ fast: true, limit: 12 }),
+        api.getProfile({ skipSessionRedirect: true }).catch(() => null),
+        api
+          .getTasks({ fast: true, limit: 12, skipSessionRedirect: true })
+          .catch(() => null),
       ]);
+      if (!tasksRes) return;
       const u = profileRes?.user as
         | { telegramUserId?: string | null; hasMtprotoSession?: boolean }
         | undefined;
