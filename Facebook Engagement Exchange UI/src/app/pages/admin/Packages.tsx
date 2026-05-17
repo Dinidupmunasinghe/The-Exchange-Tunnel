@@ -1,17 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
 import { Switch } from "../../components/ui/switch";
 import { api } from "../../services/api";
 import { PricingCard } from "../../landing/components/PricingCard";
 import {
   EMPTY_PACKAGE_DRAFT,
-  featuresToText,
-  textToFeatures,
+  normalizeFeatures,
+  normalizePublicPackage,
   type PublicCreditPackage
 } from "../../lib/creditPackages";
 import { FormError, FormMessage, PageHeader, StatusPill } from "./_shared";
@@ -19,19 +18,9 @@ import { FormError, FormMessage, PageHeader, StatusPill } from "./_shared";
 type Draft = Omit<PublicCreditPackage, "id"> & { id?: number };
 
 function draftFromPackage(pkg: PublicCreditPackage): Draft {
-  return {
-    id: pkg.id,
-    name: pkg.name,
-    tagline: pkg.tagline,
-    priceLabel: pkg.priceLabel,
-    pricePeriod: pkg.pricePeriod,
-    credits: pkg.credits,
-    priceLkr: pkg.priceLkr,
-    features: [...pkg.features],
-    isPopular: pkg.isPopular,
-    isActive: pkg.isActive !== false,
-    sortOrder: pkg.sortOrder ?? 0
-  };
+  const normalized = normalizePublicPackage(pkg);
+  const { id, ...rest } = normalized;
+  return { id, ...rest };
 }
 
 function PackageEditor({
@@ -49,16 +38,36 @@ function PackageEditor({
   onCancel?: () => void;
   saving: boolean;
 }) {
-  const featuresText = featuresToText(draft.features);
+  const featureRows = draft.features?.length ? draft.features : [""];
+  const previewFeatures = normalizeFeatures(draft.features);
+
+  function setFeatures(next: string[]) {
+    onChange({ ...draft, features: next });
+  }
+
+  function updateFeature(index: number, value: string) {
+    const next = [...featureRows];
+    next[index] = value;
+    setFeatures(next);
+  }
+
+  function addFeature() {
+    setFeatures([...featureRows, ""]);
+  }
+
+  function removeFeature(index: number) {
+    const next = featureRows.filter((_, i) => i !== index);
+    setFeatures(next.length ? next : [""]);
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-2 sm:col-span-2">
             <Label>Plan name</Label>
             <Input
-              value={draft.name}
+              value={draft.name ?? ""}
               onChange={(e) => onChange({ ...draft, name: e.target.value })}
               placeholder="Pro"
             />
@@ -66,7 +75,7 @@ function PackageEditor({
           <div className="space-y-2 sm:col-span-2">
             <Label>Tagline</Label>
             <Input
-              value={draft.tagline}
+              value={draft.tagline ?? ""}
               onChange={(e) => onChange({ ...draft, tagline: e.target.value })}
               placeholder="For serious growth"
             />
@@ -74,7 +83,7 @@ function PackageEditor({
           <div className="space-y-2">
             <Label>Display price</Label>
             <Input
-              value={draft.priceLabel}
+              value={draft.priceLabel ?? ""}
               onChange={(e) => onChange({ ...draft, priceLabel: e.target.value })}
               placeholder="$29 or Free"
             />
@@ -82,7 +91,7 @@ function PackageEditor({
           <div className="space-y-2">
             <Label>Price period</Label>
             <Input
-              value={draft.pricePeriod}
+              value={draft.pricePeriod ?? ""}
               onChange={(e) => onChange({ ...draft, pricePeriod: e.target.value })}
               placeholder="/month"
             />
@@ -92,7 +101,7 @@ function PackageEditor({
             <Input
               type="number"
               min={1}
-              value={draft.credits}
+              value={draft.credits ?? 0}
               onChange={(e) => onChange({ ...draft, credits: Number(e.target.value) })}
             />
           </div>
@@ -102,7 +111,7 @@ function PackageEditor({
               type="number"
               min={0}
               step="0.01"
-              value={draft.priceLkr}
+              value={draft.priceLkr ?? 0}
               onChange={(e) => onChange({ ...draft, priceLkr: Number(e.target.value) })}
             />
           </div>
@@ -117,14 +126,37 @@ function PackageEditor({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label>Features (one per line)</Label>
-          <Textarea
-            rows={8}
-            value={featuresText}
-            onChange={(e) => onChange({ ...draft, features: textToFeatures(e.target.value) })}
-            placeholder="2,000 exchanges per month&#10;Real-time analytics"
-          />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <Label>Features</Label>
+            <Button type="button" variant="outline" size="sm" onClick={addFeature}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Add feature
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {featureRows.map((feature, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={feature}
+                  onChange={(e) => updateFeature(index, e.target.value)}
+                  placeholder="e.g. 2,000 exchanges per month"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => removeFeature(index)}
+                  disabled={featureRows.length === 1 && !feature.trim()}
+                  aria-label="Remove feature"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-6">
@@ -167,11 +199,12 @@ function PackageEditor({
           Landing page preview (styles fixed)
         </p>
         <PricingCard
+          preview
           name={draft.name || "Plan"}
           price={draft.priceLabel || "Free"}
           period={draft.pricePeriod || "/month"}
           description={draft.tagline || "Tagline"}
-          features={draft.features.length ? draft.features : ["Add features in the editor"]}
+          features={previewFeatures.length ? previewFeatures : ["Add features in the editor"]}
           popular={draft.isPopular}
         />
       </div>
@@ -187,13 +220,15 @@ export function AdminPackages() {
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [draft, setDraft] = useState<Draft>({ ...EMPTY_PACKAGE_DRAFT });
+  const editorRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await api.adminListPackages();
-      setPackages(Array.isArray(res.packages) ? res.packages : []);
+      const list = Array.isArray(res.packages) ? res.packages : [];
+      setPackages(list.map((p) => normalizePublicPackage(p)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load packages");
     } finally {
@@ -205,6 +240,14 @@ export function AdminPackages() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (editingId === null) return;
+    const t = window.setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [editingId]);
+
   function startCreate() {
     setEditingId("new");
     setDraft({ ...EMPTY_PACKAGE_DRAFT, sortOrder: packages.length });
@@ -213,7 +256,12 @@ export function AdminPackages() {
   }
 
   function startEdit(pkg: PublicCreditPackage) {
-    setEditingId(pkg.id);
+    const id = Number(pkg.id);
+    if (!Number.isFinite(id)) {
+      setError("Could not open editor: invalid package id.");
+      return;
+    }
+    setEditingId(id);
     setDraft(draftFromPackage(pkg));
     setMessage(null);
     setError(null);
@@ -224,13 +272,13 @@ export function AdminPackages() {
     setError(null);
     setMessage(null);
     const payload = {
-      name: draft.name.trim(),
-      tagline: draft.tagline.trim(),
-      priceLabel: draft.priceLabel.trim(),
-      pricePeriod: draft.pricePeriod.trim() || "/month",
+      name: String(draft.name ?? "").trim(),
+      tagline: String(draft.tagline ?? "").trim(),
+      priceLabel: String(draft.priceLabel ?? "").trim(),
+      pricePeriod: String(draft.pricePeriod ?? "").trim() || "/month",
       credits: Number(draft.credits),
       priceLkr: Number(draft.priceLkr),
-      features: draft.features,
+      features: normalizeFeatures(draft.features),
       isPopular: Boolean(draft.isPopular),
       isActive: draft.isActive !== false,
       sortOrder: Number(draft.sortOrder ?? 0)
@@ -281,55 +329,79 @@ export function AdminPackages() {
       <FormMessage message={message} />
 
       {editingId !== null ? (
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle>{editingId === "new" ? "New package" : `Edit: ${draft.name}`}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PackageEditor
-              draft={draft}
-              onChange={setDraft}
-              onSave={() => void saveDraft()}
-              onCancel={() => setEditingId(null)}
-              onDelete={typeof editingId === "number" ? () => void remove({ ...draft, id: editingId } as PublicCreditPackage) : undefined}
-              saving={saving}
-            />
-          </CardContent>
-        </Card>
+        <div
+          ref={editorRef}
+          className="sticky top-0 z-20 -mx-1 scroll-mt-4 rounded-xl border-2 border-primary/40 bg-background/95 p-1 shadow-lg backdrop-blur-sm"
+        >
+          <Card className="border-border bg-card">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle>{editingId === "new" ? "New package" : `Edit: ${draft.name || "Package"}`}</CardTitle>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                Close
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <PackageEditor
+                draft={draft}
+                onChange={setDraft}
+                onSave={() => void saveDraft()}
+                onCancel={() => setEditingId(null)}
+                onDelete={
+                  typeof editingId === "number"
+                    ? () => void remove({ ...draft, id: editingId } as PublicCreditPackage)
+                    : undefined
+                }
+                saving={saving}
+              />
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {packages.map((pkg) => (
-          <Card key={pkg.id} className="border-border bg-card">
-            <CardHeader className="space-y-2 pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-lg">{pkg.name}</CardTitle>
-                <StatusPill value={pkg.isActive ? "active" : "paused"} />
-              </div>
-              <p className="text-sm text-muted-foreground">{pkg.tagline}</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-2xl font-bold text-foreground">
-                {pkg.priceLabel}
-                {pkg.priceLabel.toLowerCase() !== "free" ? (
-                  <span className="text-sm font-normal text-muted-foreground"> {pkg.pricePeriod}</span>
-                ) : null}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {pkg.credits.toLocaleString()} credits · order {pkg.sortOrder ?? 0}
-                {pkg.isPopular ? " · Most popular" : ""}
-              </p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => startEdit(pkg)}>
-                  Edit
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => void remove(pkg)}>
-                  Delete
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {packages.map((pkg) => {
+          const isEditing = editingId === pkg.id;
+          return (
+            <Card
+              key={pkg.id}
+              className={`border-border bg-card ${isEditing ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardHeader className="space-y-2 pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-lg">{pkg.name}</CardTitle>
+                  <StatusPill value={pkg.isActive ? "active" : "paused"} />
+                </div>
+                <p className="text-sm text-muted-foreground">{pkg.tagline}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-2xl font-bold text-foreground">
+                  {pkg.priceLabel}
+                  {pkg.priceLabel.toLowerCase() !== "free" ? (
+                    <span className="text-sm font-normal text-muted-foreground"> {pkg.pricePeriod}</span>
+                  ) : null}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {pkg.credits.toLocaleString()} credits · order {pkg.sortOrder ?? 0}
+                  {pkg.isPopular ? " · Most popular" : ""}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={isEditing ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => startEdit(pkg)}
+                  >
+                    {isEditing ? "Editing…" : "Edit"}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void remove(pkg)}>
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
       {packages.length === 0 && !loading ? (
         <p className="text-sm text-muted-foreground md:col-span-2 xl:col-span-4">

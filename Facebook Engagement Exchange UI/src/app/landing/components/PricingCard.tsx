@@ -10,6 +10,8 @@ interface PricingCardProps {
   features: string[];
   popular?: boolean;
   delay?: number;
+  /** Admin preview: static CTA instead of router link */
+  preview?: boolean;
 }
 
 export function PricingCard({
@@ -19,8 +21,14 @@ export function PricingCard({
   description,
   features,
   popular = false,
-  delay = 0
+  delay = 0,
+  preview = false
 }: PricingCardProps) {
+  const ctaClass = `block w-full py-3 rounded-lg font-semibold mb-8 text-center transition-colors ${
+    popular
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+  }`;
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -61,17 +69,17 @@ export function PricingCard({
           </div>
         </div>
 
-        <GetStartedLink
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className={`block w-full py-3 rounded-lg font-semibold mb-8 text-center transition-colors ${
-            popular
-              ? "bg-blue-600 text-white hover:bg-blue-700"
-              : "bg-gray-100 text-gray-900 hover:bg-gray-200"
-          }`}
-        >
-          Get Started
-        </GetStartedLink>
+        {preview ? (
+          <div className={ctaClass}>Get Started</div>
+        ) : (
+          <GetStartedLink
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={ctaClass}
+          >
+            Get Started
+          </GetStartedLink>
+        )}
 
         <div className="space-y-4 flex-1">
           {features.map((feature, i) => (
