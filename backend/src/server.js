@@ -41,6 +41,126 @@ async function ensureSchemaPatches() {
   } catch {
     // Best effort only; the cursor feed still works if a hosted DB blocks DDL.
   }
+  await ensureCreditPackageColumns(qi);
+  await seedDefaultCreditPackages();
+}
+
+async function ensureCreditPackageColumns(queryInterface) {
+  await addColumnIfMissing(queryInterface, "credit_packages", "tagline", {
+    type: db.sequelize.Sequelize.STRING(255),
+    allowNull: true
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "priceLabel", {
+    type: db.sequelize.Sequelize.STRING(40),
+    allowNull: true
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "pricePeriod", {
+    type: db.sequelize.Sequelize.STRING(24),
+    allowNull: false,
+    defaultValue: "/month"
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "features", {
+    type: db.sequelize.Sequelize.TEXT,
+    allowNull: true
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "isPopular", {
+    type: db.sequelize.Sequelize.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "sortOrder", {
+    type: db.sequelize.Sequelize.INTEGER,
+    allowNull: false,
+    defaultValue: 0
+  });
+}
+
+async function seedDefaultCreditPackages() {
+  const count = await db.CreditPackage.count();
+  if (count > 0) return;
+  const defaults = [
+    {
+      name: "Free",
+      tagline: "Perfect for getting started",
+      priceLabel: "Free",
+      pricePeriod: "/month",
+      credits: 50,
+      priceLkr: 0,
+      features: JSON.stringify([
+        "50 exchanges per month",
+        "Basic analytics",
+        "Community support",
+        "Standard exchange speed",
+        "Mobile app access"
+      ]),
+      isPopular: false,
+      sortOrder: 0,
+      isActive: true
+    },
+    {
+      name: "Starter",
+      tagline: "For growing your presence",
+      priceLabel: "$9",
+      pricePeriod: "/month",
+      credits: 500,
+      priceLkr: 9,
+      features: JSON.stringify([
+        "500 exchanges per month",
+        "Advanced analytics",
+        "Priority support",
+        "Faster exchange speed",
+        "Custom targeting",
+        "Remove watermark"
+      ]),
+      isPopular: false,
+      sortOrder: 1,
+      isActive: true
+    },
+    {
+      name: "Pro",
+      tagline: "For serious growth",
+      priceLabel: "$29",
+      pricePeriod: "/month",
+      credits: 2000,
+      priceLkr: 29,
+      features: JSON.stringify([
+        "2,000 exchanges per month",
+        "Real-time analytics",
+        "24/7 priority support",
+        "Instant exchange speed",
+        "Advanced targeting",
+        "API access",
+        "Team collaboration",
+        "Custom branding"
+      ]),
+      isPopular: true,
+      sortOrder: 2,
+      isActive: true
+    },
+    {
+      name: "Enterprise",
+      tagline: "For maximum reach",
+      priceLabel: "$99",
+      pricePeriod: "/month",
+      credits: 10000,
+      priceLkr: 99,
+      features: JSON.stringify([
+        "Unlimited exchanges",
+        "Custom analytics dashboard",
+        "Dedicated account manager",
+        "Lightning-fast speed",
+        "AI-powered targeting",
+        "Full API access",
+        "Unlimited team members",
+        "White-label solution",
+        "Custom integrations"
+      ]),
+      isPopular: false,
+      sortOrder: 3,
+      isActive: true
+    }
+  ];
+  await db.CreditPackage.bulkCreate(defaults);
 }
 
 async function ensureDevSchema() {

@@ -5,7 +5,7 @@ import { InteractiveChart } from "./components/InteractiveChart";
 import { ActivityFeed } from "./components/ActivityFeed";
 import { FloatingCard } from "./components/FloatingCard";
 import { ExchangeAnimation } from "./components/ExchangeAnimation";
-import { PricingCard } from "./components/PricingCard";
+import { LandingPricingSection } from "./components/LandingPricingSection";
 import { GetStartedLink } from "./GetStartedLink";
 import { useState } from "react";
 
@@ -493,102 +493,7 @@ export function LandingApp() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
-              <Zap className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-blue-600 font-medium">Pricing</span>
-            </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
-              Choose your perfect plan
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Start <span className="text-blue-600 font-medium">free</span> and upgrade as you grow. All plans include our core features.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <PricingCard
-              name="Free"
-              price="Free"
-              description="Perfect for getting started"
-              features={[
-                "50 exchanges per month",
-                "Basic analytics",
-                "Community support",
-                "Standard exchange speed",
-                "Mobile app access"
-              ]}
-              delay={0}
-            />
-
-            <PricingCard
-              name="Starter"
-              price="$9"
-              description="For growing your presence"
-              features={[
-                "500 exchanges per month",
-                "Advanced analytics",
-                "Priority support",
-                "Faster exchange speed",
-                "Custom targeting",
-                "Remove watermark"
-              ]}
-              delay={0.1}
-            />
-
-            <PricingCard
-              name="Pro"
-              price="$29"
-              description="For serious growth"
-              popular={true}
-              features={[
-                "2,000 exchanges per month",
-                "Real-time analytics",
-                "24/7 priority support",
-                "Instant exchange speed",
-                "Advanced targeting",
-                "API access",
-                "Team collaboration",
-                "Custom branding"
-              ]}
-              delay={0.2}
-            />
-
-            <PricingCard
-              name="Enterprise"
-              price="$99"
-              description="For maximum reach"
-              features={[
-                "Unlimited exchanges",
-                "Custom analytics dashboard",
-                "Dedicated account manager",
-                "Lightning-fast speed",
-                "AI-powered targeting",
-                "Full API access",
-                "Unlimited team members",
-                "White-label solution",
-                "Custom integrations"
-              ]}
-              delay={0.3}
-            />
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.5 }}
-            className="text-center mt-12"
-          >
-            <p className="text-gray-600">
-              All plans include a <span className="text-blue-600 font-medium">14-day money-back guarantee</span>. No questions asked.
-            </p>
-          </motion.div>
-        </div>
-      </section>
+      <LandingPricingSection />
 
       {/* CTA Section */}
       <section className="landing-cta relative overflow-hidden bg-blue-800 px-6 py-20">

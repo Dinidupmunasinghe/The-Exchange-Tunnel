@@ -630,32 +630,72 @@ async function deleteRepostPricingRule(req, res) {
  * Credit packages CRUD
  * ========================================================================= */
 
+const { parseFeatures, serializeCreditPackage } = require("../utils/creditPackageSerializer");
+
+function readPackageBody(body) {
+  const name = String(body.name || "").trim();
+  const tagline = String(body.tagline || "").trim();
+  const priceLabel = String(body.priceLabel || "").trim();
+  const pricePeriod = String(body.pricePeriod || "/month").trim() || "/month";
+  const credits = Number(body.credits);
+  const priceLkr = Number(body.priceLkr);
+  const features = parseFeatures(body.features);
+  const isPopular = Boolean(body.isPopular);
+  const isActive = body.isActive !== false;
+  const sortOrder = Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0;
+  return {
+    name,
+    tagline,
+    priceLabel,
+    pricePeriod,
+    credits,
+    priceLkr,
+    features: JSON.stringify(features),
+    isPopular,
+    isActive,
+    sortOrder
+  };
+}
+
+function validatePackagePayload(payload, { partial = false } = {}) {
+  if (!partial && !payload.name) return "Package name is required";
+  if (payload.name != null && !String(payload.name).trim()) return "Package name is required";
+  if (payload.credits != null) {
+    if (!Number.isInteger(payload.credits) || payload.credits < 1) {
+      return "Credits must be a positive integer";
+    }
+  }
+  if (payload.priceLkr != null) {
+    if (!Number.isFinite(payload.priceLkr) || payload.priceLkr < 0) {
+      return "Price must be a valid non-negative number";
+    }
+  }
+  return null;
+}
+
 async function listCreditPackages(req, res) {
-  const packages = await db.CreditPackage.findAll({ order: [["id", "DESC"]] });
-  return res.json({ packages });
+  const packages = await db.CreditPackage.findAll({
+    order: [
+      ["sortOrder", "ASC"],
+      ["id", "ASC"]
+    ]
+  });
+  return res.json({ packages: packages.map(serializeCreditPackage) });
 }
 
 async function createCreditPackage(req, res) {
-  const name = String(req.body.name || "").trim();
-  const credits = Number(req.body.credits);
-  const priceLkr = Number(req.body.priceLkr);
-  const isActive = req.body.isActive !== false;
-  if (!name) return res.status(400).json({ message: "Package name is required" });
-  if (!Number.isInteger(credits) || credits < 1) {
-    return res.status(400).json({ message: "Credits must be a positive integer" });
-  }
-  if (!Number.isFinite(priceLkr) || priceLkr < 0) {
-    return res.status(400).json({ message: "Price must be a valid non-negative number" });
-  }
-  const created = await db.CreditPackage.create({ name, credits, priceLkr, isActive });
+  const payload = readPackageBody(req.body);
+  const err = validatePackagePayload(payload);
+  if (err) return res.status(400).json({ message: err });
+  const created = await db.CreditPackage.create(payload);
   await logAdminAction({
     req,
     action: "create_credit_package",
     targetType: "package",
     targetId: created.id,
-    payload: { name, credits, priceLkr, isActive }
+    payload
   });
-  return res.status(201).json({ message: "Package created", package: created });
+  return res.status(201).json({ message: "Package created", package: serializeCreditPackage(created) });
 }
 
 async function updateCreditPackage(req, res) {
@@ -663,23 +703,20 @@ async function updateCreditPackage(req, res) {
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid package id" });
   const pkg = await db.CreditPackage.findByPk(id);
   if (!pkg) return res.status(404).json({ message: "Package not found" });
+  const payload = readPackageBody({ ...serializeCreditPackage(pkg), ...req.body });
   const updates = {};
-  if (req.body.name != null) updates.name = String(req.body.name || "").trim();
-  if (req.body.credits != null) {
-    const credits = Number(req.body.credits);
-    if (!Number.isInteger(credits) || credits < 1) {
-      return res.status(400).json({ message: "Credits must be a positive integer" });
-    }
-    updates.credits = credits;
-  }
-  if (req.body.priceLkr != null) {
-    const priceLkr = Number(req.body.priceLkr);
-    if (!Number.isFinite(priceLkr) || priceLkr < 0) {
-      return res.status(400).json({ message: "Price must be a valid non-negative number" });
-    }
-    updates.priceLkr = priceLkr;
-  }
-  if (req.body.isActive != null) updates.isActive = Boolean(req.body.isActive);
+  if (req.body.name != null) updates.name = payload.name;
+  if (req.body.tagline != null) updates.tagline = payload.tagline;
+  if (req.body.priceLabel != null) updates.priceLabel = payload.priceLabel;
+  if (req.body.pricePeriod != null) updates.pricePeriod = payload.pricePeriod;
+  if (req.body.credits != null) updates.credits = payload.credits;
+  if (req.body.priceLkr != null) updates.priceLkr = payload.priceLkr;
+  if (req.body.features != null) updates.features = payload.features;
+  if (req.body.isPopular != null) updates.isPopular = payload.isPopular;
+  if (req.body.isActive != null) updates.isActive = payload.isActive;
+  if (req.body.sortOrder != null) updates.sortOrder = payload.sortOrder;
+  const err = validatePackagePayload(updates, { partial: true });
+  if (err) return res.status(400).json({ message: err });
   Object.assign(pkg, updates);
   await pkg.save();
   await logAdminAction({
@@ -689,7 +726,7 @@ async function updateCreditPackage(req, res) {
     targetId: id,
     payload: updates
   });
-  return res.json({ message: "Package updated", package: pkg });
+  return res.json({ message: "Package updated", package: serializeCreditPackage(pkg) });
 }
 
 async function deleteCreditPackage(req, res) {

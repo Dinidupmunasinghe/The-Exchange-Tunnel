@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { api } from "../services/api";
+import { WalletPackageCard } from "../components/WalletPackageCard";
+import type { PublicCreditPackage } from "../lib/creditPackages";
 
 export function Wallet() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [balance, setBalance] = useState(0);
+  const [packages, setPackages] = useState<PublicCreditPackage[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([api.getTransactions(), api.getProfile()])
@@ -16,6 +19,14 @@ export function Wallet() {
         setBalance(profile.user.credits || 0);
       })
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    api
+      .getPublicPackages()
+      .then((res) => setPackages(Array.isArray(res.packages) ? res.packages : []))
+      .catch(() => setPackages([]))
+      .finally(() => setPackagesLoading(false));
   }, []);
 
   const totalEarned = useMemo(
@@ -87,48 +98,25 @@ export function Wallet() {
           <p className="text-sm text-muted-foreground">Choose a package to get started</p>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              { credits: 500, price: 9.99, popular: false },
-              { credits: 1500, price: 24.99, popular: true },
-              { credits: 5000, price: 74.99, popular: false },
-            ].map((pkg) => (
-              <div
-                key={pkg.credits}
-                className={`relative rounded-lg border-2 p-6 transition-all hover:scale-105 ${
-                  pkg.popular
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-secondary/30"
-                }`}
-              >
-                {pkg.popular && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
-                    Most Popular
-                  </Badge>
-                )}
-                <div className="text-center space-y-4">
-                  <div>
-                    <p className="text-3xl font-bold text-foreground">
-                      {pkg.credits}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Credits</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-primary">${pkg.price}</p>
-                    <p className="text-xs text-muted-foreground">
-                      ${(pkg.price / pkg.credits * 100).toFixed(2)} per 100 credits
-                    </p>
-                  </div>
-                  <Button
-                    className="w-full"
-                    variant={pkg.popular ? "default" : "outline"}
-                  >
-                    Buy Now
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+          {packagesLoading ? (
+            <p className="text-sm text-muted-foreground">Loading packages…</p>
+          ) : packages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No packages available right now.</p>
+          ) : (
+            <div
+              className={`grid gap-4 ${
+                packages.length >= 4
+                  ? "md:grid-cols-2 xl:grid-cols-4"
+                  : packages.length === 3
+                    ? "md:grid-cols-3"
+                    : "md:grid-cols-2"
+              }`}
+            >
+              {packages.map((pkg) => (
+                <WalletPackageCard key={pkg.id} pkg={pkg} />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

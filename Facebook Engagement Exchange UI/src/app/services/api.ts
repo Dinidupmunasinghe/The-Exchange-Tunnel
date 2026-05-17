@@ -1,4 +1,5 @@
 import { clearProfileCache, writeProfileCache } from "../lib/profileCache";
+import type { PublicCreditPackage } from "../lib/creditPackages";
 
 function cacheProfileFromAuthUser(user: unknown) {
   const u = user as { name?: string; email?: string; credits?: number } | null;
@@ -362,7 +363,21 @@ export async function updateProfilePhoto(profilePhotoUrl: string | null) {
   });
 }
 
+export type CreditPackagePayload = {
+  name: string;
+  tagline?: string;
+  priceLabel?: string;
+  pricePeriod?: string;
+  credits: number;
+  priceLkr: number;
+  features?: string[] | string;
+  isPopular?: boolean;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
 export const api = {
+  getPublicPackages: () => requestWithoutAuth<{ packages: PublicCreditPackage[] }>("/packages"),
   getProfile: (opts?: SessionRequestOpts) =>
     authRequest("/users/me", {}, opts) as Promise<{ user: any }>,
   updateProfilePhoto,
@@ -659,20 +674,18 @@ export const api = {
     adminRequestJson(`/admin/repost-pricing-rules/${id}`, { method: "DELETE" }) as Promise<{
       message: string;
     }>,
-  adminListPackages: () => adminRequestJson("/admin/packages") as Promise<{ packages: any[] }>,
-  adminCreatePackage: (payload: { name: string; credits: number; priceLkr: number; isActive?: boolean }) =>
+  adminListPackages: () =>
+    adminRequestJson("/admin/packages") as Promise<{ packages: PublicCreditPackage[] }>,
+  adminCreatePackage: (payload: CreditPackagePayload) =>
     adminRequestJson("/admin/packages", {
       method: "POST",
       body: JSON.stringify(payload)
-    }) as Promise<{ message: string; package: any }>,
-  adminUpdatePackage: (
-    id: number,
-    payload: { name?: string; credits?: number; priceLkr?: number; isActive?: boolean }
-  ) =>
+    }) as Promise<{ message: string; package: PublicCreditPackage }>,
+  adminUpdatePackage: (id: number, payload: Partial<CreditPackagePayload>) =>
     adminRequestJson(`/admin/packages/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
-    }) as Promise<{ message: string; package: any }>,
+    }) as Promise<{ message: string; package: PublicCreditPackage }>,
   adminDeletePackage: (id: number) =>
     adminRequestJson(`/admin/packages/${id}`, { method: "DELETE" }) as Promise<{ message: string }>,
   adminGetOverview: () =>

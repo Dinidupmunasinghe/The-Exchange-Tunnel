@@ -157,8 +157,14 @@ router.post(
   "/packages",
   [
     body("name").isString().trim().isLength({ min: 1, max: 120 }),
+    body("tagline").optional().isString().trim().isLength({ max: 255 }),
+    body("priceLabel").optional().isString().trim().isLength({ max: 40 }),
+    body("pricePeriod").optional().isString().trim().isLength({ max: 24 }),
     body("credits").isInt({ min: 1 }),
     body("priceLkr").isFloat({ min: 0 }),
+    body("features").optional(),
+    body("isPopular").optional().isBoolean(),
+    body("sortOrder").optional().isInt({ min: 0 }),
     body("isActive").optional().isBoolean()
   ],
   validateRequest,
@@ -169,8 +175,14 @@ router.patch(
   [
     param("id").isInt({ min: 1 }),
     body("name").optional().isString().trim().isLength({ min: 1, max: 120 }),
+    body("tagline").optional().isString().trim().isLength({ max: 255 }),
+    body("priceLabel").optional().isString().trim().isLength({ max: 40 }),
+    body("pricePeriod").optional().isString().trim().isLength({ max: 24 }),
     body("credits").optional().isInt({ min: 1 }),
     body("priceLkr").optional().isFloat({ min: 0 }),
+    body("features").optional(),
+    body("isPopular").optional().isBoolean(),
+    body("sortOrder").optional().isInt({ min: 0 }),
     body("isActive").optional().isBoolean()
   ],
   validateRequest,
