@@ -18,7 +18,7 @@ export const EMPTY_PACKAGE_DRAFT: Omit<PublicCreditPackage, "id"> = {
   priceLabel: "$9",
   pricePeriod: "/month",
   credits: 500,
-  priceLkr: 9,
+  priceLkr: 0,
   features: ["Feature one", "Feature two", "Feature three"],
   isPopular: false,
   isActive: true,
@@ -59,6 +59,14 @@ export function normalizePublicPackage(raw: Partial<PublicCreditPackage> & { id?
     isActive: raw.isActive !== false,
     sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Number(raw.sortOrder) : 0
   };
+}
+
+/** Backend legacy field — derived from display price so admin never edits LKR separately. */
+export function priceLkrFromDisplayLabel(label: string): number {
+  const s = String(label ?? "").trim().toLowerCase();
+  if (!s || s === "free") return 0;
+  const match = String(label).replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : 0;
 }
 
 export function normalizeFeatures(features: string[] | undefined | null): string[] {

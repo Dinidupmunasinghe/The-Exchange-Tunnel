@@ -11,6 +11,7 @@ import {
   EMPTY_PACKAGE_DRAFT,
   normalizeFeatures,
   normalizePublicPackage,
+  priceLkrFromDisplayLabel,
   type PublicCreditPackage
 } from "../../lib/creditPackages";
 import { FormError, FormMessage, PageHeader, StatusPill } from "./_shared";
@@ -103,16 +104,6 @@ function PackageEditor({
               min={1}
               value={draft.credits ?? 0}
               onChange={(e) => onChange({ ...draft, credits: Number(e.target.value) })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Price LKR (billing)</Label>
-            <Input
-              type="number"
-              min={0}
-              step="0.01"
-              value={draft.priceLkr ?? 0}
-              onChange={(e) => onChange({ ...draft, priceLkr: Number(e.target.value) })}
             />
           </div>
           <div className="space-y-2">
@@ -277,7 +268,7 @@ export function AdminPackages() {
       priceLabel: String(draft.priceLabel ?? "").trim(),
       pricePeriod: String(draft.pricePeriod ?? "").trim() || "/month",
       credits: Number(draft.credits),
-      priceLkr: Number(draft.priceLkr),
+      priceLkr: priceLkrFromDisplayLabel(String(draft.priceLabel ?? "")),
       features: normalizeFeatures(draft.features),
       isPopular: Boolean(draft.isPopular),
       isActive: draft.isActive !== false,
