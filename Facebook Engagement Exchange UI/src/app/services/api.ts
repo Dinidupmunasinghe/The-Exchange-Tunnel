@@ -10,11 +10,18 @@ function cacheProfileFromAuthUser(user: unknown) {
   });
 }
 
+const DEFAULT_RENDER_API = "https://the-exchange-tunnel.onrender.com/api";
+
 function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
-  if (import.meta.env.PROD) {
-    return "/api";
+  if (configured && configured !== "/api") {
+    return configured.replace(/\/$/, "");
+  }
+  if (import.meta.env.PROD && typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.endsWith(".vercel.app") || host.includes("exchange-tunnel")) {
+      return DEFAULT_RENDER_API;
+    }
   }
   return "/api";
 }
@@ -160,6 +167,12 @@ function extractApiErrorMessage(response: Response, payload: Json, rawText: stri
 async function readJsonBody(response: Response): Promise<{ payload: Json; rawText: string }> {
   const rawText = await response.text();
   if (!rawText) return { payload: {}, rawText: "" };
+  const trimmed = rawText.trim();
+  if (trimmed.startsWith("<!") || trimmed.startsWith("<html")) {
+    throw new Error(
+      "API returned HTML instead of JSON. Set VITE_API_BASE_URL to your Render API URL or fix Vercel /api rewrites."
+    );
+  }
   try {
     return { payload: JSON.parse(rawText) as Json, rawText };
   } catch {

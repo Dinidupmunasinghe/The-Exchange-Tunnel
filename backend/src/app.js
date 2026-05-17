@@ -8,6 +8,11 @@ const env = require("./config/env");
 
 const app = express();
 
+const allowedCorsOrigins = String(env.corsOrigin || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 // Allow Vite's default port or the next free port (5173, 5174, …) during local dev.
 const corsOrigin =
   env.nodeEnv !== "production"
@@ -15,12 +20,17 @@ const corsOrigin =
         if (!origin || /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
           return callback(null, true);
         }
-        if (origin === env.corsOrigin) {
+        if (allowedCorsOrigins.includes(origin)) {
           return callback(null, true);
         }
         return callback(null, false);
       }
-    : env.corsOrigin;
+    : (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedCorsOrigins.includes(origin)) return callback(null, true);
+        if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
+        return callback(null, false);
+      };
 
 app.use(helmet());
 app.use(
