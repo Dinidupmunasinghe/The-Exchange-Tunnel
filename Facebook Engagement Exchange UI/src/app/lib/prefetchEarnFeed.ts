@@ -12,8 +12,9 @@ export function prefetchEarnFeed(): Promise<void> {
     try {
       const [profileRes, tasksRes] = await Promise.all([
         api.getProfile({ skipSessionRedirect: true }).catch(() => null),
-        withNetworkRetry(() =>
-          api.getTasks({ fast: true, limit: 12, skipSessionRedirect: true })
+        withNetworkRetry(
+          () => api.getTasks({ fast: true, limit: 12, skipSessionRedirect: true }),
+          { attempts: 2, baseDelayMs: 1200 }
         ).catch(() => null),
       ]);
       if (!tasksRes) return;

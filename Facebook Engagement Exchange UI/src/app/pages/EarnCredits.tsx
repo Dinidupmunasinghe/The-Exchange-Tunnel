@@ -271,10 +271,12 @@ export function EarnCredits() {
       if (!silent && !hasVisibleFeed) setLoading(true);
       else if (!silent) setIsRefreshing(true);
       try {
+        const hasCache = tasks.length > 0 || Boolean(readEarnFeedCache()?.tasks.length);
         const [profileRes, tasksRes] = await Promise.all([
           api.getProfile({ skipSessionRedirect: true }).catch(() => null),
-          withNetworkRetry(() =>
-            api.getTasks({ fast: true, limit: EARN_PAGE_SIZE, skipSessionRedirect: true })
+          withNetworkRetry(
+            () => api.getTasks({ fast: true, limit: EARN_PAGE_SIZE, skipSessionRedirect: true }),
+            hasCache ? { attempts: 2, baseDelayMs: 1200 } : { attempts: 3, baseDelayMs: 2500 }
           )
         ]);
         const u = profileRes?.user as

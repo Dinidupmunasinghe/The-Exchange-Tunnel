@@ -1072,7 +1072,7 @@ async function getAvailableTasks(req, res) {
     }
   }
   if (memoryUpserts.length) {
-    if (engagementsOnly) {
+    if (engagementsOnly || fastFeed) {
       void Promise.all(memoryUpserts).catch(() => undefined);
     } else {
       await Promise.all(memoryUpserts).catch(() => undefined);
