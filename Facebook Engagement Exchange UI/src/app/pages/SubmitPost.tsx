@@ -509,8 +509,7 @@ export function SubmitPost() {
                         {adminRewards ? "" : ", admin value loading…"})
                       </p>
                       <p className="mt-1">
-                        Campaign creators can&apos;t change this rate. Adjust your budget to control how many
-                        slots you fund.
+                        This price is set by the platform. Choose below how many you want.
                       </p>
                     </div>
                   </div>
