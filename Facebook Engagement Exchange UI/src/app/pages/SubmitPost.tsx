@@ -55,7 +55,8 @@ export function SubmitPost() {
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [creditBudget, setCreditBudget] = useState([100]);
+  const [slots, setSlots] = useState(10);
+  const [freeRemaining, setFreeRemaining] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRecheckingSetup, setIsRecheckingSetup] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
@@ -79,6 +80,12 @@ export function SubmitPost() {
     const nextChannelId = res.user?.telegramActingChannelId ? String(res.user.telegramActingChannelId) : null;
     const nextHasLogin = Boolean(res.user?.telegramUserId);
     setBalance(nextBalance);
+    const usage = res.user?.usage as { isOnFreePlan?: boolean; freeCreditCap?: number | null; lifetimeCreditsSpent?: number } | undefined;
+    setFreeRemaining(
+      usage?.isOnFreePlan && usage.freeCreditCap != null
+        ? Math.max(0, Number(usage.freeCreditCap) - Number(usage.lifetimeCreditsSpent || 0))
+        : null
+    );
     setChannelTitle(nextTitle);
     setConnectedChannelId(nextChannelId);
     setHasTelegramLogin(nextHasLogin);
@@ -122,20 +129,27 @@ export function SubmitPost() {
         : null
     : null;
   const cost = adminCost && adminCost > 0 ? adminCost : fallbackCost;
-  const estimatedEngagements = effectiveType ? Math.floor(creditBudget[0] / cost) : 0;
+  /** Credits the user can put into this campaign right now (balance and free-plan allowance). */
+  const spendable = Math.max(0, Math.min(balance ?? 0, freeRemaining ?? Number.POSITIVE_INFINITY));
+  /** Most slots the user can afford (server accepts up to 1000 per campaign). */
+  const maxSlots = Math.max(0, Math.min(1000, Math.floor(spendable / Math.max(1, cost))));
+  const canAfford = maxSlots >= 1;
+  const estimatedEngagements = effectiveType && canAfford ? Math.min(Math.max(1, slots), maxSlots) : 0;
   const totalCharge = effectiveType ? cost * estimatedEngagements : 0;
+  const slotNoun =
+    campaignMode === "subscribe"
+      ? "subscribers"
+      : derivedType === "like"
+        ? "likes"
+        : derivedType === "comment"
+          ? "comments"
+          : "engagements";
 
-  const maxSpend = balance != null ? Math.min(500, balance) : 500;
-  const minSpend = maxSpend < 50 ? maxSpend : 50;
-
+  // Keep the chosen amount inside what the user can afford when balance / price change.
   useEffect(() => {
-    if (balance == null) return;
-    setCreditBudget((prev) => {
-      const v = prev[0];
-      const next = Math.min(maxSpend, Math.max(minSpend, v));
-      return [next];
-    });
-  }, [balance, maxSpend, minSpend]);
+    if (maxSlots < 1) return;
+    setSlots((prev) => Math.min(Math.max(1, prev), maxSlots));
+  }, [maxSlots]);
 
   const toggleKind = (kind: BaseEngagementKind) => {
     setSelection((prev) => ({ ...prev, [kind]: !prev[kind] }));
@@ -174,7 +188,7 @@ export function SubmitPost() {
       return;
     }
     if (estimatedEngagements < 1) {
-      toast.error("Increase your budget", { description: `Need at least ${cost} credits for one slot.` });
+      toast.error("Not enough credits", { description: `You need at least ${cost} credits for one ${slotNoun.replace(/s$/, "")}.` });
       return;
     }
     if (balance != null && totalCharge > balance) {
@@ -212,7 +226,7 @@ export function SubmitPost() {
       setCampaignName("");
       setSelection(defaultSelection);
       setCampaignMode("subscribe");
-      setCreditBudget([100]);
+      setSlots(10);
       setMessageUrl("");
       const res = await api.getProfile();
       setBalance(res.user?.credits ?? 0);
@@ -501,22 +515,70 @@ export function SubmitPost() {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Budget (credits)</Label>
-                    <span className="text-sm font-bold text-primary">{creditBudget[0]}</span>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <Label htmlFor="slots">How many {slotNoun}?</Label>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {cost} credits each · you can afford up to {maxSlots.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="slots"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={Math.max(1, maxSlots)}
+                        value={canAfford ? estimatedEngagements : 0}
+                        disabled={!canAfford}
+                        onChange={(e) => {
+                          const n = Math.floor(Number(e.target.value));
+                          if (Number.isFinite(n)) setSlots(Math.min(Math.max(1, n), Math.max(1, maxSlots)));
+                        }}
+                        className="h-9 w-24 text-right tabular-nums"
+                        aria-label={`Number of ${slotNoun}`}
+                      />
+                    </div>
                   </div>
                   <Slider
-                    value={creditBudget}
-                    onValueChange={(v) => {
-                      const c = Math.min(maxSpend, Math.max(minSpend, v[0]));
-                      setCreditBudget([c]);
-                    }}
-                    max={maxSpend}
-                    min={minSpend}
-                    step={10}
-                    className="w-full"
+                    value={[canAfford ? estimatedEngagements : 0]}
+                    onValueChange={(v) => setSlots(Math.max(1, Math.round(v[0])))}
+                    min={canAfford ? 1 : 0}
+                    max={Math.max(1, maxSlots)}
+                    step={1}
+                    disabled={!canAfford}
+                    className="w-full py-1"
+                    aria-label={`Number of ${slotNoun}`}
                   />
+                  <div className="flex items-center justify-between rounded-lg bg-muted px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Total cost</span>
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {totalCharge.toLocaleString()} credits
+                      {balance != null ? (
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          · {Math.max(0, balance - totalCharge).toLocaleString()} left after
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
+                  {balance != null && !canAfford ? (
+                    <Callout
+                      tone="warning"
+                      title="Not enough credits for this campaign"
+                      action={
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={freeRemaining != null && freeRemaining < cost && (balance ?? 0) >= cost ? "/wallet" : "/earn"}>
+                            {freeRemaining != null && freeRemaining < cost && (balance ?? 0) >= cost ? "Upgrade plan" : "Earn credits"}
+                          </Link>
+                        </Button>
+                      }
+                    >
+                      {freeRemaining != null && freeRemaining < cost && (balance ?? 0) >= cost
+                        ? `You’ve used your free-plan campaign allowance. Upgrade to launch more campaigns.`
+                        : `One ${slotNoun.replace(/s$/, "")} costs ${cost} credits and you have ${balance}. Earn a few more credits first.`}
+                    </Callout>
+                  ) : null}
                 </div>
                 <Button
                   type="submit"
@@ -527,6 +589,7 @@ export function SubmitPost() {
                     !channelTitle ||
                     isSubmitting ||
                     !effectiveType ||
+                    !canAfford ||
                     (balance != null && totalCharge > balance)
                   }
                 >
@@ -560,15 +623,15 @@ export function SubmitPost() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Per slot</span>
+                <span className="text-muted-foreground">Price each</span>
                 <span className="font-medium">{cost} cr</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Reserved</span>
+                <span className="text-muted-foreground">Total cost</span>
                 <span className="font-medium">{totalCharge} cr</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Slots</span>
+                <span className="text-muted-foreground">You get</span>
                 <span className="text-2xl font-bold text-primary">{effectiveType ? estimatedEngagements : "—"}</span>
               </div>
             </CardContent>
