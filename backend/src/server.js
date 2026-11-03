@@ -304,7 +304,20 @@ function staggerInterval(fn, intervalMs, offsetMs) {
   }, offsetMs);
 }
 
+function assertSecureConfig() {
+  const problems = env.validateSecrets();
+  if (!problems.length) return;
+  if (env.isProduction) {
+    // eslint-disable-next-line no-console
+    console.error(`Refusing to start: insecure configuration:\n - ${problems.join("\n - ")}`);
+    process.exit(1);
+  }
+  // eslint-disable-next-line no-console
+  console.warn(`[security] dev-only configuration warnings:\n - ${problems.join("\n - ")}`);
+}
+
 async function bootstrap() {
+  assertSecureConfig();
   try {
     await db.sequelize.authenticate();
     await ensureSchemaPatches();

@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const { clientErrorMessage } = require("../utils/httpErrors");
 const db = require("../models");
 const sequelize = require("../config/database");
 const tg = require("../services/telegramService");
@@ -754,7 +755,7 @@ async function submitTaskCompletion(req, res) {
   return res.json({ message: "Task completed and credits added", task: done });
   } catch (err) {
     const status = err.status || 500;
-    return res.status(status).json({ message: err.message || "Could not complete task" });
+    return res.status(status).json({ message: clientErrorMessage(err, "Could not complete task") });
   }
 }
 
@@ -1155,7 +1156,7 @@ async function startCommentDetection(req, res) {
     });
     return res.json({ token, expiresInMs: commentDetectionStore.TTL_MS });
   } catch (err) {
-    return res.status(500).json({ message: err.message || "Could not start comment detection" });
+    return res.status(500).json({ message: clientErrorMessage(err, "Could not start comment detection") });
   }
 }
 

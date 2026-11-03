@@ -216,8 +216,34 @@ async function clearSelectedAccount(req, res) {
   return res.json({ message: "Selected channel removed" });
 }
 
+/** The Telegram session string is a full account credential: keep it server-side only. */
+function publicBridgeResult(result) {
+  if (!result || typeof result !== "object") return result;
+  const { sessionString, ...rest } = result;
+  return rest;
+}
+
+/** The user session must belong to the same Telegram account linked to this Exchange Tunnel
+ *  account; otherwise one Telegram identity could earn on many app accounts. */
+function sessionIdentityMismatch(user, result) {
+  const sessionTgId = result?.user?.id != null ? String(result.user.id) : "";
+  if (!sessionTgId) return false;
+  return String(user.telegramUserId || "") !== sessionTgId;
+}
+
+function sessionMismatchBody() {
+  return {
+    code: "SESSION_ACCOUNT_MISMATCH",
+    message:
+      "That phone number belongs to a different Telegram account than the one linked to Exchange Tunnel. Sign in with the phone number of your linked Telegram account."
+  };
+}
+
 async function sendMtprotoCode(req, res) {
-  const { phone, proxy } = req.body || {};
+  const { phone } = req.body || {};
+  if (!req.user.telegramUserId) {
+    return res.status(400).json({ message: "Connect your Telegram account first, then sign in the user session." });
+  }
   const normalizedPhone = normalizePhone(phone);
   const creds = resolveMtprotoCredentials(req.body || {});
   if (!creds || !normalizedPhone) {
@@ -228,7 +254,7 @@ async function sendMtprotoCode(req, res) {
       apiId: creds.apiId,
       apiHash: creds.apiHash,
       phone: normalizedPhone,
-      proxy
+      proxy: null
     });
     if (result?.phoneCodeHash) {
       mtprotoAuthStore.setAuthState(
@@ -238,14 +264,17 @@ async function sendMtprotoCode(req, res) {
         result?.sessionString ? String(result.sessionString) : null
       );
     }
-    return res.json(result);
+    return res.json(publicBridgeResult(result));
   } catch (error) {
     return handleMtprotoError(res, error, "Failed to send Telegram code");
   }
 }
 
 async function mtprotoSignIn(req, res) {
-  const { phone, phoneCode, phoneCodeHash, proxy } = req.body || {};
+  const { phone, phoneCode, phoneCodeHash } = req.body || {};
+  if (!req.user.telegramUserId) {
+    return res.status(400).json({ message: "Connect your Telegram account first, then sign in the user session." });
+  }
   const normalizedPhone = normalizePhone(phone);
   const normalizedCode = String(phoneCode || "").replace(/[^\d]/g, "");
   const creds = resolveMtprotoCredentials(req.body || {});
@@ -261,27 +290,31 @@ async function mtprotoSignIn(req, res) {
       phoneCode: normalizedCode,
       phoneCodeHash: phoneCodeHash || state?.phoneCodeHash || undefined,
       sessionString: state?.sessionString || undefined,
-      proxy
+      proxy: null
     });
     if (result.requires2fa) {
       req.user.userOAuthTokenEncrypted = encrypt(
-        JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: proxy || null })
+        JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: null })
       );
       if (result.sessionString) {
         req.user.userActingTokenEncrypted = encrypt(result.sessionString);
       }
       mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
       await req.user.save();
-      return res.status(200).json({ ...result, sessionSaved: true });
+      return res.status(200).json({ ...publicBridgeResult(result), sessionSaved: true });
+    }
+    if (sessionIdentityMismatch(req.user, result)) {
+      mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
+      return res.status(409).json(sessionMismatchBody());
     }
     req.user.userOAuthTokenEncrypted = encrypt(
-      JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: proxy || null })
+      JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: null })
     );
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
     mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
     await req.user.save();
     return res.json({
-      ...result,
+      ...publicBridgeResult(result),
       sessionSaved: true
     });
   } catch (error) {
@@ -317,10 +350,15 @@ async function mtprotoSignInPassword(req, res) {
       sessionString,
       password
     });
+    if (sessionIdentityMismatch(req.user, result)) {
+      req.user.userActingTokenEncrypted = null;
+      await req.user.save();
+      return res.status(409).json(sessionMismatchBody());
+    }
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
     await req.user.save();
     return res.json({
-      ...result,
+      ...publicBridgeResult(result),
       sessionSaved: true
     });
   } catch (error) {

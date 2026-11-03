@@ -16,6 +16,7 @@ const {
 } = require("../controllers/telegramController");
 const { isLikelyTelegramMessageUrl } = require("../services/telegramService");
 const validateRequest = require("../middleware/validateRequest");
+const { telegramCodeLimiter, telegramBridgeLimiter } = require("../middleware/rateLimiters");
 
 const router = express.Router();
 
@@ -53,12 +54,14 @@ router.delete("/pages/select", clearSelectedAccount);
 router.get("/posts", getMyPosts);
 router.post(
   "/user-auth/send-code",
+  telegramCodeLimiter,
   [body("apiId").optional().notEmpty(), body("apiHash").optional().isString().isLength({ min: 8 }), body("phone").isString()],
   validateRequest,
   sendMtprotoCode
 );
 router.post(
   "/user-auth/sign-in",
+  telegramBridgeLimiter,
   [
     body("apiId").optional().notEmpty(),
     body("apiHash").optional().isString().isLength({ min: 8 }),
@@ -71,24 +74,28 @@ router.post(
 );
 router.post(
   "/user-auth/sign-in-2fa",
+  telegramBridgeLimiter,
   [body("password").isString().isLength({ min: 1 })],
   validateRequest,
   mtprotoSignInPassword
 );
 router.post(
   "/actions/join-channel",
+  telegramBridgeLimiter,
   [body("channel").isString().isLength({ min: 1, max: 512 })],
   validateRequest,
   mtprotoJoinChannel
 );
 router.post(
   "/actions/react",
+  telegramBridgeLimiter,
   [body("chat").notEmpty(), body("msgId").isInt({ min: 1 }), body("reaction").isString().isLength({ min: 1, max: 32 })],
   validateRequest,
   mtprotoReact
 );
 router.post(
   "/actions/reply",
+  telegramBridgeLimiter,
   [body("chat").notEmpty(), body("msgId").isInt({ min: 1 }), body("text").isString().isLength({ min: 1, max: 4096 })],
   validateRequest,
   mtprotoReply

@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const { clientErrorMessage } = require("../utils/httpErrors");
 const db = require("../models");
 const sequelize = require("../config/database");
 const env = require("../config/env");
@@ -1235,7 +1236,7 @@ async function reverseEngagement(req, res) {
     if (err.status === 404) return res.status(404).json({ message: err.message });
     // eslint-disable-next-line no-console
     console.error(err);
-    return res.status(500).json({ message: err.message || "Could not reverse engagement" });
+    return res.status(500).json({ message: clientErrorMessage(err, "Could not reverse engagement") });
   }
   await logAdminAction({
     req,
@@ -1303,7 +1304,7 @@ async function runTelegramAudits(req, res) {
       };
     }
   } catch (err) {
-    return res.status(500).json({ message: err.message || "Audit run failed" });
+    return res.status(500).json({ message: clientErrorMessage(err, "Audit run failed") });
   }
   await logAdminAction({
     req,

@@ -13,6 +13,15 @@ const inferredDialect = explicitDialect
 const nodeEnv = process.env.NODE_ENV || "development";
 const isProduction = nodeEnv === "production";
 
+const DEV_JWT_SECRET = "dev-secret-change-me";
+const DEV_ENCRYPTION_SECRET = "12345678901234567890123456789012";
+const WEAK_SECRETS = new Set([
+  DEV_JWT_SECRET,
+  DEV_ENCRYPTION_SECRET,
+  "replace_with_long_secure_secret",
+  "replace_with_32_char_secret_key____"
+]);
+
 const env = {
   nodeEnv,
   isProduction,
@@ -41,9 +50,21 @@ const env = {
     ssl: process.env.DB_SSL === "true" || (Boolean(databaseUrl) && inferredDialect === "postgres")
   },
   jwt: {
-    secret: process.env.JWT_SECRET || "dev-secret-change-me",
+    secret: process.env.JWT_SECRET || (isProduction ? "" : DEV_JWT_SECRET),
     expiresIn: process.env.JWT_EXPIRES_IN || "7d"
   },
+  /** Separate signing key for admin tokens, so user and admin tokens are never interchangeable.
+   *  Set ADMIN_JWT_SECRET to fully decouple it; otherwise it is derived from JWT_SECRET. */
+  adminJwtSecret:
+    process.env.ADMIN_JWT_SECRET ||
+    (process.env.JWT_SECRET || !isProduction
+      ? require("crypto")
+          .createHmac("sha256", process.env.JWT_SECRET || DEV_JWT_SECRET)
+          .update("exchange-tunnel:admin-token-key")
+          .digest("hex")
+      : ""),
+  /** Reverse-proxy hops to trust for client IPs (Render = 1). Used by rate limiters. */
+  trustProxy: Number(process.env.TRUST_PROXY ?? (isProduction ? 1 : 0)),
   adminLoginEmail: String(process.env.ADMIN_LOGIN_EMAIL || process.env.ADMIN_EMAIL || "")
     .trim()
     .toLowerCase(),
@@ -51,7 +72,7 @@ const env = {
   adminEmail: String(process.env.ADMIN_EMAIL || "")
     .trim()
     .toLowerCase(),
-  encryptionSecret: process.env.ENCRYPTION_SECRET || "12345678901234567890123456789012",
+  encryptionSecret: process.env.ENCRYPTION_SECRET || (isProduction ? "" : DEV_ENCRYPTION_SECRET),
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
   /** Telegram: bot token = Login Widget HMAC key + getChat / getChatMember. */
   telegram: {
@@ -80,5 +101,28 @@ const env = {
     webhookId: process.env.PAYPAL_WEBHOOK_ID || ""
   }
 };
+
+/**
+ * Returns fatal configuration problems. In production the server refuses to start when any
+ * are present; in development they are printed as warnings.
+ */
+function validateSecrets() {
+  const problems = [];
+  const check = (name, value, minLen) => {
+    const v = String(value || "");
+    if (!v) problems.push(`${name} is not set`);
+    else if (WEAK_SECRETS.has(v)) problems.push(`${name} is a default/example value`);
+    else if (v.length < minLen) problems.push(`${name} must be at least ${minLen} characters`);
+  };
+  check("JWT_SECRET", env.jwt.secret, 32);
+  check("ENCRYPTION_SECRET", env.encryptionSecret, 32);
+  if (process.env.ADMIN_JWT_SECRET) check("ADMIN_JWT_SECRET", env.adminJwtSecret, 32);
+  if (env.adminJwtSecret && env.adminJwtSecret === env.jwt.secret) {
+    problems.push("ADMIN_JWT_SECRET must differ from JWT_SECRET");
+  }
+  return problems;
+}
+
+env.validateSecrets = validateSecrets;
 
 module.exports = env;

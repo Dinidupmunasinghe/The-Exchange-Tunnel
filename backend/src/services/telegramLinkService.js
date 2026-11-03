@@ -7,6 +7,16 @@ function isPlaceholderTelegramEmail(email) {
   );
 }
 
+/** A Telegram-only account that never created campaigns, engaged, or spent/earned credits. */
+async function isUnusedGhostAccount(user) {
+  const [campaigns, engagements, txns] = await Promise.all([
+    db.Campaign.count({ where: { userId: user.id } }),
+    db.Engagement.count({ where: { userId: user.id } }),
+    db.Transaction.count({ where: { userId: user.id, type: ["earn", "spend"] } })
+  ]);
+  return campaigns === 0 && engagements === 0 && txns === 0;
+}
+
 /**
  * Attach a verified Telegram identity to an existing Exchange Tunnel user.
  * @param {import("../models").User} user
@@ -22,8 +32,9 @@ async function attachTelegramIdentityToUser(user, from) {
 
   const conflict = await db.User.findOne({ where: { telegramUserId: tgId } });
   if (conflict && conflict.id !== user.id) {
-    // Telegram-only ghost from "Sign in with Telegram" — let the real email account claim it.
-    if (isPlaceholderTelegramEmail(conflict.email)) {
+    // Telegram-only ghost from "Sign in with Telegram": the real email account may claim it,
+    // but only while the ghost is unused. Otherwise its credits/campaigns would be orphaned.
+    if (isPlaceholderTelegramEmail(conflict.email) && (await isUnusedGhostAccount(conflict))) {
       conflict.telegramUserId = null;
       if (typeof conflict.clearActingTelegramChannel === "function") {
         conflict.clearActingTelegramChannel();
@@ -31,7 +42,9 @@ async function attachTelegramIdentityToUser(user, from) {
       await conflict.save();
     } else {
       const err = new Error(
-        "This Telegram account is already linked to another Exchange Tunnel account. Sign in with that email, or contact support."
+        isPlaceholderTelegramEmail(conflict.email)
+          ? "This Telegram account already has its own Exchange Tunnel account with activity. Sign in with Telegram to use it, or contact support to merge accounts."
+          : "This Telegram account is already linked to another Exchange Tunnel account. Sign in with that email, or contact support."
       );
       err.status = 409;
       throw err;

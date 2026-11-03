@@ -1,6 +1,14 @@
 const TTL_MS = 10 * 60 * 1000;
 const store = new Map();
 
+// Entries were only removed when read again; sweep so abandoned sign-ins do not accumulate.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, row] of store) {
+    if (now > row.expiresAt) store.delete(k);
+  }
+}, 60 * 1000).unref();
+
 function key(userId, phone) {
   const p = String(phone || "").trim();
   const normalized = p.startsWith("+") ? `+${p.replace(/[^\d]/g, "")}` : `+${p.replace(/[^\d]/g, "")}`;

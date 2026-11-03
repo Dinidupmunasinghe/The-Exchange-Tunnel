@@ -324,11 +324,20 @@ export async function registerWithEmail(email: string, password: string, name?: 
   return data;
 }
 
-/** Deep-link login step 1: get a one-time token + t.me URL */
+/** Deep-link login step 1: get a one-time token + t.me URL + code the bot will show */
 export async function startTelegramDeeplinkLogin() {
-  return requestWithoutAuth<{ token: string; expiresInMs: number }>("/auth/telegram-deeplink/start", {
-    method: "POST",
-  });
+  return requestWithoutAuth<{ token: string; code: string; expiresInMs: number }>(
+    "/auth/telegram-deeplink/start",
+    {
+      method: "POST",
+    }
+  );
+}
+
+/** Store a session token returned by a login flow (and warm the profile cache). */
+export function completeTokenLogin(token: string, user?: unknown) {
+  setToken(token);
+  cacheProfileFromAuthUser(user);
 }
 
 type DeeplinkPollResult =
@@ -353,7 +362,7 @@ export async function linkTelegramToAccount(auth: Record<string, string | number
 
 export type TelegramLinkDeeplinkStartResult =
   | { alreadyLinked: true; user: unknown; expiresInMs: number }
-  | { alreadyLinked?: false; token: string; expiresInMs: number };
+  | { alreadyLinked?: false; token: string; code: string; expiresInMs: number };
 
 export async function startTelegramLinkDeeplink() {
   return authRequest<TelegramLinkDeeplinkStartResult>("/users/me/telegram/link-deeplink/start", {

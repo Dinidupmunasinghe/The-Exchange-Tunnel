@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const axios = require("axios");
 const env = require("../config/env");
+const { signedTelegramPhotoPath } = require("../utils/mediaSigning");
 
 const TG_API = "https://api.telegram.org";
 
@@ -156,19 +157,125 @@ async function getChatMemberCount(chatId) {
   return Number(data.result || 0);
 }
 
-async function getChatPhotoUrl(chatId) {
+/**
+ * Telegram file paths stay valid for at least an hour. Cache them (bounded) so the media
+ * proxy does not hit getChat/getFile for every image request.
+ * key "chat:<id>" | "user:<id>" -> { filePath: string|null, at: number }
+ */
+const photoPathCache = new Map();
+const PHOTO_CACHE_TTL_MS = 30 * 60 * 1000;
+const PHOTO_CACHE_MAX = 500;
+
+function cacheGet(key) {
+  const hit = photoPathCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() - hit.at > PHOTO_CACHE_TTL_MS) {
+    photoPathCache.delete(key);
+    return undefined;
+  }
+  return hit.filePath;
+}
+
+function cacheSet(key, filePath) {
+  if (photoPathCache.size >= PHOTO_CACHE_MAX) {
+    const oldest = photoPathCache.keys().next().value;
+    if (oldest !== undefined) photoPathCache.delete(oldest);
+  }
+  photoPathCache.set(key, { filePath, at: Date.now() });
+}
+
+async function filePathForFileId(fileId) {
+  if (!fileId) return null;
+  const fileInfo = await botRequest("getFile", { file_id: String(fileId) });
+  return fileInfo?.result?.file_path || null;
+}
+
+/** Server-side only: resolves the Telegram file path of a chat's photo (never send to clients). */
+async function resolveChatPhotoFilePath(chatId) {
   if (!isConfigured() || chatId == null) return null;
+  const key = `chat:${chatId}`;
+  const cached = cacheGet(key);
+  if (cached !== undefined) return cached;
   try {
     const chat = await getChat(chatId);
     const fileId = chat?.photo?.big_file_id || chat?.photo?.small_file_id || null;
-    if (!fileId) return null;
-    const fileInfo = await botRequest("getFile", { file_id: String(fileId) });
-    const filePath = fileInfo?.result?.file_path;
-    if (!filePath) return null;
-    return `${TG_API}/file/bot${env.telegram.botToken}/${filePath}`;
+    const filePath = await filePathForFileId(fileId);
+    cacheSet(key, filePath);
+    return filePath;
   } catch {
     return null;
   }
+}
+
+/** Server-side only: resolves the Telegram file path of a user's newest profile photo. */
+async function resolveUserPhotoFilePath(userTelegramId) {
+  if (!isConfigured() || userTelegramId == null) return null;
+  const key = `user:${userTelegramId}`;
+  const cached = cacheGet(key);
+  if (cached !== undefined) return cached;
+  try {
+    const photos = await botRequest("getUserProfilePhotos", {
+      user_id: String(userTelegramId),
+      limit: 1
+    });
+    const firstSet = photos?.result?.photos?.[0];
+    const lastSize = Array.isArray(firstSet) && firstSet.length > 0 ? firstSet[firstSet.length - 1] : null;
+    const filePath = await filePathForFileId(lastSize?.file_id);
+    cacheSet(key, filePath);
+    return filePath;
+  } catch {
+    return null;
+  }
+}
+
+/** Streams a Telegram file. The bot-token URL never leaves the server. */
+async function fetchTelegramFileStream(filePath) {
+  if (!isConfigured() || !filePath) return null;
+  const res = await axios.get(`${TG_API}/file/bot${env.telegram.botToken}/${filePath}`, {
+    responseType: "stream",
+    timeout: 15000,
+    maxContentLength: 10 * 1024 * 1024,
+    validateStatus: () => true
+  });
+  if (res.status !== 200) {
+    res.data?.destroy?.();
+    return null;
+  }
+  return { stream: res.data, contentType: String(res.headers["content-type"] || "image/jpeg") };
+}
+
+/**
+ * @param {string|number} chatId
+ * @param {string} text
+ * @param {object} [replyMarkup] Telegram reply_markup object (e.g. inline_keyboard)
+ */
+async function sendBotMessage(chatId, text, replyMarkup) {
+  return botRequest("sendMessage", {
+    chat_id: String(chatId),
+    text,
+    ...(replyMarkup ? { reply_markup: JSON.stringify(replyMarkup) } : {})
+  });
+}
+
+async function answerCallbackQuery(callbackQueryId, text) {
+  return botRequest("answerCallbackQuery", {
+    callback_query_id: String(callbackQueryId),
+    ...(text ? { text } : {})
+  });
+}
+
+async function editBotMessageText(chatId, messageId, text) {
+  return botRequest("editMessageText", {
+    chat_id: String(chatId),
+    message_id: String(messageId),
+    text
+  });
+}
+
+/** Public URL (our signed media proxy) for a chat photo, or null when the chat has no photo. */
+async function getChatPhotoUrl(chatId) {
+  const filePath = await resolveChatPhotoFilePath(chatId);
+  return filePath ? signedTelegramPhotoPath("chat", chatId) : null;
 }
 
 /**
@@ -247,24 +354,10 @@ async function getChatMemberUser(channelChatId, userTelegramId) {
   }
 }
 
+/** Public URL (our signed media proxy) for a user's photo, or null when they have none. */
 async function getUserProfilePhotoUrl(userTelegramId) {
-  if (!isConfigured() || userTelegramId == null) return null;
-  try {
-    const photos = await botRequest("getUserProfilePhotos", {
-      user_id: String(userTelegramId),
-      limit: 1
-    });
-    const firstSet = photos?.result?.photos?.[0];
-    const lastSize = Array.isArray(firstSet) && firstSet.length > 0 ? firstSet[firstSet.length - 1] : null;
-    const fileId = lastSize?.file_id;
-    if (!fileId) return null;
-    const fileInfo = await botRequest("getFile", { file_id: String(fileId) });
-    const filePath = fileInfo?.result?.file_path;
-    if (!filePath) return null;
-    return `${TG_API}/file/bot${env.telegram.botToken}/${filePath}`;
-  } catch {
-    return null;
-  }
+  const filePath = await resolveUserPhotoFilePath(userTelegramId);
+  return filePath ? signedTelegramPhotoPath("user", userTelegramId) : null;
 }
 
 /**
@@ -339,6 +432,12 @@ module.exports = {
   isUserChannelAdminOrCreator,
   getChatMemberUser,
   getUserProfilePhotoUrl,
+  resolveChatPhotoFilePath,
+  resolveUserPhotoFilePath,
+  fetchTelegramFileStream,
+  sendBotMessage,
+  answerCallbackQuery,
+  editBotMessageText,
   chatMatchesIdOrUsername,
   fetchTmePagePreview
 };

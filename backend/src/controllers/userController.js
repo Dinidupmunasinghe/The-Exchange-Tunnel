@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { clientErrorMessage } = require("../utils/httpErrors");
 const db = require("../models");
 const env = require("../config/env");
 const { getDashboardStats } = require("../services/creditService");
@@ -89,7 +90,8 @@ function profileUserPayload(user) {
   };
 }
 
-const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
+// JSON body limit is 2 MB on low-memory hosts; base64 adds ~33%, so cap the decoded image.
+const MAX_PROFILE_PHOTO_BYTES = 1400 * 1024;
 
 function profilePhotoDataUrlByteLength(dataUrl) {
   const m = String(dataUrl).match(/^data:image\/[^;]+;base64,(.+)$/i);
@@ -118,7 +120,7 @@ async function updateProfilePhoto(req, res) {
   const profilePhotoUrl = raw === null || raw === undefined ? null : String(raw).trim() || null;
   if (!isAllowedProfilePhotoUrl(profilePhotoUrl)) {
     return res.status(400).json({
-      message: "Use an https image URL or upload a JPEG/PNG/WebP image under 5 MB"
+      message: "Use an https image URL or upload a JPEG/PNG/WebP image under 1.4 MB"
     });
   }
 
@@ -136,7 +138,10 @@ async function linkTelegram(req, res) {
     return res.status(400).json({ message: "Telegram auth payload (with hash) is required" });
   }
   if (!tg.verifyWidgetLogin(d)) {
-    return res.status(401).json({ message: "Invalid Telegram login signature" });
+    // 400, not 401: the user's own session is fine; only the Telegram payload is bad/stale.
+    return res
+      .status(400)
+      .json({ message: "Telegram login could not be verified. Please try connecting again." });
   }
   if (req.user.telegramUserId) {
     return res.status(400).json({ message: "Telegram is already connected to this account" });
@@ -153,7 +158,7 @@ async function linkTelegram(req, res) {
     return res.json({ message: "Telegram connected", user: profileUserPayload(user) });
   } catch (error) {
     const status = error.status || 500;
-    return res.status(status).json({ message: error.message || "Could not link Telegram" });
+    return res.status(status).json({ message: clientErrorMessage(error, "Could not link Telegram") });
   }
 }
 
@@ -171,9 +176,10 @@ async function linkTelegramDeeplinkStart(req, res) {
     return res.status(503).json({ message: "TELEGRAM_BOT_NAME is not configured on the server" });
   }
   const token = crypto.randomBytes(24).toString("hex");
-  deeplinkStore.create(token, { linkUserId: req.user.id });
+  const code = deeplinkStore.create(token, { linkUserId: req.user.id });
   return res.json({
     token,
+    code,
     url: `https://t.me/${botName}?start=login_${token}`,
     expiresInMs: deeplinkStore.TTL_MS
   });
@@ -207,7 +213,7 @@ async function linkTelegramDeeplinkPoll(req, res) {
     return res.json({ status: "ok", user: profileUserPayload(user) });
   } catch (error) {
     const status = error.status || 500;
-    return res.status(status).json({ message: error.message || "Could not link Telegram" });
+    return res.status(status).json({ message: clientErrorMessage(error, "Could not link Telegram") });
   }
 }
 

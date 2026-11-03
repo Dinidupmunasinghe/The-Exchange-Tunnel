@@ -9,6 +9,9 @@ const { handlePayPalWebhook } = require("./controllers/paymentController");
 
 const app = express();
 
+// Correct client IPs for rate limiting behind Render/Vercel proxies.
+if (env.trustProxy > 0) app.set("trust proxy", env.trustProxy);
+
 const allowedCorsOrigins = String(env.corsOrigin || "")
   .split(",")
   .map((o) => o.trim())

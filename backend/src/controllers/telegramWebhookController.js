@@ -1,6 +1,8 @@
+const crypto = require("crypto");
 const env = require("../config/env");
 const deeplinkStore = require("../services/telegramDeeplinkStore");
 const commentDetectionStore = require("../services/commentDetectionStore");
+const tg = require("../services/telegramService");
 
 /**
  * Telegram Bot API push updates — used to complete "open t.me/bot?start=login_*" login.
@@ -8,20 +10,29 @@ const commentDetectionStore = require("../services/commentDetectionStore");
  */
 async function handleTelegramWebhook(req, res) {
   const secret = env.telegram.webhookSecret;
-  if (env.nodeEnv === "production" && !secret) {
-    return res.status(503).json({ ok: false, message: "Set TELEGRAM_WEBHOOK_SECRET and configure setWebhook" });
+  // A forged update can complete someone else's deep-link login, so the secret is mandatory.
+  // Local testing without it requires an explicit opt-in (never honoured in production).
+  const allowInsecure = !env.isProduction && process.env.TELEGRAM_WEBHOOK_ALLOW_INSECURE === "true";
+  if (!secret && !allowInsecure) {
+    return res
+      .status(503)
+      .json({ ok: false, message: "Set TELEGRAM_WEBHOOK_SECRET and configure setWebhook" });
   }
   if (secret) {
-    if (req.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
+    const given = Buffer.from(String(req.get("X-Telegram-Bot-Api-Secret-Token") || ""));
+    const expected = Buffer.from(String(secret));
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
       return res.status(403).json({ ok: false });
     }
-  } else if (env.nodeEnv !== "production") {
-    // eslint-disable-next-line no-console
-    console.warn("telegram webhook: TELEGRAM_WEBHOOK_SECRET unset (dev only — insecure)");
   }
 
   const body = req.body;
   if (!body || typeof body !== "object") {
+    return res.status(200).json({ ok: true });
+  }
+
+  if (body.callback_query && typeof body.callback_query === "object") {
+    await handleLoginCallback(body.callback_query).catch(() => undefined);
     return res.status(200).json({ ok: true });
   }
 
@@ -64,7 +75,7 @@ async function handleTelegramWebhook(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  const ok = deeplinkStore.resolve(token, {
+  const pendingInfo = deeplinkStore.awaitConfirmation(token, {
     id: from.id,
     first_name: from.first_name,
     last_name: from.last_name,
@@ -72,12 +83,58 @@ async function handleTelegramWebhook(req, res) {
     photo_url: undefined
   });
 
-  if (!ok) {
-    // Unknown/expired token — still 200 so Telegram does not retry forever
+  const chatId = msg.chat?.id ?? from.id;
+  if (!pendingInfo) {
+    // Unknown/expired token — still 200 so Telegram does not retry forever.
+    await tg
+      .sendBotMessage(chatId, "This sign-in link has expired. Start again from the Exchange Tunnel website.")
+      .catch(() => undefined);
     return res.status(200).json({ ok: true });
   }
 
+  const action = pendingInfo.linkMode
+    ? "link this Telegram account to an Exchange Tunnel account"
+    : "sign in to Exchange Tunnel with this Telegram account";
+  await tg
+    .sendBotMessage(
+      chatId,
+      `Someone asked to ${action}.\n\n` +
+        `Confirmation code: ${pendingInfo.code}\n\n` +
+        "Only tap Confirm if YOU started this on your own device and the website shows the same code. " +
+        "Never confirm a link someone else sent you.",
+      {
+        inline_keyboard: [
+          [
+            { text: "✅ Confirm", callback_data: `cl_${token}` },
+            { text: "✖ Cancel", callback_data: `xl_${token}` }
+          ]
+        ]
+      }
+    )
+    .catch(() => undefined);
+
   return res.status(200).json({ ok: true });
+}
+
+/** Handles the Confirm / Cancel inline buttons of the deep-link login prompt. */
+async function handleLoginCallback(cq) {
+  const data = String(cq.data || "");
+  const m = /^(cl|xl)_([a-f0-9]+)$/i.exec(data);
+  if (!m || !cq.from || cq.from.is_bot) {
+    if (cq.id) await tg.answerCallbackQuery(cq.id).catch(() => undefined);
+    return;
+  }
+  const [, kind, token] = m;
+  const ok = kind === "cl" ? deeplinkStore.confirm(token, cq.from.id) : deeplinkStore.cancel(token, cq.from.id);
+  const text = !ok
+    ? "This request has expired or was already handled."
+    : kind === "cl"
+      ? "Confirmed. Return to the website — you will be signed in automatically."
+      : "Cancelled. Nobody was signed in.";
+  await tg.answerCallbackQuery(cq.id, text).catch(() => undefined);
+  if (cq.message?.chat?.id != null && cq.message?.message_id != null) {
+    await tg.editBotMessageText(cq.message.chat.id, cq.message.message_id, text).catch(() => undefined);
+  }
 }
 
 module.exports = { handleTelegramWebhook };

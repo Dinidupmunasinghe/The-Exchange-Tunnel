@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { cn } from "./ui/utils";
 import { TelegramBrandIcon } from "./TelegramBrandIcon";
 import {
+  ApiError,
   getToken,
   isAccessTokenValid,
   linkTelegramToAccount,
@@ -35,14 +36,24 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
   const [widgetBusy, setWidgetBusy] = useState(false);
   const [deeplinkState, setDeeplinkState] = useState<"idle" | "waiting" | "done" | "error">("idle");
   const [deeplinkUrl, setDeeplinkUrl] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [confirmCode, setConfirmCode] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeRef = useRef(false);
 
   const stopPolling = () => {
+    activeRef.current = false;
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      clearTimeout(pollRef.current);
       pollRef.current = null;
     }
   };
+
+  const confirmCodeBox = confirmCode ? (
+    <div className="rounded-lg border border-border px-4 py-2">
+      <p className="text-xs text-muted-foreground">Tap Confirm in Telegram — it should show this code</p>
+      <p className="font-mono text-xl font-semibold tracking-widest">{confirmCode}</p>
+    </div>
+  ) : null;
 
   useEffect(() => () => stopPolling(), []);
 
@@ -145,31 +156,52 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
         finishIfAlreadyLinked();
         return;
       }
-      const { token } = start;
+      const { token, code } = start;
       const url = `https://t.me/${BOT}?start=login_${token}`;
       setDeeplinkUrl(url);
+      setConfirmCode(code || null);
       openTelegramBotUrl(url);
 
       stopPolling();
-      pollRef.current = setInterval(async () => {
+      activeRef.current = true;
+      const deadline = Date.now() + (start.expiresInMs || 15 * 60 * 1000);
+      // Sequential polls: a slow response can never overlap with the next one.
+      const pollOnce = async () => {
+        if (!activeRef.current) return;
+        if (Date.now() > deadline) {
+          stopPolling();
+          setDeeplinkState("error");
+          toast.error("Link expired. Please try again.");
+          return;
+        }
         try {
           const result = await pollTelegramLinkDeeplink(token);
-          if (result.status === "pending") return;
-          stopPolling();
+          if (!activeRef.current) return;
           if (result.status === "ok") {
+            stopPolling();
             setDeeplinkState("done");
             toast.success("Telegram connected to your account");
             onLinked?.();
             return;
           }
-          setDeeplinkState("error");
-          toast.error("message" in result && result.message ? result.message : "Link expired");
+          if (result.status !== "pending") {
+            stopPolling();
+            setDeeplinkState("error");
+            toast.error("message" in result && result.message ? result.message : "Link expired");
+            return;
+          }
         } catch (e: unknown) {
-          stopPolling();
-          setDeeplinkState("error");
-          toast.error(e instanceof Error ? e.message : "Could not connect Telegram");
+          if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+            stopPolling();
+            setDeeplinkState("error");
+            toast.error(e.message || "Could not connect Telegram");
+            return;
+          }
+          // network hiccup / server restarting: keep trying until the deadline
         }
-      }, 2000);
+        if (activeRef.current) pollRef.current = setTimeout(pollOnce, 2000);
+      };
+      pollRef.current = setTimeout(pollOnce, 2000);
     } catch (e: unknown) {
       stopPolling();
       setDeeplinkState("idle");
@@ -236,7 +268,8 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
     deeplinkState === "waiting" ? (
       <div className="flex w-full flex-col items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-4 text-center dark:bg-muted/30">
         <Loader2 className="h-5 w-5 animate-spin text-[#2AABEE]" />
-        <p className="text-sm text-muted-foreground">Tap START in Telegram, then return here</p>
+        <p className="text-sm text-muted-foreground">Tap START, then Confirm in Telegram, and return here</p>
+        {confirmCodeBox}
         {deeplinkUrl ? (
           <Button
             type="button"
@@ -270,6 +303,7 @@ export function TelegramLinkPanel({ onLinked, variant = "default" }: Props) {
     <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card/50 py-4 text-center">
       <Loader2 className="h-6 w-6 animate-spin text-[#2AABEE]" />
       <p className="text-sm text-muted-foreground">Confirm in Telegram, then return here.</p>
+      {confirmCodeBox}
       {deeplinkUrl ? (
         <a href={deeplinkUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-[#2AABEE] underline">
           Open Telegram again

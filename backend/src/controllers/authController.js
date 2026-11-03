@@ -137,9 +137,10 @@ async function telegramDeeplinkStart(req, res) {
     return res.status(503).json({ message: "TELEGRAM_BOT_NAME is not configured on the server" });
   }
   const token = crypto.randomBytes(24).toString("hex");
-  deeplinkStore.create(token);
+  const code = deeplinkStore.create(token);
   return res.json({
     token,
+    code,
     url: `https://t.me/${botName}?start=login_${token}`,
     expiresInMs: deeplinkStore.TTL_MS
   });

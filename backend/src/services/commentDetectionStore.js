@@ -28,6 +28,7 @@ function prune() {
     if (v.expires < now) pendingByToken.delete(k);
   }
 }
+setInterval(prune, 60 * 1000).unref();
 
 /**
  * @param {PendingCommentDetect} row

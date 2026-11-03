@@ -39,10 +39,32 @@ function releaseSlot() {
   activeBridgeCount = Math.max(0, activeBridgeCount - 1);
 }
 
+/**
+ * SOCKS proxies are only allowed when the operator lists them in TELEGRAM_PROXY_ALLOWLIST
+ * ("host:port,host2:port2"). Client-supplied proxies would let users make the server open
+ * connections to arbitrary hosts (SSRF), so anything else is dropped.
+ */
+const PROXY_ALLOWLIST = new Set(
+  String(process.env.TELEGRAM_PROXY_ALLOWLIST || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+function sanitizeProxy(proxy) {
+  if (!proxy || typeof proxy !== "object") return null;
+  const key = `${String(proxy.host || "").trim().toLowerCase()}:${Number(proxy.port || 0)}`;
+  return PROXY_ALLOWLIST.has(key) ? proxy : null;
+}
+
+const MAX_BRIDGE_OUTPUT_BYTES = 5 * 1024 * 1024;
+
 async function runBridge(operation, payload) {
+  const safePayload = { ...(payload || {}) };
+  if ("proxy" in safePayload) safePayload.proxy = sanitizeProxy(safePayload.proxy);
   await acquireSlot();
   try {
-    return await spawnBridge(operation, payload);
+    return await spawnBridge(operation, safePayload);
   } finally {
     releaseSlot();
   }
@@ -68,11 +90,13 @@ function spawnBridge(operation, payload) {
     }, BRIDGE_TIMEOUT_MS);
 
     python.stdout.on("data", (chunk) => {
-      stdout += String(chunk);
+      if (stdout.length < MAX_BRIDGE_OUTPUT_BYTES) stdout += String(chunk);
     });
     python.stderr.on("data", (chunk) => {
-      stderr += String(chunk);
+      if (stderr.length < 64 * 1024) stderr += String(chunk);
     });
+    // Without this, EPIPE (python missing / exited early) is an uncaught exception that kills the API.
+    python.stdin.on("error", () => undefined);
     python.on("error", (error) => {
       if (settled) return;
       settled = true;

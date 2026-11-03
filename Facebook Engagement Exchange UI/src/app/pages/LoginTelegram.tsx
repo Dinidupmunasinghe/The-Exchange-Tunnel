@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { safeReturnPath } from "../lib/returnPath";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { TelegramBrandIcon } from "../components/TelegramBrandIcon";
 import { toast } from "sonner";
 import {
+  ApiError,
+  completeTokenLogin,
   loginWithTelegram,
   startTelegramDeeplinkLogin,
   pollTelegramDeeplinkLogin,
-  setToken,
 } from "../services/api";
 
 const BOT = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "").trim();
@@ -20,15 +22,18 @@ declare global {
   }
 }
 
-function TelegramDeeplinkLogin() {
+function TelegramDeeplinkLogin({ afterLoginPath }: { afterLoginPath: string }) {
   const navigate = useNavigate();
   const [state, setState] = useState<"idle" | "waiting" | "done" | "error">("idle");
   const [deeplinkUrl, setDeeplinkUrl] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [confirmCode, setConfirmCode] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeRef = useRef(false);
 
   const stopPolling = () => {
+    activeRef.current = false;
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      clearTimeout(pollRef.current);
       pollRef.current = null;
     }
   };
@@ -43,17 +48,24 @@ function TelegramDeeplinkLogin() {
   };
 
   const startLogin = async () => {
+    stopPolling();
     setState("waiting");
     setDeeplinkUrl(null);
+    setConfirmCode(null);
 
     try {
-      const { token, expiresInMs } = await startTelegramDeeplinkLogin();
+      const { token, code, expiresInMs } = await startTelegramDeeplinkLogin();
       const url = `https://t.me/${BOT}?start=login_${token}`;
       setDeeplinkUrl(url);
+      setConfirmCode(code || null);
       openTelegramBotUrl(url);
 
       const deadline = Date.now() + expiresInMs;
-      pollRef.current = setInterval(async () => {
+      activeRef.current = true;
+      // Sequential polling (next poll is scheduled only after the previous one finished),
+      // so slow responses can never overlap and navigate twice.
+      const pollOnce = async () => {
+        if (!activeRef.current) return;
         if (Date.now() > deadline) {
           stopPolling();
           setState("error");
@@ -62,21 +74,34 @@ function TelegramDeeplinkLogin() {
         }
         try {
           const result = await pollTelegramDeeplinkLogin(token);
+          if (!activeRef.current) return;
           if (result.status === "ok") {
             stopPolling();
-            setToken((result as { status: "ok"; token: string }).token);
+            completeTokenLogin(result.token, result.user);
             setState("done");
             toast.success("Signed in with Telegram!");
-            navigate("/dashboard", { replace: true });
-          } else if (result.status === "expired") {
+            navigate(afterLoginPath, { replace: true });
+            return;
+          }
+          if (result.status === "expired") {
             stopPolling();
             setState("error");
             toast.error(result.message ?? "Login link expired.");
+            return;
           }
-        } catch {
-          // keep polling
+        } catch (e) {
+          if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+            // 410 expired / 400 invalid: polling again cannot succeed.
+            stopPolling();
+            setState("error");
+            toast.error(e.message || "Login link expired. Please try again.");
+            return;
+          }
+          // network / 5xx: keep polling
         }
-      }, 2000);
+        if (activeRef.current) pollRef.current = setTimeout(pollOnce, 2000);
+      };
+      pollRef.current = setTimeout(pollOnce, 2000);
     } catch (e) {
       stopPolling();
       setState("idle");
@@ -89,7 +114,15 @@ function TelegramDeeplinkLogin() {
     return (
       <div className="flex flex-col items-center gap-4 py-2 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Confirm in Telegram, then return here.</p>
+        <p className="text-sm text-muted-foreground">
+          The bot will ask you to confirm. Tap <strong>Confirm</strong> in Telegram, then return here.
+        </p>
+        {confirmCode ? (
+          <div className="rounded-lg border border-border px-4 py-2">
+            <p className="text-xs text-muted-foreground">Check that Telegram shows this code</p>
+            <p className="font-mono text-2xl font-semibold tracking-widest">{confirmCode}</p>
+          </div>
+        ) : null}
         {deeplinkUrl ? (
           <a href={deeplinkUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
             Open Telegram again
@@ -118,6 +151,8 @@ function TelegramDeeplinkLogin() {
 
 export function LoginTelegram() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const afterLoginPath = safeReturnPath(searchParams.get("returnTo")) ?? "/dashboard";
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -126,7 +161,7 @@ export function LoginTelegram() {
       try {
         await loginWithTelegram(user as Record<string, string | number | undefined>);
         toast.success("Signed in with Telegram");
-        navigate("/dashboard", { replace: true });
+        navigate(afterLoginPath, { replace: true });
       } catch (e: unknown) {
         toast.error(e instanceof Error ? e.message : "Login failed");
       } finally {
@@ -136,7 +171,7 @@ export function LoginTelegram() {
     return () => {
       delete window.onTelegramAuth;
     };
-  }, [navigate]);
+  }, [navigate, afterLoginPath]);
 
   useEffect(() => {
     if (!BOT) return;
@@ -167,7 +202,7 @@ export function LoginTelegram() {
         <CardContent className="space-y-4">
           <div id="tg-login-legacy-mount" className="flex justify-center" />
           {busy ? <p className="text-center text-sm text-muted-foreground">Signing in…</p> : null}
-          <TelegramDeeplinkLogin />
+          <TelegramDeeplinkLogin afterLoginPath={afterLoginPath} />
           <p className="text-center text-xs text-muted-foreground">
             <Link to="/login" className="text-primary underline underline-offset-2">
               Back to email sign in

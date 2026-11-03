@@ -11,6 +11,7 @@ const packageRoutes = require("./packageRoutes");
 const paymentRoutes = require("./paymentRoutes");
 const adminRoutes = require("./adminRoutes");
 const adminAuthRoutes = require("./adminAuthRoutes");
+const mediaRoutes = require("./mediaRoutes");
 
 const router = express.Router();
 
@@ -37,6 +38,7 @@ router.use("/admin-auth", adminAuthRoutes);
 router.use("/admin", adminRoutes);
 router.use("/packages", packageRoutes);
 router.use("/payments", paymentRoutes);
+router.use("/media", mediaRoutes);
 router.use(authMiddleware);
 router.use("/users", userRoutes);
 router.use("/telegram", telegramRoutes);
