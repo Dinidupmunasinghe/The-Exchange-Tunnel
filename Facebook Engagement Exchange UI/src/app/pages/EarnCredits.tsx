@@ -409,7 +409,7 @@ export function EarnCredits() {
         return;
       }
 
-      if (action !== "subscribe" && action !== "like" && hasEngagement(myEngagements, campaignId, action)) {
+      if (action !== "like" && hasEngagement(myEngagements, campaignId, action)) {
         toast.info("You already recorded this action.");
         return;
       }

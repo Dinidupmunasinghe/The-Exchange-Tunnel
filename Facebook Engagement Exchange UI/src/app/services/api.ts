@@ -497,7 +497,7 @@ export const api = {
     messageKey?: string;
     messageUrl?: string;
     channelUrl?: string;
-    engagementType: "subscribe" | "like" | "comment" | "like_comment";
+    engagementType: "subscribe" | "like" | "comment" | "like_comment" | "share";
     creditsPerEngagement: number;
     maxEngagements: number;
     scheduledLaunchAt?: string | null;

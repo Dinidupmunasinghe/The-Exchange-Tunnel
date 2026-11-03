@@ -103,19 +103,20 @@ export function normalizePublicPackage(raw: Partial<PublicCreditPackage> & { id?
   const priceLkr = Number(raw.priceLkr ?? 0);
   const priceLabel = String(raw.priceLabel ?? "").trim();
   const isFree = Boolean(raw.isFree) || priceUsdFromDisplayLabel(priceLabel) <= 0;
+  const rawFeatures: unknown = raw.features;
   let features: string[] = [];
-  if (Array.isArray(raw.features)) {
-    features = raw.features.map((line) => String(line).trim()).filter(Boolean);
-  } else if (typeof raw.features === "string" && raw.features.trim()) {
+  if (Array.isArray(rawFeatures)) {
+    features = rawFeatures.map((line) => String(line).trim()).filter(Boolean);
+  } else if (typeof rawFeatures === "string" && rawFeatures.trim()) {
     try {
-      const parsed = JSON.parse(raw.features);
+      const parsed = JSON.parse(rawFeatures);
       if (Array.isArray(parsed)) {
-        features = parsed.map((line) => String(line).trim()).filter(Boolean);
+        features = parsed.map((line: unknown) => String(line).trim()).filter(Boolean);
       }
     } catch {
-      features = raw.features
+      features = rawFeatures
         .split("\n")
-        .map((line) => line.trim())
+        .map((line: string) => line.trim())
         .filter(Boolean);
     }
   }

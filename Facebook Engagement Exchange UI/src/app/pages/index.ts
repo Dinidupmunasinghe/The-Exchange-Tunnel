@@ -6,6 +6,6 @@ export { Campaigns } from "./Campaigns";
 export { Analytics } from "./Analytics";
 export { Wallet } from "./Wallet";
 export { Settings } from "./Settings";
-export { Admin } from "./Admin";
+
 export { AdminLogin } from "./AdminLogin";
 export { NotFound } from "./NotFound";
