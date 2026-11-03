@@ -21,6 +21,8 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         field: "facebookPageName"
       },
+      /** Public @username of the connected channel (null = private channel). */
+      telegramActingChannelUsername: { type: DataTypes.STRING(64), allowNull: true },
       userActingTokenEncrypted: {
         type: DataTypes.TEXT,
         allowNull: true,
@@ -43,11 +45,13 @@ module.exports = (sequelize, DataTypes) => {
   User.prototype.setActingTelegramChannel = function setActingTelegramChannel(channel) {
     this.telegramActingChannelId = String(channel.id);
     this.telegramActingChannelTitle = channel.title ? String(channel.title) : null;
+    this.telegramActingChannelUsername = channel.username ? String(channel.username) : null;
   };
 
   User.prototype.clearActingTelegramChannel = function clearActingTelegramChannel() {
     this.telegramActingChannelId = null;
     this.telegramActingChannelTitle = null;
+    this.telegramActingChannelUsername = null;
   };
 
   return User;

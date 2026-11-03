@@ -31,3 +31,19 @@ html.landing-route body {
 #landing-scroll .landing-cta p {
   color: #ffffff;
 }
+
+/* Brand: remap Tailwind's blue scale to Exchange Tunnel's Telegram blue on the landing page,
+   so every blue-* utility (and the app's primary) shares one brand colour. */
+#landing-scroll {
+  --color-blue-50: #eef7fd;
+  --color-blue-100: #d8eefb;
+  --color-blue-200: #b4defa;
+  --color-blue-300: #82c9f5;
+  --color-blue-400: #4db5f0;
+  --color-blue-500: #2aabee;
+  --color-blue-600: #0b78c4;
+  --color-blue-700: #0a68aa;
+  --color-blue-800: #075a94;
+  --color-blue-900: #06426d;
+  --color-blue-950: #052c4a;
+}

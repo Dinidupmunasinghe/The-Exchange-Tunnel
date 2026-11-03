@@ -37,6 +37,10 @@ async function addIndexIfMissing(queryInterface, tableName, indexName, fields, o
 /** Safe additive columns — runs in all environments (including production). */
 async function ensureSchemaPatches() {
   const qi = db.sequelize.getQueryInterface();
+  await addColumnIfMissing(qi, "users", "telegramActingChannelUsername", {
+    type: db.sequelize.Sequelize.STRING(64),
+    allowNull: true
+  });
   await addColumnIfMissing(qi, "users", "profilePhotoUrl", {
     type: db.sequelize.Sequelize.TEXT,
     allowNull: true

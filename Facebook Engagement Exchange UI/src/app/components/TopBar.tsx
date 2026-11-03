@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
-import { Search, Coins } from "lucide-react";
-import { Button } from "./ui/button";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router";
+import { Coins, LogOut, Rocket, Search, Settings, Wallet } from "lucide-react";
 import { Input } from "./ui/input";
 import {
   DropdownMenu,
@@ -9,161 +8,121 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { ThemeToggle } from "./theme/ThemeToggle";
 import { NotificationsPopover } from "./NotificationsPopover";
-import { api, clearToken, getToken, isAccessTokenValid } from "../services/api";
-import { readProfileCache, writeProfileCache } from "../lib/profileCache";
-import { cn } from "./ui/utils";
-
-type ProfileState = { name?: string; email?: string; credits?: number };
-
-function profileFromCache(): ProfileState | null {
-  const cached = readProfileCache();
-  if (!cached) return null;
-  return { name: cached.name, email: cached.email, credits: cached.credits };
-}
+import { clearToken } from "../services/api";
+import { refreshSetup, resetSetup, setupHref, useSetupStatus } from "../lib/setupStatus";
 
 export function TopBar() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<ProfileState | null>(() => profileFromCache());
-  const [sessionHint, setSessionHint] = useState<string | null>(null);
+  const setup = useSetupStatus();
+  const profile = setup.profile;
 
-  const loadProfile = useCallback(async () => {
-    if (!isAccessTokenValid(getToken())) {
-      setSessionHint("Session expired. Please sign in again.");
-      return;
-    }
-    try {
-      const res = await api.getProfile({ skipSessionRedirect: true });
-      const user = res.user as ProfileState;
-      setProfile(user);
-      writeProfileCache(user);
-      setSessionHint(null);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Could not load profile";
-      if (!getToken() || !isAccessTokenValid(getToken())) {
-        setSessionHint("Session expired. Please sign in again.");
-        return;
-      }
-      setSessionHint(message);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
-
+  // Keep balance fresh while the tab is in use.
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") void loadProfile();
+      if (document.visibilityState === "visible") void refreshSetup(true);
     };
     const timer = window.setInterval(() => {
-      void loadProfile();
+      if (document.visibilityState === "visible") void refreshSetup(true);
     }, 60_000);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [loadProfile]);
+  }, []);
 
   const displayName = profile?.name || profile?.email?.split("@")[0] || "Account";
-
   const initials = (() => {
-    const n = profile?.name || profile?.email || "U";
-    const parts = n.split(/[\s@]+/).filter(Boolean);
+    const n = String(profile?.name || profile?.email || "U").replace(/^@/, "");
+    const parts = n.split(/[\s@._]+/).filter(Boolean);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return n.slice(0, 2).toUpperCase();
   })();
 
-  function handleLogout() {
+  function logout() {
     clearToken();
+    resetSetup();
     navigate("/login", { replace: true });
   }
 
-  function handleSignInAgain() {
-    clearToken();
-    navigate("/login?session=expired", { replace: true });
-  }
-
   return (
-    <header className="hidden h-14 items-center justify-between border-b border-border bg-sidebar px-6 lg:flex">
-      <div className="relative max-w-md flex-1">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <form
-          role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const q = String(new FormData(e.currentTarget).get("q") || "").trim();
-            navigate(q ? `/campaigns?q=${encodeURIComponent(q)}` : "/campaigns");
-          }}
-        >
-          <Input
-            name="q"
-            type="search"
-            aria-label="Search your campaigns"
-            placeholder="Search your campaigns…"
-            className="h-9 rounded-full border border-border bg-card pl-10 text-sm placeholder:text-muted-foreground"
-          />
-        </form>
-      </div>
+    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/80 px-6 backdrop-blur">
+      <form
+        role="search"
+        className="relative w-full max-w-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = String(new FormData(e.currentTarget).get("q") || "").trim();
+          navigate(q ? `/campaigns?q=${encodeURIComponent(q)}` : "/campaigns");
+        }}
+      >
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          name="q"
+          type="search"
+          aria-label="Search your campaigns"
+          placeholder="Search your campaigns…"
+          className="h-9 rounded-lg border-border bg-muted pl-9 text-sm"
+        />
+      </form>
 
       <div className="flex items-center gap-2">
-        <div className="flex h-9 items-center gap-1.5 rounded-full border border-border bg-card pl-1 pr-3 dark:bg-card/90">
-          <span
-            className={cn(
-              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-              "bg-amber-500/15 ring-1 ring-inset ring-amber-600/25",
-              "dark:bg-brand/15 dark:ring-brand/30"
-            )}
-            aria-hidden
-          >
-            <Coins className="h-4 w-4 text-amber-700 dark:text-brand" strokeWidth={2.25} />
-          </span>
-          <span className="text-xs text-muted-foreground">Balance</span>
-          <span className="text-sm font-semibold tabular-nums text-foreground">
-            {profile?.credits ?? "—"}
-          </span>
-        </div>
-
+        <Link
+          to="/wallet"
+          className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm transition-colors hover:bg-muted"
+          title="Your credit balance"
+        >
+          <Coins className="h-4 w-4 text-primary" />
+          <span className="font-semibold tabular-nums text-foreground">{Number(profile?.credits ?? 0).toLocaleString()}</span>
+          <span className="hidden text-muted-foreground xl:inline">credits</span>
+        </Link>
         <ThemeToggle />
         <NotificationsPopover />
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-9 gap-2 rounded-md px-1.5 text-sm font-medium text-foreground hover:bg-accent"
+            <button
+              type="button"
+              className="flex h-9 items-center gap-2 rounded-lg px-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              aria-label="Account menu"
             >
               <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-primary text-primary-foreground text-[11px] font-semibold">
-                  {initials}
-                </AvatarFallback>
+                {profile?.profilePhotoUrl ? <AvatarImage src={profile.profilePhotoUrl} alt="" /> : null}
+                <AvatarFallback className="bg-primary text-[11px] font-semibold text-primary-foreground">{initials}</AvatarFallback>
               </Avatar>
               <span className="hidden max-w-[140px] truncate md:inline">{displayName}</span>
-            </Button>
+            </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuLabel className="font-normal">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{displayName}</p>
-                <p className="text-xs text-muted-foreground">{profile?.email || ""}</p>
-                {sessionHint ? (
-                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{sessionHint}</p>
-                ) : null}
-              </div>
+              <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {profile?.plan?.name || "Free"} plan · {Number(profile?.credits ?? 0).toLocaleString()} credits
+              </p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {sessionHint && (!getToken() || !isAccessTokenValid(getToken())) ? (
-              <DropdownMenuItem onClick={handleSignInAgain}>Sign in again</DropdownMenuItem>
-            ) : null}
-            <DropdownMenuItem onClick={() => navigate("/settings")}>Account Settings</DropdownMenuItem>
+            {!setup.complete ? (
+              <DropdownMenuItem onClick={() => navigate(setupHref(setup.nextStep?.id))}>
+                <Rocket className="h-4 w-4" /> Finish setup ({setup.doneCount}/{setup.total})
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => navigate(setupHref("goal"))}>
+                <Rocket className="h-4 w-4" /> Setup guide
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => navigate("/wallet")}>
+              <Wallet className="h-4 w-4" /> Wallet & plans
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings")}>
+              <Settings className="h-4 w-4" /> Settings
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-              Log out
+            <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+              <LogOut className="h-4 w-4" /> Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

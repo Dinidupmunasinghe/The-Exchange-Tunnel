@@ -24,21 +24,8 @@ import { Progress } from "../components/ui/progress";
 import { api } from "../services/api";
 import { getEngagementLabel } from "../lib/engagement";
 import { toast } from "sonner";
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "active":
-      return "bg-primary/10 text-primary border-primary/20";
-    case "pending":
-      return "bg-sky-500/10 text-sky-600 border-sky-500/20";
-    case "completed":
-      return "bg-green-500/10 text-green-500 border-green-500/20";
-    case "paused":
-      return "bg-orange-500/10 text-orange-500 border-orange-500/20";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-};
+import { Activity, FolderOpen, Megaphone, Coins as CoinsIcon } from "lucide-react";
+import { Callout, EmptyState, LinkButton, PageHeader, SegmentedControl, StatCard, StatusBadge } from "../components/kit";
 
 function isCampaignLive(c: { status: string; scheduledLaunchAt?: string | null }) {
   if (c.status === "active") return true;
@@ -87,6 +74,20 @@ export function Campaigns() {
           )
         : campaigns,
     [campaigns, query]
+  );
+  const [statusFilter, setStatusFilter] = useState<"all" | "running" | "paused" | "ended">("all");
+  const filteredCampaigns = useMemo(
+    () =>
+      visibleCampaigns.filter((c) =>
+        statusFilter === "all"
+          ? true
+          : statusFilter === "running"
+            ? c.status === "active" || c.status === "pending"
+            : statusFilter === "paused"
+              ? c.status === "paused"
+              : c.status === "completed" || c.status === "cancelled"
+      ),
+    [visibleCampaigns, statusFilter]
   );
   const activeCount = campaigns.filter(isCampaignLive).length;
   const totalEngagements = campaigns.reduce((sum, c) => sum + (c.completedEngagements || 0), 0);
@@ -146,85 +147,73 @@ export function Campaigns() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">My Campaigns</h1>
-          <p className="text-muted-foreground mt-1">Track and manage your campaigns</p>
-        </div>
-        <Button asChild>
-          <Link to="/submit">
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Create Campaign
-          </Link>
-        </Button>
+      <PageHeader
+        title="My campaigns"
+        description="See how your campaigns are doing. Pause or delete any time — unused credits come back to you."
+        actions={
+          <LinkButton to="/submit">
+            <Megaphone className="h-4 w-4" /> New campaign
+          </LinkButton>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Running campaigns" value={activeCount} icon={Activity} tone="success" />
+        <StatCard label="Completed actions" value={totalEngagements.toLocaleString()} hint="Subscribers, likes, comments and reposts" icon={FolderOpen} tone="primary" />
+        <StatCard label="Credits spent" value={totalSpent.toLocaleString()} hint="Only for completed actions" icon={CoinsIcon} tone="violet" />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Active Campaigns</p>
-              <p className="text-3xl font-bold text-foreground">{activeCount}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">Total Completions</p>
-              <p className="text-3xl font-bold text-foreground">{totalEngagements}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Credits Spent</p>
-              <p className="text-3xl font-bold text-foreground">{totalSpent}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
       {!selectedPageName ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
-          No Telegram channel connected yet.{" "}
-          <Link to="/settings" className="font-medium underline underline-offset-2">
-            Connect your channel in Settings
-          </Link>
-          .
-        </div>
+        <Callout
+          tone="warning"
+          title="No channel connected"
+          action={<LinkButton to="/get-started?step=channel&returnTo=%2Fcampaigns" size="sm">Connect channel</LinkButton>}
+        >
+          Connect your Telegram channel to launch new campaigns.
+        </Callout>
       ) : (
-        <div className="rounded-lg border border-border bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
-          Connected channel: <span className="font-medium text-foreground">{selectedPageName}</span>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Promoting <span className="font-medium text-foreground">{selectedPageName}</span>
+        </p>
       )}
 
-      {query ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">
-            {visibleCampaigns.length} result{visibleCampaigns.length === 1 ? "" : "s"} for{" "}
-            <span className="font-medium text-foreground">“{searchParams.get("q")}”</span>
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => setSearchParams({})}>
-            Clear search
-          </Button>
+      {campaigns.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SegmentedControl
+            ariaLabel="Filter campaigns"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: "all", label: "All", count: visibleCampaigns.length },
+              { value: "running", label: "Running" },
+              { value: "paused", label: "Paused" },
+              { value: "ended", label: "Ended" },
+            ]}
+          />
+          {query ? (
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              Results for <span className="font-medium text-foreground">“{searchParams.get("q")}”</span>
+              <Button variant="ghost" size="sm" onClick={() => setSearchParams({})}>
+                Clear
+              </Button>
+            </span>
+          ) : null}
         </div>
       ) : null}
 
       {campaigns.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/10 px-6 py-14 text-center">
-          <p className="font-medium text-foreground">No campaigns yet</p>
-          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Launch a campaign to get subscribers, likes, comments or reposts on your Telegram posts.
-          </p>
-          <Button asChild className="mt-4">
-            <Link to="/submit">Launch your first campaign</Link>
-          </Button>
-        </div>
+        <EmptyState
+          icon={Megaphone}
+          title="No campaigns yet"
+          description="Launch a campaign to get subscribers, likes, comments or reposts on your Telegram channel."
+          action={<LinkButton to="/submit">Launch your first campaign</LinkButton>}
+        />
+      ) : filteredCampaigns.length === 0 ? (
+        <EmptyState title="Nothing here" description="No campaigns match this filter." />
       ) : null}
 
       <div className="space-y-4">
-        {visibleCampaigns.map((campaign) => {
+        {filteredCampaigns.map((campaign) => {
           const creditsTotal = campaign.maxEngagements * campaign.creditsPerEngagement;
           const creditsSpent = campaign.spentCredits || 0;
           const progress = creditsTotal ? (creditsSpent / creditsTotal) * 100 : 0;
@@ -232,17 +221,15 @@ export function Campaigns() {
           const title = campaign.name || `Campaign #${campaign.id}`;
 
           return (
-            <Card key={campaign.id} className="border-border bg-card hover:bg-card/80 transition-colors">
+            <Card key={campaign.id} className="transition-shadow hover:shadow-md">
               <CardContent className="p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex-1 space-y-4 min-w-0">
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-lg font-bold text-foreground">{title}</h3>
-                          <Badge variant="outline" className={getStatusColor(campaign.status)}>
-                            {campaign.status}
-                          </Badge>
+                          <h3 className="text-base font-semibold text-foreground">{title}</h3>
+                          <StatusBadge status={campaign.status} />
                           <Badge variant="outline" className="border-border">
                             {getEngagementLabel(campaign.engagementType)}
                           </Badge>
@@ -264,7 +251,7 @@ export function Campaigns() {
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Credit Usage</span>
+                        <span className="text-muted-foreground">Budget used</span>
                         <span className="font-medium text-foreground">
                           {creditsSpent} / {creditsTotal} credits
                         </span>
@@ -274,8 +261,10 @@ export function Campaigns() {
 
                     <div className="flex flex-wrap items-center gap-6 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Completions:</span>
-                        <span className="font-bold text-foreground">{campaign.completedEngagements}</span>
+                        <span className="text-muted-foreground">Completed:</span>
+                        <span className="font-semibold text-foreground">
+                          {campaign.completedEngagements} / {campaign.maxEngagements}
+                        </span>
                       </div>
                     </div>
                   </div>

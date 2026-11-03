@@ -18,6 +18,8 @@ import { api } from "../services/api";
 import { WalletPackageCard } from "../components/WalletPackageCard";
 import type { PublicCreditPackage } from "../lib/creditPackages";
 import { packageCta } from "../lib/packageCheckout";
+import { EmptyState, PageHeader, StatCard } from "../components/kit";
+import { Coins as CoinsIcon, Receipt } from "lucide-react";
 
 type Subscription = Awaited<ReturnType<typeof api.getMySubscription>>;
 
@@ -85,51 +87,35 @@ export function Wallet() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Wallet</h1>
-          <p className="mt-1 text-muted-foreground">Your credits, plan and transaction history</p>
-        </div>
-        <Button type="button" onClick={() => plansRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-          <Sparkles className="mr-2 h-4 w-4" />
-          {isPaid ? "Change plan" : "Upgrade plan"}
-        </Button>
-      </div>
+      <PageHeader
+        title="Wallet & plans"
+        description="Your credits, your plan and every credit that came in or went out."
+        actions={
+          <Button type="button" onClick={() => plansRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            <Sparkles className="h-4 w-4" />
+            {isPaid ? "Change plan" : "Upgrade plan"}
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border bg-gradient-to-br from-primary/20 to-primary/5">
-          <CardContent className="p-6">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Available balance</p>
-              <p className="text-4xl font-bold text-primary tabular-nums">{balance.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">credits</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <p className="text-sm text-muted-foreground">Earned from tasks</p>
-              </div>
-              <p className="text-3xl font-bold text-foreground tabular-nums">{totals ? totals.earned.toLocaleString() : "…"}</p>
-              <p className="text-xs text-muted-foreground">All time</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <TrendingDown className="h-4 w-4 text-orange-500" />
-                <p className="text-sm text-muted-foreground">Spent on campaigns</p>
-              </div>
-              <p className="text-3xl font-bold text-foreground tabular-nums">{totals ? totals.spent.toLocaleString() : "…"}</p>
-              <p className="text-xs text-muted-foreground">All time, net of refunds</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Available balance" value={balance.toLocaleString()} hint="Credits you can spend now" icon={CoinsIcon} tone="primary" />
+        <StatCard
+          label="Earned from tasks"
+          value={totals ? totals.earned.toLocaleString() : "…"}
+          hint="All time"
+          icon={TrendingUp}
+          tone="success"
+          loading={!totals}
+        />
+        <StatCard
+          label="Spent on campaigns"
+          value={totals ? totals.spent.toLocaleString() : "…"}
+          hint="All time, net of refunds"
+          icon={TrendingDown}
+          tone="violet"
+          loading={!totals}
+        />
       </div>
 
       {/* Current plan */}
@@ -205,7 +191,7 @@ export function Wallet() {
         </CardHeader>
         <CardContent>
           {transactions.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No transactions yet.</p>
+            <EmptyState icon={Receipt} title="No transactions yet" description="Credits you earn and spend will appear here." className="border-0 py-8" />
           ) : (
             <div className="space-y-3">
               {transactions.map((transaction) => {
@@ -213,11 +199,11 @@ export function Wallet() {
                 return (
                   <div
                     key={transaction.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/30 p-4 transition-colors hover:bg-secondary/50"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted"
                   >
                     <div className="flex min-w-0 items-center gap-4">
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${earn ? "bg-primary/10" : "bg-orange-500/10"}`}>
-                        {earn ? <TrendingUp className="h-5 w-5 text-primary" /> : <TrendingDown className="h-5 w-5 text-orange-500" />}
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${earn ? "bg-success-soft" : "bg-muted"}`}>
+                        {earn ? <TrendingUp className="h-5 w-5 text-success" /> : <TrendingDown className="h-5 w-5 text-muted-foreground" />}
                       </div>
                       <div className="min-w-0">
                         <p className="truncate font-medium text-foreground">{txLabel(transaction)}</p>
@@ -228,7 +214,7 @@ export function Wallet() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className={`text-lg font-bold tabular-nums ${earn ? "text-primary" : "text-orange-500"}`}>
+                      <p className={`text-lg font-bold tabular-nums ${earn ? "text-success" : "text-foreground"}`}>
                         {transaction.amount > 0 ? "+" : ""}
                         {transaction.amount}
                       </p>

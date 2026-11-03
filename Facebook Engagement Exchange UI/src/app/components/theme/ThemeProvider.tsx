@@ -11,15 +11,15 @@ interface ThemeContextValue {
 const STORAGE_KEY = "exchange_theme";
 
 function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     // ignore
   }
-  if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
-  return "dark";
+  // Light is the product default; users can switch to dark with the toggle.
+  return "light";
 }
 
 function applyTheme(theme: Theme) {

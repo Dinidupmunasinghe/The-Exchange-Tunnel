@@ -39,6 +39,7 @@ import { AdminEngagements } from "./pages/admin/Engagements";
 import { AdminTelegram } from "./pages/admin/Telegram";
 import { AdminAuditLogs } from "./pages/admin/AuditLogs";
 import { Landing } from "./pages/Landing";
+import { GetStarted } from "./pages/GetStarted";
 
 export const router = createBrowserRouter([
   { path: "/login", Component: Login },
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
       {
         Component: ProtectedRoute,
         children: [
+          { path: "get-started", Component: GetStarted },
           { path: "connect-telegram", Component: ConnectTelegram },
           {
             Component: TelegramRequiredRoute,

@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { api } from "../services/api";
+import { Callout, PageHeader, SegmentedControl, StatusBadge } from "../components/kit";
 
 type RepostChannel = {
   userId: number;
@@ -157,11 +158,8 @@ export function RepostRequests() {
 
   function statusBadge(status?: string | null) {
     const v = String(status || "").toLowerCase();
-    if (v === "completed") return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">Completed</Badge>;
-    if (v === "cancelled") return <Badge className="bg-rose-500/15 text-rose-300">Cancelled</Badge>;
-    if (v === "assigned" || v === "active")
-      return <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-300">{v === "assigned" ? "Pending action" : "Active"}</Badge>;
-    return <Badge variant="outline">{status || "Unknown"}</Badge>;
+    if (v === "assigned") return <StatusBadge status="assigned" label="Waiting for repost" />;
+    return <StatusBadge status={v || "unknown"} />;
   }
 
   const notifications = useMemo(() => {
@@ -190,47 +188,26 @@ export function RepostRequests() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl">Request Repost</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Connect your source Telegram post, then pick a connected channel to request a repost.
-        </p>
-      </div>
+      <PageHeader
+        title="Repost requests"
+        description="Ask other channel owners to repost one of your posts to their channel. They earn credits for it; you pay only when the repost is done."
+      />
 
-      <div className="inline-flex rounded-lg border border-border bg-card p-1">
-        <Button
-          type="button"
-          size="sm"
-          variant={tab === "send" ? "default" : "ghost"}
-          onClick={() => setTab("send")}
-          className="rounded-md"
-        >
-          Send Request
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={tab === "received" ? "default" : "ghost"}
-          onClick={() => setTab("received")}
-          className="rounded-md"
-        >
-          Received Requests
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={tab === "sent" ? "default" : "ghost"}
-          onClick={() => setTab("sent")}
-          className="rounded-md"
-        >
-          Sent Requests
-        </Button>
-      </div>
+      <SegmentedControl
+        ariaLabel="Repost request views"
+        value={tab}
+        onChange={(v) => setTab(v)}
+        options={[
+          { value: "send", label: "Request a repost" },
+          { value: "received", label: "Received", count: receivedRequests.length },
+          { value: "sent", label: "Sent", count: sentRequests.length },
+        ]}
+      />
 
       {tab === "send" ? (
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle>Connect a post</CardTitle>
+          <CardTitle>1. Paste the post you want reposted</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input
@@ -242,10 +219,10 @@ export function RepostRequests() {
             <Button type="button" variant="outline" onClick={() => void loadChannels()} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh channels"}
             </Button>
-            <p className="text-xs text-muted-foreground">Paste any valid Telegram post link to request repost.</p>
+            <p className="text-xs text-muted-foreground">Then choose a channel below (2) and send your request.</p>
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          {notice ? <p className="text-sm text-emerald-700 dark:text-emerald-400">{notice}</p> : null}
+          {notice ? <Callout tone="success">{notice}</Callout> : null}
         </CardContent>
       </Card>
       ) : null}

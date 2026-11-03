@@ -8,11 +8,11 @@ import { StatsCard } from "../components/StatsCard";
 import { CreditsFlowChart, EngagementActivityChart, useChartTheme } from "../components/charts";
 import { api, type UserAnalytics } from "../services/api";
 import { cn } from "../components/ui/utils";
+import { Callout, PageHeader, SegmentedControl, StatusBadge } from "../components/kit";
 
 const PERIODS = [7, 30, 90] as const;
 
-const cardClass =
-  "border-border bg-card shadow-none dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:ring-1 dark:ring-white/[0.06]";
+const cardClass = "";
 
 const TYPE_LABELS: Record<string, string> = {
   subscribe: "Subscribes",
@@ -21,13 +21,6 @@ const TYPE_LABELS: Record<string, string> = {
   share: "Reposts",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  pending: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  paused: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  completed: "bg-muted text-muted-foreground",
-  cancelled: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
-};
 
 function EngagementMix({ byType }: { byType: UserAnalytics["engagementsByType"] }) {
   const t = useChartTheme();
@@ -102,38 +95,31 @@ export function Analytics() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-          <p className="mt-1 text-muted-foreground">Your real credit flow, engagements and campaign results</p>
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1" role="group" aria-label="Time range">
-          {PERIODS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setDays(p)}
-              aria-pressed={days === p}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                days === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {p} days
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="Analytics"
+        description="Your credit flow, the actions you completed and how your campaigns perform."
+        actions={
+          <SegmentedControl
+            ariaLabel="Time range"
+            value={days}
+            onChange={(v) => setDays(v)}
+            options={PERIODS.map((p) => ({ value: p, label: `${p} days` }))}
+          />
+        }
+      />
 
       {error ? (
-        <Card className={cardClass}>
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-6">
-            <p className="text-sm text-muted-foreground">{error}</p>
+        <Callout
+          tone="danger"
+          title="Couldn’t load analytics"
+          action={
             <Button variant="outline" size="sm" onClick={() => void load(days)} className="gap-2">
-              <RefreshCw className="h-4 w-4" /> Retry
+              <RefreshCw className="h-4 w-4" /> Try again
             </Button>
-          </CardContent>
-        </Card>
+          }
+        >
+          {error}
+        </Callout>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -201,9 +187,7 @@ export function Analytics() {
                           <p className="text-xs capitalize text-muted-foreground">{c.engagementType.replace("_", " + ")}</p>
                         </td>
                         <td className="py-3 pr-3">
-                          <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium capitalize", STATUS_STYLES[c.status] || STATUS_STYLES.completed)}>
-                            {c.status}
-                          </span>
+                          <StatusBadge status={c.status} />
                         </td>
                         <td className="py-3 pr-3">
                           <div className="flex items-center gap-2">

@@ -42,8 +42,26 @@ function clearPhoneCodeHash(userId, phone) {
   store.delete(key(userId, phone));
 }
 
+/** Half-finished sign-in waiting for the 2FA password (never stored on the user record). */
+function setPending2fa(userId, data) {
+  store.set(`2fa::${userId}`, { ...data, expiresAt: Date.now() + TTL_MS });
+}
+
+function getPending2fa(userId) {
+  const row = store.get(`2fa::${userId}`);
+  if (!row || Date.now() > row.expiresAt) return null;
+  return row;
+}
+
+function clearPending2fa(userId) {
+  store.delete(`2fa::${userId}`);
+}
+
 module.exports = {
   setAuthState,
   getAuthState,
-  clearPhoneCodeHash
+  clearPhoneCodeHash,
+  setPending2fa,
+  getPending2fa,
+  clearPending2fa
 };

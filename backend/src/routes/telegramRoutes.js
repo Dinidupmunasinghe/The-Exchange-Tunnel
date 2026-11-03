@@ -10,6 +10,7 @@ const {
   sendMtprotoCode,
   mtprotoSignIn,
   mtprotoSignInPassword,
+  mtprotoDisconnect,
   mtprotoJoinChannel,
   mtprotoReact,
   mtprotoReply
@@ -79,6 +80,7 @@ router.post(
   validateRequest,
   mtprotoSignInPassword
 );
+router.post("/user-auth/disconnect", mtprotoDisconnect);
 router.post(
   "/actions/join-channel",
   telegramBridgeLimiter,

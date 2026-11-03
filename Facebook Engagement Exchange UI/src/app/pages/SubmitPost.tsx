@@ -29,6 +29,9 @@ import {
   type BaseEngagementKind,
   selectionToEngagementType
 } from "../lib/engagement";
+import { Callout, PageHeader, Section } from "../components/kit";
+import { ChannelSetup } from "../components/setup/ChannelSetup";
+import { useSetupStatus } from "../lib/setupStatus";
 
 const defaultSelection: Record<BaseEngagementKind, boolean> = {
   like: true,
@@ -45,6 +48,7 @@ function isTme(str: string) {
 }
 
 export function SubmitPost() {
+  const setup = useSetupStatus();
   const [campaignMode, setCampaignMode] = useState<"subscribe" | "engagement">("subscribe");
   const [campaignName, setCampaignName] = useState("");
   const [selection, setSelection] = useState<Record<BaseEngagementKind, boolean>>(defaultSelection);
@@ -258,121 +262,28 @@ export function SubmitPost() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Launch Campaigns</h1>
-        <p className="text-muted-foreground mt-1">
-          Run either a channel subscribe campaign or a post engagement campaign.
-        </p>
-      </div>
-      {!channelTitle ? (
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/20">
-          <CardContent className="space-y-4 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-base font-semibold text-foreground">Quick setup before launch</p>
-                <p className="text-sm text-muted-foreground">
-                  Complete these 3 steps. We auto-check when you return from Telegram.
-                </p>
-              </div>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "border-primary/40 bg-primary/10 text-primary transition-all duration-300",
-                  setupReady ? "scale-105 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]" : ""
-                )}
-              >
-                {completedSteps}/3 complete
-              </Badge>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div
-                className={cn(
-                  "rounded-lg border p-3 transition-all duration-300",
-                  hasTelegramLogin ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Step 1</p>
-                    <p className="font-medium text-foreground">Login with Telegram</p>
-                  </div>
-                  <UserRoundCheck
-                    className={cn(
-                      "h-4 w-4 transition-all duration-300",
-                      hasTelegramLogin ? "text-emerald-600 dark:text-emerald-400 scale-110" : "text-muted-foreground"
-                    )}
-                  />
-                </div>
-                {!hasTelegramLogin ? (
-                  <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
-                    <Link to="/login">Open login</Link>
-                  </Button>
-                ) : (
-                  <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Done</p>
-                )}
-              </div>
-
-              <div
-                className={cn(
-                  "rounded-lg border p-3 transition-all duration-300",
-                  channelTitle ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-card/60"
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Step 2</p>
-                    <p className="font-medium text-foreground">Connect channel</p>
-                  </div>
-                  <CheckCircle
-                    className={cn(
-                      "h-4 w-4 transition-all duration-300",
-                      channelTitle ? "text-emerald-600 dark:text-emerald-400 scale-110" : "text-muted-foreground"
-                    )}
-                  />
-                </div>
-                {channelTitle ? (
-                  <p className="mt-3 truncate text-xs text-emerald-700 dark:text-emerald-300">{channelTitle}</p>
-                ) : (
-                  <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
-                    <Link to="/settings">Open settings</Link>
-                  </Button>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-border bg-card/60 p-3 transition-all duration-300">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Step 3</p>
-                    <p className="font-medium text-foreground">Telegram permissions</p>
-                  </div>
-                  <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="mt-3 space-y-2">
-                  <Button size="sm" variant="outline" className="w-full justify-between" asChild>
-                    <a href={fixBotAdminUrl} target="_blank" rel="noreferrer">
-                      Add bot to channel <ArrowUpRight className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                  <Button size="sm" variant="outline" className="w-full justify-between" asChild>
-                    <a href={fixBotFatherUrl} target="_blank" rel="noreferrer">
-                      Open BotFather <ArrowUpRight className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => void handleRecheckSetup()} disabled={isRecheckingSetup}>
-                {isRecheckingSetup ? "Rechecking..." : "I fixed it, recheck now"}
-              </Button>
-              {setupCheckMessage ? (
-                <p className="text-xs text-muted-foreground animate-in fade-in-0 duration-300">{setupCheckMessage}</p>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
+      <PageHeader
+        title="New campaign"
+        description="Get real subscribers for your channel, or likes, comments and reposts on a post. You pay with credits only for what you get."
+      />
+      {!setup.loading && !setup.channel ? (
+        <Section
+          title="First, connect your channel"
+          description="Campaigns promote your own Telegram channel. Connect it once — it takes a minute."
+        >
+          <ChannelSetup
+            connected={false}
+            onConnected={() => {
+              void refreshSetupState().catch(() => undefined);
+            }}
+          />
+        </Section>
+      ) : null}
+      {!setup.loading && setup.channel && campaignMode === "subscribe" && !setup.profile?.telegramActingChannelUsername ? (
+        <Callout tone="warning" title="Subscriber campaigns need a public channel">
+          Your channel has no public @username. Add one in Telegram (Channel info → Edit → Channel type → Public), then
+          reconnect it in Settings — or choose a post engagement campaign instead.
+        </Callout>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -663,12 +574,16 @@ export function SubmitPost() {
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4 flex gap-2">
-              <Info className="h-5 w-5 text-blue-500 flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                Earners must subscribe to the channel; the app confirms subscription with your bot. For post campaigns, they
-                can complete like and/or comment actions based on your selected bundle.
+            <CardContent className="space-y-3 p-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Info className="h-4 w-4 shrink-0 text-primary" /> How it works
               </p>
+              <ol className="list-decimal space-y-1.5 pl-5 text-xs text-muted-foreground">
+                <li>The credits for all slots are reserved when you launch.</li>
+                <li>Members see your campaign in their Earn feed and complete it.</li>
+                <li>Our bot checks every subscribe and action on Telegram before paying.</li>
+                <li>Pause or delete any time — unused credits come back to you.</li>
+              </ol>
             </CardContent>
           </Card>
           <Card>

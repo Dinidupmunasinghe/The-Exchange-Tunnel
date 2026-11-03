@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { LogoMark } from "../components/kit";
 import { ArrowRight, Send, Users, TrendingUp, Shield, MessageCircle, BarChart3, Zap, CheckCircle2, Heart, Share2, Eye, Sparkles } from "lucide-react";
 import { StatCard } from "./components/StatCard";
 import { InteractiveChart } from "./components/InteractiveChart";
@@ -41,13 +42,7 @@ export function LandingApp() {
             whileHover={{ scale: 1.05 }}
             className="flex items-center gap-2 cursor-pointer"
           >
-            <motion.div
-              animate={{ rotate: [0, 360] }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center"
-            >
-              <Send className="w-5 h-5 text-white" />
-            </motion.div>
+            <LogoMark className="h-8 w-8" />
             <span className="text-xl font-semibold text-gray-900">Exchange Tunnel</span>
           </motion.div>
           <motion.div className="flex items-center gap-4 sm:gap-8">
@@ -306,54 +301,54 @@ export function LandingApp() {
       <section id="features" className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 rounded-full mb-4">
-              <Zap className="w-4 h-4 text-green-600" />
-              <span className="text-sm text-green-600 font-medium">Features</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
+              <Zap className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-blue-600 font-medium">Why Exchange Tunnel</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
-              Features designed to<br />empower your workflow
+              Real engagement,<br />checked on Telegram
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Stay ahead with <span className="text-blue-600 font-medium">tools</span> that prioritize your <span className="text-blue-500 font-medium">needs</span>, integrating <span className="text-blue-700 font-medium">insights</span> and efficiency into one powerful platform.
+              Every subscribe, reaction, comment and repost is <span className="text-blue-600 font-medium">verified on Telegram</span> before credits move — so you only pay for what really happened.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
-                icon: TrendingUp,
-                title: "Real-time analytics",
-                description: "Track your engagement growth with detailed analytics and insights to optimize your strategy.",
+                icon: Users,
+                title: "Real subscribers",
+                description: "Subscriber campaigns bring real Telegram members to your channel — checked by our bot before you pay.",
                 gradient: "from-blue-500 to-blue-600"
               },
               {
-                icon: Users,
-                title: "Collaborate together",
-                description: "Connect with your team, share updates instantly, and achieve your goals faster.",
+                icon: Heart,
+                title: "Likes, comments & reposts",
+                description: "Boost a single post with reactions, comments or reposts to other channels — pick exactly what you need.",
                 gradient: "from-blue-400 to-blue-500"
               },
               {
                 icon: Shield,
-                title: "Safe & secure",
-                description: "Your data is protected with enterprise-grade security and encrypted exchanges.",
+                title: "Fair by design",
+                description: "Undone actions are taken back automatically and unused budget is refunded when you stop a campaign.",
                 gradient: "from-blue-600 to-blue-700"
               },
               {
                 icon: Zap,
-                title: "Lightning fast",
-                description: "Experience instant exchanges and real-time updates with our optimized platform.",
+                title: "Earn in one tap",
+                description: "No copying links around: tap a task and we do the action on Telegram for you. Credits arrive instantly.",
                 gradient: "from-blue-500 to-cyan-500"
               },
               {
                 icon: BarChart3,
-                title: "Smart insights",
-                description: "Get actionable recommendations based on your engagement patterns and growth metrics.",
+                title: "Clear analytics",
+                description: "See credits earned and spent, engagement received and how every campaign is performing.",
                 gradient: "from-indigo-500 to-blue-600"
               },
               {
-                icon: MessageCircle,
-                title: "Easy communication",
-                description: "Seamlessly connect with other users and manage all your exchanges in one place.",
+                icon: Sparkles,
+                title: "Free to start",
+                description: "Get 50 free credits when you sign up. Upgrade only when you want to grow faster.",
                 gradient: "from-blue-400 to-indigo-500"
               }
             ].map((feature, i) => (
@@ -406,9 +401,9 @@ export function LandingApp() {
       <section id="how" className="py-20 px-6 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-full mb-4">
-              <CheckCircle2 className="w-4 h-4 text-purple-600" />
-              <span className="text-sm text-purple-600 font-medium">How it works</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
+              <CheckCircle2 className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-blue-600 font-medium">How it works</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
               Get started in minutes
@@ -422,22 +417,22 @@ export function LandingApp() {
             {[
               {
                 step: "01",
-                title: "Create account",
-                description: "Sign up with your Telegram account in seconds. No credit card required to get started.",
+                title: "Create account & connect Telegram",
+                description: "Sign up free and link your Telegram account. A short guided setup verifies your phone and channel.",
                 icon: Users,
                 color: "blue"
               },
               {
                 step: "02",
-                title: "Choose exchange type",
-                description: "Select what you want to exchange - likes, shares, comments, or followers. Set your preferences.",
+                title: "Earn credits",
+                description: "Do quick tasks on other members’ posts — subscribe, react, comment or repost — and collect credits.",
                 icon: CheckCircle2,
                 color: "blue"
               },
               {
                 step: "03",
-                title: "Watch growth happen",
-                description: "Start receiving real engagement from our network of active users. Track everything in real-time.",
+                title: "Grow your channel",
+                description: "Spend credits on a campaign and watch real subscribers and engagement arrive. Track it all in analytics.",
                 icon: TrendingUp,
                 color: "blue"
               }
@@ -577,13 +572,7 @@ export function LandingApp() {
               whileHover={{ scale: 1.05 }}
               className="flex items-center gap-2 cursor-pointer"
             >
-              <motion.div
-                whileHover={{ rotate: 360 }}
-                transition={{ duration: 0.5 }}
-                className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center"
-              >
-                <Send className="w-5 h-5 text-white" />
-              </motion.div>
+              <LogoMark className="h-8 w-8" />
               <span className="text-xl font-semibold text-gray-900">Exchange Tunnel</span>
             </motion.div>
             <motion.div

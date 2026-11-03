@@ -749,6 +749,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }) as Promise<{ ok: boolean; requires2fa?: boolean; sessionSaved?: boolean }>,
+  mtprotoDisconnect: () =>
+    authRequest("/telegram/user-auth/disconnect", { method: "POST" }) as Promise<{ message: string }>,
   mtprotoSignIn2fa: (payload: { password: string }) =>
     authRequest("/telegram/user-auth/sign-in-2fa", {
       method: "POST",

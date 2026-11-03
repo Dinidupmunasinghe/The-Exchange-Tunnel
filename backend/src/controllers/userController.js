@@ -24,6 +24,7 @@ async function getProfile(req, res) {
       "telegramUserId",
       "telegramActingChannelId",
       "telegramActingChannelTitle",
+      "telegramActingChannelUsername",
       "userActingTokenEncrypted",
       "profilePhotoUrl",
       "createdAt"

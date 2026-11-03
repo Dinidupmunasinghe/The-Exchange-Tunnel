@@ -197,7 +197,7 @@ export function LoginTelegram() {
             <TelegramBrandIcon size={56} />
           </div>
           <CardTitle className="text-2xl">Sign in with Telegram</CardTitle>
-          <CardDescription>For accounts created with Telegram only.</CardDescription>
+          <CardDescription>New here or coming back — your Telegram account is all you need.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div id="tg-login-legacy-mount" className="flex justify-center" />
@@ -205,7 +205,7 @@ export function LoginTelegram() {
           <TelegramDeeplinkLogin afterLoginPath={afterLoginPath} />
           <p className="text-center text-xs text-muted-foreground">
             <Link to="/login" className="text-primary underline underline-offset-2">
-              Back to email sign in
+              Use email instead
             </Link>
           </p>
         </CardContent>

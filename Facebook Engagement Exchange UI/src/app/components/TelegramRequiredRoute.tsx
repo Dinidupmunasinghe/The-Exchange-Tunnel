@@ -30,7 +30,7 @@ export function TelegramRequiredRoute() {
 
   if (check === "unlinked") {
     const returnTo = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/connect-telegram?returnTo=${returnTo}`} replace state={{ from: location }} />;
+    return <Navigate to={`/get-started?step=telegram&returnTo=${returnTo}`} replace state={{ from: location }} />;
   }
   if (check === "loading") {
     // Do not render (and fetch data for) app pages before we know Telegram is linked.

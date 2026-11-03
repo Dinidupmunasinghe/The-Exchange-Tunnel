@@ -66,6 +66,15 @@ function handleMtprotoError(res, error, fallbackMessage) {
   return res.status(400).json({ code: code || "MTPROTO_ERROR", message: error.message || fallbackMessage });
 }
 
+/** Removes the saved Telegram sign-in used for earning ("phone verification"). */
+async function mtprotoDisconnect(req, res) {
+  mtprotoAuthStore.clearPending2fa(req.user.id);
+  req.user.userActingTokenEncrypted = null;
+  req.user.userOAuthTokenEncrypted = null;
+  await req.user.save();
+  return res.json({ message: "Phone verification removed. You can verify again at any time." });
+}
+
 async function connectChannelToUser(req, res) {
   const raw = req.body && typeof req.body.channel === "string" ? req.body.channel.trim() : "";
   if (!isConfigured()) {
@@ -134,10 +143,11 @@ async function connectChannelToUser(req, res) {
     });
   }
   const title = chat.title || (chat.username ? `@${chat.username}` : "Channel");
-  await req.user.setActingTelegramChannel({ id: String(chat.id), title });
+  await req.user.setActingTelegramChannel({ id: String(chat.id), title, username: chat.username || null });
   await req.user.save();
   return res.json({
     message: "Telegram channel connected",
+    channel: { id: String(chat.id), title, username: chat.username || null },
     pages: [
       {
         id: String(chat.id),
@@ -293,15 +303,15 @@ async function mtprotoSignIn(req, res) {
       proxy: null
     });
     if (result.requires2fa) {
-      req.user.userOAuthTokenEncrypted = encrypt(
-        JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: null })
-      );
-      if (result.sessionString) {
-        req.user.userActingTokenEncrypted = encrypt(result.sessionString);
-      }
+      // Keep the half-finished sign-in in memory only: the account must not look "verified"
+      // until the 2FA password is accepted.
+      mtprotoAuthStore.setPending2fa(req.user.id, {
+        sessionString: result.sessionString || null,
+        apiId: creds.apiId,
+        apiHash: creds.apiHash
+      });
       mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
-      await req.user.save();
-      return res.status(200).json({ ...publicBridgeResult(result), sessionSaved: true });
+      return res.status(200).json({ ...publicBridgeResult(result), sessionSaved: false });
     }
     if (sessionIdentityMismatch(req.user, result)) {
       mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
@@ -336,10 +346,15 @@ async function mtprotoSignInPassword(req, res) {
     return res.status(400).json({ message: "password is required" });
   }
 
-  const creds = parseStoredMtprotoCredentials(req.user);
-  const sessionString = parseStoredSessionString(req.user);
-  if (!creds) {
-    return res.status(400).json({ message: "No MTProto credentials found. Start login again." });
+  const pending = mtprotoAuthStore.getPending2fa(req.user.id);
+  const creds = pending
+    ? { apiId: pending.apiId, apiHash: pending.apiHash, proxy: null }
+    : parseStoredMtprotoCredentials(req.user);
+  const sessionString = pending?.sessionString || parseStoredSessionString(req.user);
+  if (!creds || !sessionString) {
+    return res
+      .status(400)
+      .json({ code: "VERIFICATION_EXPIRED", message: "Your verification timed out. Please request a new code." });
   }
 
   try {
@@ -350,11 +365,13 @@ async function mtprotoSignInPassword(req, res) {
       sessionString,
       password
     });
+    mtprotoAuthStore.clearPending2fa(req.user.id);
     if (sessionIdentityMismatch(req.user, result)) {
-      req.user.userActingTokenEncrypted = null;
-      await req.user.save();
       return res.status(409).json(sessionMismatchBody());
     }
+    req.user.userOAuthTokenEncrypted = encrypt(
+      JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: null })
+    );
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
     await req.user.save();
     return res.json({
@@ -452,6 +469,7 @@ module.exports = {
   sendMtprotoCode,
   mtprotoSignIn,
   mtprotoSignInPassword,
+  mtprotoDisconnect,
   mtprotoJoinChannel,
   mtprotoReact,
   mtprotoReply

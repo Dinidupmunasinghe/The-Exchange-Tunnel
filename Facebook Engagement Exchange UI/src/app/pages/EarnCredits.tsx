@@ -24,6 +24,11 @@ import {
   type CampaignOwner
 } from "../lib/ownerProfile";
 import { withNetworkRetry } from "../services/api";
+import { Callout, EmptyState, ListSkeleton, PageHeader } from "../components/kit";
+import { FinishSetupDialog } from "../components/setup/FinishSetupDialog";
+import { useSetupStatus, setupHref, type SetupStepId } from "../lib/setupStatus";
+import { friendlyError } from "../lib/friendlyErrors";
+import { Sparkles } from "lucide-react";
 
 type TaskRow = {
   id: number;
@@ -194,6 +199,8 @@ export function EarnCredits() {
   const [commentDraftByCampaign, setCommentDraftByCampaign] = useState<Record<number, string>>({});
   const [activeCommentCampaignId, setActiveCommentCampaignId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const setup = useSetupStatus();
+  const [setupNeeded, setSetupNeeded] = useState<Exclude<SetupStepId, "goal"> | null>(null);
 
   const applyFeedPayload = useCallback(
     (
@@ -375,6 +382,11 @@ export function EarnCredits() {
     action: "subscribe" | "like" | "comment" | "share"
   ) => {
     if (!bundleAllowsAction(engagementType, action)) return;
+    if (!setup.loading) {
+      if (!setup.telegram) return setSetupNeeded("telegram");
+      if (!setup.phone && hasMtprotoSession !== true) return setSetupNeeded("phone");
+      if (action === "share" && !setup.channel) return setSetupNeeded("channel");
+    }
     try {
       if (action === "subscribe") {
         const subscribedAlready = hasEngagement(myEngagements, campaignId, "subscribe");
@@ -390,7 +402,7 @@ export function EarnCredits() {
             if (res.fallback) {
               toast.success(res.message || "Saved subscription cleared.");
             } else {
-              toast.success("Unsubscribed and credits refunded.");
+              toast.success("Unsubscribed. The credits for this task were taken back.");
             }
           });
           refreshAfterEngagementChange();
@@ -402,10 +414,7 @@ export function EarnCredits() {
           return;
         }
         if (hasMtprotoSession === false) {
-          toast.error("Subscribe requires Telegram user session auth first.", {
-            description: "Opening Settings now. Complete User Session setup and try again.",
-          });
-          window.location.href = "/settings#user-session";
+          setSetupNeeded("phone");
           return;
         }
         await runWithBusy(`${campaignId}-subscribe`, async () => {
@@ -415,7 +424,7 @@ export function EarnCredits() {
             actionKind: "subscribe",
           });
           toast.success(`Earned ${subscribeTask.rewardCredits} credits`, {
-            description: `Recorded · subscribe · task #${subscribeTask.id}`,
+            description: "You joined the channel. Stay subscribed to keep the credits.",
           });
         });
         refreshAfterEngagementChange();
@@ -447,7 +456,7 @@ export function EarnCredits() {
             proofText: commentText,
           });
           toast.success(`Earned ${task.rewardCredits} credits`, {
-            description: `Recorded · comment · task #${task.id}`,
+            description: "Your comment was posted.",
           });
         });
         setCommentDraftByCampaign((prev) => ({ ...prev, [campaignId]: "" }));
@@ -472,17 +481,14 @@ export function EarnCredits() {
             if (res.fallback) {
               toast.success(res.message || "Saved like cleared.");
             } else {
-              toast.success("Like removed and credits refunded.");
+              toast.success("Reaction removed. The credits for this task were taken back.");
             }
           });
           refreshAfterEngagementChange();
           return;
         }
         if (hasMtprotoSession === false) {
-          toast.error("Engagement requires Telegram user session auth first.", {
-            description: "Opening Settings now. Complete User Session setup and try again.",
-          });
-          window.location.href = "/settings#user-session";
+          setSetupNeeded("phone");
           return;
         }
         const selectedReaction = selectedReactionByCampaign[campaignId] || "👍";
@@ -494,7 +500,7 @@ export function EarnCredits() {
             reaction: selectedReaction,
           });
           toast.success(`Earned ${task.rewardCredits} credits`, {
-            description: `Recorded · reaction ${selectedReaction} · task #${task.id}`,
+            description: `You reacted ${selectedReaction} on the post.`,
           });
         });
         refreshAfterEngagementChange();
@@ -512,17 +518,14 @@ export function EarnCredits() {
             if (res.fallback) {
               toast.success(res.message || "Saved repost cleared.");
             } else {
-              toast.success("Repost removed and credits refunded.");
+              toast.success("Repost removed. The credits for this task were taken back.");
             }
           });
           refreshAfterEngagementChange();
           return;
         }
         if (hasMtprotoSession === false) {
-          toast.error("Share requires Telegram user session auth first.", {
-            description: "Opening Settings now. Complete User Session setup and try again.",
-          });
-          window.location.href = "/settings#user-session";
+          setSetupNeeded("phone");
           return;
         }
         await runWithBusy(`${campaignId}-share`, async () => {
@@ -532,21 +535,18 @@ export function EarnCredits() {
             actionKind: "share",
           });
           toast.success(`Earned ${task.rewardCredits} credits`, {
-            description: `Recorded · repost · task #${task.id}`,
+            description: "The post was shared to your channel.",
           });
         });
         refreshAfterEngagementChange();
         return;
       }
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Could not update engagement";
-      toast.error(msg);
-      if (
-        msg.includes("requires Telegram user session") ||
-        msg.includes("Like requires Telegram user session auth first")
-      ) {
-        toast.info("Open Settings to connect Telegram User Session for engagement.");
-        window.location.href = "/settings#user-session";
+      const fe = friendlyError(error, "Could not complete this action");
+      if (fe.fixStep && fe.fixStep !== "goal") {
+        setSetupNeeded(fe.fixStep);
+      } else {
+        toast.error(fe.message);
       }
     }
   };
@@ -559,7 +559,7 @@ export function EarnCredits() {
         if (res.fallback) {
           toast.success(res.message || "Saved comment cleared.");
         } else {
-          toast.success("Comment removed and credits refunded.");
+          toast.success("Comment removed. The credits for this task were taken back.");
         }
       });
       refreshAfterEngagementChange();
@@ -574,79 +574,74 @@ export function EarnCredits() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Earn Credits</h1>
-          <p className="mt-1 text-muted-foreground">Do quick actions on Telegram posts to earn credits. Each action pays once.</p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={loading && tasks.length === 0}
-          onClick={() => void loadTasks()}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading || isRefreshing ? "animate-spin" : ""}`} />
-          Refresh feed
-        </Button>
-      </div>
+      <PageHeader
+        title="Earn credits"
+        description="Pick a task, tap the button and the credits land in your wallet instantly. Each action pays once."
+        actions={
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loading && tasks.length === 0}
+            onClick={() => void loadTasks()}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading || isRefreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        }
+      />
 
-      {showSetupHint && !(profileReady && (hasTelegram === false || hasMtprotoSession === false)) ? (
-        <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-          <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            <span className="font-medium text-foreground">Tip:</span> to like or comment, Telegram requires you to be a
-            member of the channel. If you are not, the app joins it for you automatically when you tap Like or Comment.
-          </p>
-        </div>
-      ) : null}
-      {profileReady && hasTelegram === false ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
-          Sign in with Telegram on{" "}
-          <Link to="/login" className="font-medium underline underline-offset-2">
-            Login
-          </Link>{" "}
-          first. The app checks your Telegram user id and channel subscription.
-        </div>
-      ) : null}
-      {profileReady && hasTelegram && hasMtprotoSession === false ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
-          Earn engagements (subscribe, like, comment, repost) require Telegram user session connection. Go to{" "}
-          <Link to="/settings" className="font-medium underline underline-offset-2">
-            Settings
-          </Link>{" "}
-          and complete Telegram User Session setup.
-        </div>
+      {!setup.loading && !setup.canEarn ? (
+        <Callout
+          tone="info"
+          title={!setup.telegram ? "Connect Telegram to start earning" : "One quick step before you can earn"}
+          action={
+            <Button asChild size="sm">
+              <Link to={setupHref(!setup.telegram ? "telegram" : "phone", "/earn")}>
+                {!setup.telegram ? "Connect Telegram" : "Verify my phone"}
+              </Link>
+            </Button>
+          }
+        >
+          {!setup.telegram
+            ? "Link your Telegram account so we can check and reward your actions."
+            : "Verify your phone once so we can subscribe, like, comment and repost for you when you tap a task. Takes about a minute."}
+        </Callout>
       ) : null}
 
       <div className="space-y-6">
         {isRefreshing && tasks.length > 0 ? (
-          <p className="text-xs text-muted-foreground">Updating feed…</p>
+          <p className="text-xs text-muted-foreground">Updating…</p>
         ) : null}
-        {loading && tasks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Loading feed…</p>
-        ) : null}
+        {loading && tasks.length === 0 ? <ListSkeleton rows={3} /> : null}
         {loadError ? (
-          <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">
-            {tasks.length > 0 ? "Showing cached feed. " : ""}
-            Couldn&apos;t reach the API: <span className="font-medium">{loadError}</span>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Callout
+            tone="danger"
+            title={tasks.length > 0 ? "Showing your last loaded tasks" : "We couldn’t load tasks"}
+            action={
               <Button type="button" size="sm" variant="outline" disabled={isRefreshing} onClick={() => void loadTasks()}>
-                {isRefreshing ? "Retrying…" : "Retry now"}
+                {isRefreshing ? "Retrying…" : "Try again"}
               </Button>
-              <span className="text-xs opacity-90">
-                {tasks.length > 0
-                  ? "Your feed may be outdated until the backend responds."
-                  : "The server may be waking up — retry in a few seconds."}
-              </span>
-            </div>
-          </div>
+            }
+          >
+            {loadError}
+          </Callout>
         ) : null}
         {!loading && !loadError && tasks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No tasks in your feed. This usually means there are no open campaigns from other members right now, or your
-            own campaigns are filtered out. Try Refresh, or wait for an active campaign from another member.
-          </p>
+          <EmptyState
+            icon={Sparkles}
+            title="No tasks right now"
+            description="New tasks appear whenever other members launch campaigns. Check back soon, or launch your own campaign meanwhile."
+            action={
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={() => void loadTasks()}>
+                  Refresh
+                </Button>
+                <Button asChild size="sm">
+                  <Link to="/submit">Launch a campaign</Link>
+                </Button>
+              </>
+            }
+          />
         ) : null}
 
         {taskGroups.map(({ campaign, tasks: campaignTasks }) => {
@@ -702,7 +697,7 @@ export function EarnCredits() {
                     </div>
                     <div className="flex items-start gap-2">
                       <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2 py-1">
-                        <span className="text-xs text-muted-foreground">Associated tasks</span>
+                        <span className="text-xs text-muted-foreground">Task</span>
                         <Badge variant="outline" className={taskTypeBadgeClass}>
                           {isSubscribeCampaign ? "Subscribe" : getEngagementLabel(et)}
                         </Badge>
@@ -741,8 +736,6 @@ export function EarnCredits() {
                     onClick={() => void handleAction(cid, campaignTasks, et, "subscribe")}
                     disabled={
                       actionsLocked ||
-                      hasTelegram === false ||
-                      hasMtprotoSession !== true ||
                       (subscribed && !subscribedEarned)
                     }
                   >
@@ -769,7 +762,7 @@ export function EarnCredits() {
                     )}
                   </Button>
                 ) : null}
-                {!isSubscribeCampaign ? (
+                {!isSubscribeCampaign && bundleAllowsAction(et, "like") ? (
                 <div className="inline-flex items-center gap-2">
                 {!liked ? (
                   <Select
@@ -806,8 +799,6 @@ export function EarnCredits() {
                   disabled={
                     !bundleAllowsAction(et, "like") ||
                     actionsLocked ||
-                    hasTelegram === false ||
-                    hasMtprotoSession !== true ||
                     (liked && !likedEarned)
                   }
                 >
@@ -863,7 +854,7 @@ export function EarnCredits() {
                       size="sm"
                       className="rounded-full border-border bg-background/80 pr-3 hover:bg-muted"
                       onClick={() => void handleAction(cid, campaignTasks, et, "share")}
-                      disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                      disabled={busy !== null}
                     >
                       {busy === `${cid}-share` ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -921,7 +912,7 @@ export function EarnCredits() {
                         size="icon"
                         className="h-9 w-9 rounded-full"
                         onClick={() => void handleAction(cid, campaignTasks, et, "comment")}
-                        disabled={busy !== null || hasTelegram === false || hasMtprotoSession !== true}
+                        disabled={busy !== null}
                       >
                         {busy === `${cid}-comment-submit` ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -936,8 +927,12 @@ export function EarnCredits() {
                       variant="outline"
                       size="sm"
                       className="rounded-full border-blue-500/25 bg-background/80 pr-3 hover:bg-blue-500/10"
-                      onClick={() => setActiveCommentCampaignId(cid)}
-                      disabled={actionsLocked || hasTelegram === false || hasMtprotoSession !== true}
+                      onClick={() => {
+                        if (!setup.loading && !setup.telegram) return setSetupNeeded("telegram");
+                        if (!setup.loading && !setup.phone) return setSetupNeeded("phone");
+                        setActiveCommentCampaignId(cid);
+                      }}
+                      disabled={actionsLocked}
                     >
                       <MessageCircle className="mr-2 h-4 w-4" />
                       Comment
@@ -966,6 +961,7 @@ export function EarnCredits() {
           </div>
         ) : null}
       </div>
+      <FinishSetupDialog step={setupNeeded} onOpenChange={(open) => !open && setSetupNeeded(null)} returnTo="/earn" />
     </div>
   );
 }
