@@ -10,12 +10,16 @@ const {
   unlinkTelegram
 } = require("../controllers/userController");
 const validateRequest = require("../middleware/validateRequest");
+const { getUserAnalytics } = require("../services/analyticsService");
 const { authLimiter } = require("../middleware/rateLimiters");
 
 const router = express.Router();
 
 router.get("/me", getProfile);
 router.get("/dashboard", getDashboard);
+router.get("/analytics", async (req, res) => {
+  res.json(await getUserAnalytics(req.user.id, { days: req.query.days }));
+});
 router.patch("/me/profile-photo", authLimiter, updateProfilePhoto);
 
 router.post(

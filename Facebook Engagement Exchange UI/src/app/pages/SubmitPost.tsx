@@ -92,10 +92,10 @@ export function SubmitPost() {
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void refreshSetupState();
+        void refreshSetupState().catch(() => undefined);
       }
     };
-    const onFocus = () => void refreshSetupState();
+    const onFocus = () => void refreshSetupState().catch(() => undefined);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onFocus);
     return () => {

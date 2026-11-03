@@ -8,9 +8,11 @@ import { ChatWidget } from "./ChatWidget";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { ThemeToggle } from "./theme/ThemeToggle";
 import { Button } from "./ui/button";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isDesktop = useIsDesktop();
 
   useEffect(() => {
     void prefetchEarnFeed();
@@ -50,12 +52,12 @@ export function Layout() {
             Exchange Tunnel
           </h1>
           <div className="flex shrink-0 items-center gap-1">
-            <NotificationsPopover />
+            {!isDesktop ? <NotificationsPopover /> : null}
             <ThemeToggle />
           </div>
         </div>
 
-        <TopBar />
+        {isDesktop ? <TopBar /> : null}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="mx-auto max-w-7xl">
             <Outlet />

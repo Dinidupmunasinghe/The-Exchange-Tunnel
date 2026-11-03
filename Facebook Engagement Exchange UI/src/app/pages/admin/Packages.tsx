@@ -260,33 +260,59 @@ export function AdminPackages() {
     setError(null);
   }
 
-  async function saveDraft() {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    const isFree = Boolean(draft.isFree) || priceUsdFromDisplayLabel(String(draft.priceLabel ?? "")) <= 0;
-    const payload = {
+  /** Validated payload, or an error message. priceUsd is what PayPal bills; the label is display text. */
+  function buildPayload(): { payload?: Parameters<typeof api.adminCreatePackage>[0]; error?: string } {
+    const label = String(draft.priceLabel ?? "").trim();
+    const rawUsd = draft.priceUsd as unknown;
+    const priceUsd =
+      rawUsd === "" || rawUsd == null ? priceUsdFromDisplayLabel(label) : Number(rawUsd);
+    if (!Number.isFinite(priceUsd) || priceUsd < 0) return { error: "Price (USD) must be a number of 0 or more." };
+    const isFree = draft.isFree === true || priceUsd <= 0;
+    const labelNumber = label && label.toLowerCase() !== "free" ? priceUsdFromDisplayLabel(label) : null;
+    if (!isFree && labelNumber != null && labelNumber > 0 && Math.abs(labelNumber - priceUsd) > 0.001) {
+      return {
+        error: `The display price "${label}" does not match the billed price ${priceUsd.toFixed(2)}. Make them match so customers are charged what they see.`
+      };
+    }
+    if (isFree && labelNumber != null && labelNumber > 0) {
+      return { error: `This plan is free (price $0) but the label says "${label}". Set a USD price or change the label to "Free".` };
+    }
+    return {
+      payload: {
       name: String(draft.name ?? "").trim(),
       tagline: String(draft.tagline ?? "").trim(),
       priceLabel: String(draft.priceLabel ?? "").trim(),
       pricePeriod: String(draft.pricePeriod ?? "").trim() || "/month",
       credits: Number(draft.credits),
       priceLkr: priceLkrFromDisplayLabel(String(draft.priceLabel ?? "")),
-      priceUsd: Number(draft.priceUsd ?? priceUsdFromDisplayLabel(String(draft.priceLabel ?? ""))),
+      priceUsd: isFree ? 0 : priceUsd,
       features: normalizeFeatures(draft.features),
       entitlements: normalizeEntitlements(draft.entitlements, isFree),
       isPopular: Boolean(draft.isPopular),
       isActive: draft.isActive !== false,
       isFree,
       sortOrder: Number(draft.sortOrder ?? 0)
+      }
     };
+  }
+
+  async function saveDraft() {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    const { payload, error: invalid } = buildPayload();
+    if (!payload) {
+      setError(invalid || "Invalid package");
+      setSaving(false);
+      return;
+    }
     try {
       if (editingId === "new") {
         await api.adminCreatePackage(payload);
         setMessage("Package created");
       } else if (typeof editingId === "number") {
-        await api.adminUpdatePackage(editingId, payload);
-        setMessage("Package updated");
+        const res = await api.adminUpdatePackage(editingId, payload);
+        setMessage(res.message || "Package updated");
       }
       setEditingId(null);
       await load();
@@ -303,6 +329,10 @@ export function AdminPackages() {
     setSyncingPayPal(true);
     setError(null);
     try {
+      // Save the current draft first so PayPal gets the price shown in the editor.
+      const { payload, error: invalid } = buildPayload();
+      if (!payload) throw new Error(invalid || "Invalid package");
+      await api.adminUpdatePackage(editingId, payload);
       const res = await api.adminSyncPackagePayPal(editingId);
       const planId = res.package?.paypalPlanId;
       setDraft((d) => ({ ...d, paypalPlanId: planId ?? d.paypalPlanId }));
@@ -318,9 +348,9 @@ export function AdminPackages() {
     if (!confirm(`Delete package "${pkg.name}"?`)) return;
     setError(null);
     try {
-      await api.adminDeletePackage(pkg.id);
+      const res = await api.adminDeletePackage(pkg.id);
       if (editingId === pkg.id) setEditingId(null);
-      setMessage("Package deleted");
+      setMessage(res.message || "Package deleted");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete");

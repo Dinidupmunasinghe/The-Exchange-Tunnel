@@ -83,14 +83,21 @@ export function Checkout() {
             </p>
           </div>
           <p className="text-sm text-muted-foreground">
-            You will be redirected to PayPal to approve a monthly subscription. Credits are added after
-            payment is confirmed.
+            You will be redirected to PayPal to approve a recurring subscription. Credits are added after
+            each payment is confirmed. If you are switching plans, your previous paid plan is cancelled
+            automatically. You can cancel anytime from your wallet.
           </p>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" className="flex-1" disabled={submitting} onClick={() => void startPayPal()}>
-              {submitting ? "Redirecting…" : "Continue to PayPal"}
-            </Button>
+            {pkg.isFree ? (
+              <Button type="button" className="flex-1" onClick={() => navigate("/earn")}>
+                Start earning
+              </Button>
+            ) : (
+              <Button type="button" className="flex-1" disabled={submitting} onClick={() => void startPayPal()}>
+                {submitting ? "Redirecting…" : "Continue to PayPal"}
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={() => navigate("/wallet")}>
               Cancel
             </Button>

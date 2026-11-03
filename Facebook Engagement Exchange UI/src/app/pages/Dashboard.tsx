@@ -4,43 +4,11 @@ import { Coins, ThumbsUp, MessageCircle, Share2, Activity, TrendingUp, Wallet } 
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { StatsCard, type StatsAccent } from "../components/StatsCard";
 import { DashboardChannelHint } from "../components/ChannelConnectGuide";
-import { useTheme } from "../components/theme/ThemeProvider";
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import type { TooltipProps } from "recharts";
-import { api } from "../services/api";
-import { cn } from "../components/ui/utils";
+import { CreditsFlowChart, EngagementActivityChart } from "../components/charts";
+import { api, type UserAnalytics } from "../services/api";
 
 const dashboardCardClass =
   "border-border bg-card shadow-none ring-0 dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:shadow-sm dark:ring-1 dark:ring-white/[0.06]";
-
-const engagementData = [
-  { name: "Mon", likes: 45, comments: 25, shares: 15 },
-  { name: "Tue", likes: 52, comments: 30, shares: 18 },
-  { name: "Wed", likes: 48, comments: 28, shares: 16 },
-  { name: "Thu", likes: 65, comments: 35, shares: 22 },
-  { name: "Fri", likes: 78, comments: 42, shares: 28 },
-  { name: "Sat", likes: 85, comments: 48, shares: 32 },
-  { name: "Sun", likes: 72, comments: 38, shares: 25 },
-];
-
-const creditsData = [
-  { name: "Jan", earned: 320, spent: 280 },
-  { name: "Feb", earned: 380, spent: 320 },
-  { name: "Mar", earned: 420, spent: 380 },
-  { name: "Apr", earned: 460, spent: 410 },
-  { name: "May", earned: 520, spent: 450 },
-  { name: "Jun", earned: 580, spent: 520 },
-];
 
 type ActivityType = "like" | "comment" | "share" | "campaign";
 
@@ -60,65 +28,12 @@ function formatActivityTime(iso: string) {
   }
 }
 
-const COLORS = {
-  likes: "#059669",
-  comments: "#2563eb",
-  shares: "#d97706",
-  earned: "#059669",
-  spent: "#dc2626",
-} as const;
-
-function DashboardTooltip({ active, payload, label }: TooltipProps<number, string>) {
-  const { theme } = useTheme();
-  const isLight = theme === "light";
-  if (!active || !payload?.length) return null;
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border bg-card px-3 py-2.5 text-xs",
-        isLight ? "shadow-none" : "shadow-lg",
-      )}
-    >
-      <p className="mb-2 font-semibold tracking-tight text-foreground">{label}</p>
-      <ul className="space-y-1.5">
-        {payload.map((entry) => (
-          <li key={String(entry.dataKey)} className="flex items-center justify-between gap-6 tabular-nums">
-            <span className="font-medium capitalize" style={{ color: entry.color }}>
-              {entry.name}
-            </span>
-            <span className="font-semibold text-foreground">{entry.value}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 export function Dashboard() {
-  const { theme } = useTheme();
-  const isLight = theme === "light";
-
-  const chartChrome = useMemo(
-    () =>
-      isLight
-        ? {
-            grid: "#e8edf5",
-            axisLine: "#d7dfea",
-            tick: "#526175",
-            cursor: "rgba(15, 23, 42, 0.06)",
-          }
-        : {
-            grid: "#2a2a2a",
-            axisLine: "#3f3f46",
-            tick: "#8e8ea0",
-            cursor: "rgba(255,255,255,0.08)",
-          },
-    [isLight],
-  );
-
   const [profile, setProfile] = useState<any>(null);
   const [dashboard, setDashboard] = useState<any>(null);
   const [hasConnectedChannel, setHasConnectedChannel] = useState(false);
+  const [analytics, setAnalytics] = useState<UserAnalytics | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -134,7 +49,8 @@ export function Dashboard() {
         Boolean(profileRes.user?.telegramActingChannelId) || pages.some((p) => p.selected),
       );
     }
-    load().catch(() => undefined);
+    load().catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load your dashboard"));
+    api.getAnalytics(14).then(setAnalytics).catch(() => undefined);
   }, []);
 
   const stats = useMemo(
@@ -200,136 +116,30 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* Charts */}
+      {loadError ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+          {loadError}
+        </div>
+      ) : null}
+
+      {/* Charts (real data, last 14 days) */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Engagement Trends */}
         <Card className={dashboardCardClass}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-foreground">Engagement Trends</CardTitle>
-            <p className="text-sm text-muted-foreground">Last 7 days activity</p>
+            <CardTitle className="text-foreground">Engagement activity</CardTitle>
+            <p className="text-sm text-muted-foreground">Last 14 days</p>
           </CardHeader>
           <CardContent className="pt-0">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={engagementData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                <CartesianGrid
-                  strokeDasharray="4 6"
-                  stroke={chartChrome.grid}
-                  vertical={false}
-                  strokeOpacity={isLight ? 1 : 0.9}
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={{ stroke: chartChrome.axisLine, strokeWidth: 1 }}
-                  dy={6}
-                />
-                <YAxis
-                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={36}
-                />
-                <Tooltip
-                  content={<DashboardTooltip />}
-                  cursor={{ stroke: chartChrome.cursor, strokeWidth: 1 }}
-                  wrapperStyle={{ outline: "none" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="likes"
-                  name="likes"
-                  stroke={COLORS.likes}
-                  strokeWidth={isLight ? 2.25 : 2}
-                  dot={false}
-                  activeDot={{ r: 5, strokeWidth: 2, stroke: isLight ? "#fff" : "#18191c", fill: COLORS.likes }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="comments"
-                  name="comments"
-                  stroke={COLORS.comments}
-                  strokeWidth={isLight ? 2.25 : 2}
-                  dot={false}
-                  activeDot={{ r: 5, strokeWidth: 2, stroke: isLight ? "#fff" : "#18191c", fill: COLORS.comments }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="shares"
-                  name="shares"
-                  stroke={COLORS.shares}
-                  strokeWidth={isLight ? 2.25 : 2}
-                  dot={false}
-                  activeDot={{ r: 5, strokeWidth: 2, stroke: isLight ? "#fff" : "#18191c", fill: COLORS.shares }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {analytics ? <EngagementActivityChart daily={analytics.daily} height={260} /> : <div className="h-[290px]" />}
           </CardContent>
         </Card>
-
-        {/* Credits Overview */}
         <Card className={dashboardCardClass}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-foreground">Credits Overview</CardTitle>
-            <p className="text-sm text-muted-foreground">Earned vs Spent</p>
+            <CardTitle className="text-foreground">Credit flow</CardTitle>
+            <p className="text-sm text-muted-foreground">Earned vs. spent, last 14 days</p>
           </CardHeader>
           <CardContent className="pt-0">
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={creditsData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="fillEarned" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={COLORS.earned} stopOpacity={isLight ? 0.35 : 0.45} />
-                    <stop offset="100%" stopColor={COLORS.earned} stopOpacity={isLight ? 0.02 : 0.05} />
-                  </linearGradient>
-                  <linearGradient id="fillSpent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={COLORS.spent} stopOpacity={isLight ? 0.32 : 0.42} />
-                    <stop offset="100%" stopColor={COLORS.spent} stopOpacity={isLight ? 0.02 : 0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="4 6"
-                  stroke={chartChrome.grid}
-                  vertical={false}
-                  strokeOpacity={isLight ? 1 : 0.9}
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={{ stroke: chartChrome.axisLine, strokeWidth: 1 }}
-                  dy={6}
-                />
-                <YAxis
-                  tick={{ fill: chartChrome.tick, fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={36}
-                />
-                <Tooltip
-                  content={<DashboardTooltip />}
-                  cursor={{ stroke: chartChrome.cursor, strokeWidth: 1 }}
-                  wrapperStyle={{ outline: "none" }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="earned"
-                  name="earned"
-                  stroke={COLORS.earned}
-                  strokeWidth={isLight ? 1.75 : 2}
-                  fill="url(#fillEarned)"
-                  fillOpacity={1}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="spent"
-                  name="spent"
-                  stroke={COLORS.spent}
-                  strokeWidth={isLight ? 1.75 : 2}
-                  fill="url(#fillSpent)"
-                  fillOpacity={1}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {analytics ? <CreditsFlowChart daily={analytics.daily} height={260} /> : <div className="h-[290px]" />}
           </CardContent>
         </Card>
       </div>

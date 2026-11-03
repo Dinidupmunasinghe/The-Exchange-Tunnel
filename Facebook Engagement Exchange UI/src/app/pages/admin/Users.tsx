@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -29,11 +29,26 @@ export function AdminUsers() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Debounce typing so every keystroke does not hit the API (and old responses cannot win).
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [query]);
+  const requestSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     try {
-      const res = await api.adminListUsers({ query: query || undefined, page, limit: 25 });
+      const res = await api.adminListUsers({
+        query: debouncedQuery || undefined,
+        status: status || undefined,
+        page,
+        limit: 25
+      });
+      if (seq !== requestSeq.current) return;
       setUsers(res.users || []);
       setPagination(res.pagination as Pagination);
     } catch (err) {
@@ -41,15 +56,14 @@ export function AdminUsers() {
     } finally {
       setLoading(false);
     }
-  }, [query, page]);
+  }, [debouncedQuery, status, page]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const filtered = status
-    ? users.filter((u) => (status === "active" ? u.isActive : !u.isActive))
-    : users;
+  // Status is filtered on the server so pagination totals stay correct.
+  const filtered = users;
 
   async function toggleBlock(u: User) {
     setMessage(null);
@@ -100,7 +114,7 @@ export function AdminUsers() {
             </div>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => { setStatus(e.target.value); setPage(1); }}
               className="h-9 rounded-md border border-border bg-background px-2 text-sm"
             >
               <option value="">Any status</option>

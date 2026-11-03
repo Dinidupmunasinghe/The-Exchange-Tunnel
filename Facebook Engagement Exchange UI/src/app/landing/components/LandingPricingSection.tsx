@@ -19,7 +19,7 @@ export function LandingPricingSection() {
   }, []);
 
   return (
-    <section className="bg-white px-6 py-20">
+    <section id="pricing" className="scroll-mt-20 bg-white px-6 py-20">
       <div className="mx-auto max-w-7xl">
         <div className="mb-16 text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2">
@@ -67,8 +67,8 @@ export function LandingPricingSection() {
           className="mt-12 text-center"
         >
           <p className="text-gray-600">
-            All plans include a{" "}
-            <span className="font-medium text-blue-600">14-day money-back guarantee</span>. No questions asked.
+            Cancel anytime from your wallet. Payments are processed securely by{" "}
+            <span className="font-medium text-blue-600">PayPal</span>.
           </p>
         </motion.div>
       </div>

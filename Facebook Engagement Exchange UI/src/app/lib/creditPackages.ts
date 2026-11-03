@@ -102,7 +102,12 @@ export function normalizeEntitlements(raw?: Partial<PackageEntitlements> | null,
 export function normalizePublicPackage(raw: Partial<PublicCreditPackage> & { id?: unknown }): PublicCreditPackage {
   const priceLkr = Number(raw.priceLkr ?? 0);
   const priceLabel = String(raw.priceLabel ?? "").trim();
-  const isFree = Boolean(raw.isFree) || priceUsdFromDisplayLabel(priceLabel) <= 0;
+  // priceUsd is the billing price; the label is display text and never decides "free".
+  const priceUsd =
+    raw.priceUsd != null && (raw.priceUsd as unknown) !== "" && Number.isFinite(Number(raw.priceUsd))
+      ? Number(raw.priceUsd)
+      : priceUsdFromDisplayLabel(priceLabel);
+  const isFree = raw.isFree === true || !(priceUsd > 0);
   const rawFeatures: unknown = raw.features;
   let features: string[] = [];
   if (Array.isArray(rawFeatures)) {
@@ -120,10 +125,6 @@ export function normalizePublicPackage(raw: Partial<PublicCreditPackage> & { id?
         .filter(Boolean);
     }
   }
-
-  const priceUsd = Number.isFinite(Number(raw.priceUsd))
-    ? Number(raw.priceUsd)
-    : priceUsdFromDisplayLabel(priceLabel);
 
   return {
     id: Number(raw.id),

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
+import { Loader2 } from "lucide-react";
 import { api } from "../services/api";
 
 /**
@@ -28,7 +29,16 @@ export function TelegramRequiredRoute() {
   }, []);
 
   if (check === "unlinked") {
-    return <Navigate to="/connect-telegram" replace state={{ from: location }} />;
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/connect-telegram?returnTo=${returnTo}`} replace state={{ from: location }} />;
+  }
+  if (check === "loading") {
+    // Do not render (and fetch data for) app pages before we know Telegram is linked.
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-label="Loading" />
+      </div>
+    );
   }
 
   return <Outlet />;

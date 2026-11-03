@@ -13,11 +13,14 @@ import {
   clearToken,
   isAccessTokenValid,
 } from "../services/api";
+import { safeReturnPath } from "../lib/returnPath";
 
 export function Login() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(
+    searchParams.get("mode") === "register" || searchParams.get("intent") === "free" ? "register" : "login"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -28,6 +31,8 @@ export function Login() {
   const alreadySignedIn = isAccessTokenValid(getToken());
 
   function afterAuthPath() {
+    const back = safeReturnPath(searchParams.get("returnTo"));
+    if (back) return back;
     const intent = searchParams.get("intent");
     const packageId = searchParams.get("packageId");
     if (intent === "subscribe" && packageId) return `/checkout?packageId=${packageId}`;
@@ -54,9 +59,14 @@ export function Login() {
       } else {
         await registerWithEmail(email, password, name || undefined);
         toast.success("Account created!");
-        navigate(searchParams.get("intent") === "subscribe" ? afterAuthPath() : "/connect-telegram?welcome=1", {
-          replace: true
-        });
+        // New accounts must link Telegram first; carry the original destination through.
+        const next = afterAuthPath();
+        navigate(
+          next === "/dashboard"
+            ? "/connect-telegram?welcome=1"
+            : `/connect-telegram?welcome=1&returnTo=${encodeURIComponent(next)}`,
+          { replace: true }
+        );
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -85,7 +95,7 @@ export function Login() {
             <div className="space-y-3 rounded-md border border-border bg-secondary/50 p-4 text-sm">
               <p className="font-medium text-foreground">You&apos;re already signed in</p>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button type="button" className="flex-1" onClick={() => navigate("/dashboard", { replace: true })}>
+                <Button type="button" className="flex-1" onClick={() => navigate(afterAuthPath(), { replace: true })}>
                   Continue
                 </Button>
                 <Button
@@ -157,7 +167,7 @@ export function Login() {
           </form>
 
           <p className="text-center text-xs text-muted-foreground">
-            <Link to="/login/telegram" className="text-primary underline underline-offset-2">
+            <Link to={`/login/telegram${safeReturnPath(searchParams.get("returnTo")) ? `?returnTo=${encodeURIComponent(safeReturnPath(searchParams.get("returnTo")) as string)}` : ""}`} className="text-primary underline underline-offset-2">
               Sign in with Telegram instead
             </Link>
           </p>

@@ -207,14 +207,27 @@ export function EarnCredits() {
         : [];
       const responseHasMore = Boolean(tasksRes?.hasMore);
       const responseNextCursor = typeof tasksRes?.nextCursor === "number" ? tasksRes.nextCursor : null;
-      const mergedTasks =
+      let mergedTasks =
         mode === "append" ? mergeTasksById(tasks, nextTasks) : mergeTasksPreserveOwner(tasks, nextTasks);
+      let mergedCursor = responseNextCursor;
+      let mergedHasMore = responseHasMore;
+      // A background refresh returns only the first page: keep the older pages the user already
+      // loaded with "Load more" instead of shrinking the list under them.
+      if (mode === "replace" && responseHasMore && nextTasks.length > 0 && tasks.length > nextTasks.length) {
+        const oldestIncoming = Math.min(...nextTasks.map((t) => Number(t.id)));
+        const olderLoaded = tasks.filter((t) => Number(t.id) < oldestIncoming);
+        if (olderLoaded.length > 0) {
+          mergedTasks = [...mergedTasks, ...olderLoaded];
+          mergedCursor = nextCursor;
+          mergedHasMore = hasMore;
+        }
+      }
       const mergedEngagements =
         mode === "append" ? mergeEngagements(myEngagements, nextEngagements) : nextEngagements;
       setTasks(mergedTasks);
       setMyEngagements(mergedEngagements);
-      setHasMore(responseHasMore);
-      setNextCursor(responseNextCursor);
+      setHasMore(mergedHasMore);
+      setNextCursor(mergedCursor);
       const prevCache = readEarnFeedCache();
       let cachedTelegram = prevCache?.hasTelegram ?? hasTelegram;
       let cachedMtproto = prevCache?.hasMtprotoSession ?? hasMtprotoSession;
@@ -230,12 +243,12 @@ export function EarnCredits() {
         savedAt: Date.now(),
         hasTelegram: cachedTelegram,
         hasMtprotoSession: cachedMtproto,
-        hasMore: responseHasMore,
-        nextCursor: responseNextCursor
+        hasMore: mergedHasMore,
+        nextCursor: mergedCursor
       });
       setLoadError(null);
     },
-    [hasTelegram, hasMtprotoSession, myEngagements, tasks]
+    [hasTelegram, hasMtprotoSession, myEngagements, tasks, nextCursor, hasMore]
   );
 
   const refreshTasksFast = useCallback(async () => {
@@ -388,7 +401,7 @@ export function EarnCredits() {
           toast.error("No open subscribe task right now — refresh and try again.");
           return;
         }
-        if (hasMtprotoSession !== true) {
+        if (hasMtprotoSession === false) {
           toast.error("Subscribe requires Telegram user session auth first.", {
             description: "Opening Settings now. Complete User Session setup and try again.",
           });
@@ -465,7 +478,7 @@ export function EarnCredits() {
           refreshAfterEngagementChange();
           return;
         }
-        if (hasMtprotoSession !== true) {
+        if (hasMtprotoSession === false) {
           toast.error("Engagement requires Telegram user session auth first.", {
             description: "Opening Settings now. Complete User Session setup and try again.",
           });
@@ -505,7 +518,7 @@ export function EarnCredits() {
           refreshAfterEngagementChange();
           return;
         }
-        if (hasMtprotoSession !== true) {
+        if (hasMtprotoSession === false) {
           toast.error("Share requires Telegram user session auth first.", {
             description: "Opening Settings now. Complete User Session setup and try again.",
           });
@@ -564,7 +577,7 @@ export function EarnCredits() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Earn Credits</h1>
-          <p className="mt-1 text-muted-foreground">One completion per button; subscribe in Telegram, then verify in app</p>
+          <p className="mt-1 text-muted-foreground">Do quick actions on Telegram posts to earn credits. Each action pays once.</p>
         </div>
         <Button
           type="button"
@@ -578,14 +591,12 @@ export function EarnCredits() {
         </Button>
       </div>
 
-      {showSetupHint ? (
+      {showSetupHint && !(profileReady && (hasTelegram === false || hasMtprotoSession === false)) ? (
         <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
           <Coins className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <p className="text-sm leading-relaxed text-muted-foreground">
-            <span className="font-medium text-foreground">Connect Telegram</span> in Settings and connect a user session
-            so we can act on your behalf. For post campaigns, Telegram usually requires you to join the channel before you
-            can like or comment; if you are not a member yet, the app will try to join the channel automatically when you
-            tap Like or Comment (same as subscribe campaigns).
+            <span className="font-medium text-foreground">Tip:</span> to like or comment, Telegram requires you to be a
+            member of the channel. If you are not, the app joins it for you automatically when you tap Like or Comment.
           </p>
         </div>
       ) : null}

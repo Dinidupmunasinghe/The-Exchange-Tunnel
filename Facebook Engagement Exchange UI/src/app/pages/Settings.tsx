@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useNavigate, Link, useSearchParams } from "react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowUpRight,
@@ -82,6 +82,7 @@ const SETTINGS_NAV: { id: SettingsNavId; label: string; Icon: LucideIcon }[] = [
 ];
 
 export function Settings() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pages, setPages] = useState<ManagedPage[]>([]);
@@ -107,13 +108,16 @@ export function Settings() {
   const [savingProfilePhoto, setSavingProfilePhoto] = useState(false);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
+  const profileLoadedRef = useRef(false);
   const refreshProfile = useCallback(async () => {
-    setLoadingProfile(true);
+    // Only show "Loading..." on the first load; background refreshes keep the current values.
+    if (!profileLoadedRef.current) setLoadingProfile(true);
     try {
       const res = await api.getProfile();
       setProfile(res.user as Profile);
+      profileLoadedRef.current = true;
     } catch {
-      setProfile(null);
+      if (!profileLoadedRef.current) setProfile(null);
     } finally {
       setLoadingProfile(false);
     }
@@ -125,18 +129,14 @@ export function Settings() {
       toast.error("Please choose an image file (JPEG, PNG, or WebP).");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be 5 MB or smaller.");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Image must be 15 MB or smaller.");
       return;
     }
     setSavingProfilePhoto(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("Could not read image"));
-        reader.readAsDataURL(file);
-      });
+      // Resize + compress in the browser so uploads stay small (the API accepts up to ~1.4 MB).
+      const dataUrl = await compressImageToDataUrl(file, 512, 0.85);
       await api.updateProfilePhoto(dataUrl);
       toast.success("Profile photo updated");
       await refreshProfile();
@@ -180,11 +180,13 @@ export function Settings() {
 
   useEffect(() => {
     if (searchParams.get("connectTelegram") !== "1") return;
+    // Wait for the profile before deciding, otherwise linked users get bounced around.
+    if (loadingProfile || !profileLoadedRef.current) return;
     setSearchParams({}, { replace: true });
     if (!profile?.telegramUserId) {
-      window.location.replace("/connect-telegram");
+      navigate("/connect-telegram?returnTo=%2Fsettings", { replace: true });
     }
-  }, [searchParams, setSearchParams, profile?.telegramUserId]);
+  }, [searchParams, setSearchParams, profile?.telegramUserId, loadingProfile, navigate]);
 
   useEffect(() => {
     if (profile?.telegramUserId) void refreshPages();
@@ -312,10 +314,10 @@ export function Settings() {
   async function handleUnlinkTelegram() {
     setUnlinkingTelegram(true);
     try {
-      const res = await api.unlinkTelegram();
-      setProfile(res.user as Profile);
+      await api.unlinkTelegram();
       setPages([]);
-      toast.success("Telegram unlinked. Connect again when you are ready.");
+      toast.success("Telegram unlinked. Connect a Telegram account to keep using Exchange Tunnel.");
+      navigate("/connect-telegram?returnTo=%2Fsettings", { replace: true });
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not unlink Telegram");
     } finally {
@@ -982,4 +984,28 @@ export function Settings() {
       </div>
     </div>
   );
+}
+
+/** Downscale an image to fit maxSize x maxSize and encode as JPEG/WebP data URL. */
+async function compressImageToDataUrl(file: File, maxSize: number, quality: number): Promise<string> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Could not read image"));
+      el.src = objectUrl;
+    });
+    const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not process image");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const webp = canvas.toDataURL("image/webp", quality);
+    return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

@@ -65,6 +65,13 @@ export function LandingApp() {
             >
               How it works
             </motion.a>
+            <motion.a
+              whileHover={{ scale: 1.05, color: "#000" }}
+              href="#pricing"
+              className="text-gray-600"
+            >
+              Pricing
+            </motion.a>
             <GetStartedLink
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

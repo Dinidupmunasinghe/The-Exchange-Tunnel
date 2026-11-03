@@ -1,5 +1,5 @@
 import { api, getToken, withNetworkRetry } from "../services/api";
-import { writeEarnFeedCache } from "./earnFeedCache";
+import { earnFeedCacheOwner, writeEarnFeedCache } from "./earnFeedCache";
 
 let inflight: Promise<void> | null = null;
 
@@ -8,6 +8,7 @@ export function prefetchEarnFeed(): Promise<void> {
   if (!getToken()) return Promise.resolve();
   if (inflight) return inflight;
 
+  const owner = earnFeedCacheOwner();
   inflight = (async () => {
     try {
       const [profileRes, tasksRes] = await Promise.all([
@@ -29,7 +30,7 @@ export function prefetchEarnFeed(): Promise<void> {
         hasMtprotoSession: u ? Boolean(u.hasMtprotoSession) : null,
         hasMore: Boolean(tasksRes?.hasMore),
         nextCursor: typeof tasksRes?.nextCursor === "number" ? tasksRes.nextCursor : null,
-      });
+      }, owner);
     } catch {
       // ignore — page will retry on open
     } finally {

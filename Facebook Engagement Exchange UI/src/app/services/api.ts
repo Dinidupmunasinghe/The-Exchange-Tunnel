@@ -1,4 +1,5 @@
 import { clearProfileCache, writeProfileCache } from "../lib/profileCache";
+import { clearEarnFeedCache } from "../lib/earnFeedCache";
 import type { PublicCreditPackage } from "../lib/creditPackages";
 
 function cacheProfileFromAuthUser(user: unknown) {
@@ -93,6 +94,7 @@ export function setToken(token: string) {
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
   clearProfileCache();
+  clearEarnFeedCache();
 }
 
 export function getAdminToken() {
@@ -170,8 +172,10 @@ function extractApiErrorMessage(response: Response, payload: Json, rawText: stri
   if (msg) return msg;
   if (details) return details;
 
-  if (response.status === 502 || response.status === 503) {
-    return "API unavailable (502/503). Start the backend: open a terminal, run: cd backend && npm run dev — it must listen on port 5000. Then keep Vite running with VITE_API_BASE_URL=/api.";
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    return import.meta.env.DEV
+      ? "API unavailable (502/503). Start the backend (cd backend && npm run dev, port 5000) and keep Vite running with VITE_API_BASE_URL=/api."
+      : "The server is waking up or restarting. Please wait a few seconds and try again.";
   }
 
   const trimmed = rawText.trim();
@@ -192,6 +196,9 @@ async function readJsonBody(response: Response): Promise<{ payload: Json; rawTex
   if (!rawText) return { payload: {}, rawText: "" };
   const trimmed = rawText.trim();
   if (trimmed.startsWith("<!") || trimmed.startsWith("<html")) {
+    // Error pages from a proxy (e.g. 502 while the host wakes up) are handled by status below,
+    // so 401 handling and retries still work. Only a 2xx HTML page is a misconfiguration.
+    if (!response.ok) return { payload: {}, rawText: "" };
     throw new Error(
       "API returned HTML instead of JSON. Set VITE_API_BASE_URL to your Render API URL or fix Vercel /api rewrites."
     );
@@ -228,7 +235,11 @@ async function requestJson<T>(
 
   if (!response.ok) {
     const message = extractApiErrorMessage(response, payload, rawText);
-    if (withBearer && response.status === 401) {
+    // Only a rejected session token signs the user out (not e.g. a failed Telegram check).
+    const sessionRejected =
+      response.status === 401 &&
+      /authentication token|session expired|sign in again/i.test(String(payload.message || ""));
+    if (withBearer && sessionRejected) {
       clearToken();
       if (
         !sessionOpts?.skipSessionRedirect &&
@@ -273,7 +284,7 @@ async function adminRequestJson<T>(path: string, options: RequestInit = {}): Pro
   if (!token) throw new Error("Admin not authenticated");
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -286,7 +297,14 @@ async function adminRequestJson<T>(path: string, options: RequestInit = {}): Pro
   }
   const { payload, rawText } = await readJsonBody(response);
   if (!response.ok) {
-    throw new Error(extractApiErrorMessage(response, payload, rawText));
+    if (response.status === 401) {
+      // Expired / revoked admin session: back to the admin login.
+      clearAdminToken();
+      if (typeof window !== "undefined" && window.location.pathname !== "/admin") {
+        window.location.assign("/admin?session=expired");
+      }
+    }
+    throw new ApiError(extractApiErrorMessage(response, payload, rawText), response.status, payload);
   }
   return payload as T;
 }
@@ -394,6 +412,42 @@ export async function updateProfilePhoto(profilePhotoUrl: string | null) {
   });
 }
 
+export type UserAnalytics = {
+  days: number;
+  totals: {
+    creditsEarned: number;
+    creditsSpent: number;
+    creditsRefunded: number;
+    planCredits: number;
+    engagementsDone: number;
+    engagementsReceived: number;
+    campaigns: number;
+    activeCampaigns: number;
+    costPerEngagement: number;
+  };
+  daily: Array<{
+    date: string;
+    earned: number;
+    spent: number;
+    refunded: number;
+    engagementsDone: number;
+    engagementsReceived: number;
+  }>;
+  engagementsByType: { subscribe: number; like: number; comment: number; share: number };
+  campaigns: Array<{
+    id: number;
+    name: string;
+    engagementType: string;
+    status: string;
+    maxEngagements: number;
+    completed: number;
+    progress: number;
+    creditsSpent: number;
+    budget: number;
+    createdAt: string;
+  }>;
+};
+
 export type CreditPackagePayload = {
   name: string;
   tagline?: string;
@@ -442,6 +496,14 @@ export const api = {
     }>,
   cancelMySubscription: () =>
     authRequest("/payments/subscription/cancel", { method: "POST" }) as Promise<{ message: string }>,
+  confirmSubscription: (subscriptionId: string) =>
+    authRequest(`/payments/subscription/confirm?subscriptionId=${encodeURIComponent(subscriptionId)}`) as Promise<{
+      paypalStatus: string;
+      active: boolean;
+      creditsGranted: number;
+      subscription: { packageId: number; packageName?: string; status: string } | null;
+    }>,
+  getAnalytics: (days = 30) => authRequest(`/users/analytics?days=${days}`) as Promise<UserAnalytics>,
   getProfile: (opts?: SessionRequestOpts) =>
     authRequest("/users/me", {}, opts) as Promise<{ user: any }>,
   updateProfilePhoto,

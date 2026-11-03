@@ -93,11 +93,22 @@ export function TopBar() {
     <header className="hidden h-14 items-center justify-between border-b border-border bg-sidebar px-6 lg:flex">
       <div className="relative max-w-md flex-1">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search posts, campaigns…"
-          className="h-9 rounded-full border border-border bg-card pl-10 text-sm placeholder:text-muted-foreground"
-        />
+        <form
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = String(new FormData(e.currentTarget).get("q") || "").trim();
+            navigate(q ? `/campaigns?q=${encodeURIComponent(q)}` : "/campaigns");
+          }}
+        >
+          <Input
+            name="q"
+            type="search"
+            aria-label="Search your campaigns"
+            placeholder="Search your campaigns…"
+            className="h-9 rounded-full border border-border bg-card pl-10 text-sm placeholder:text-muted-foreground"
+          />
+        </form>
       </div>
 
       <div className="flex items-center gap-2">

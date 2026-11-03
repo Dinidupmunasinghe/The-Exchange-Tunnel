@@ -1,311 +1,230 @@
-import { TrendingUp, TrendingDown, DollarSign, Activity } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
+import { Activity, Coins, Megaphone, RefreshCw, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { Button } from "../components/ui/button";
+import { Progress } from "../components/ui/progress";
+import { StatsCard } from "../components/StatsCard";
+import { CreditsFlowChart, EngagementActivityChart, useChartTheme } from "../components/charts";
+import { api, type UserAnalytics } from "../services/api";
+import { cn } from "../components/ui/utils";
 
-const engagementData = [
-  { date: "Jan 1", likes: 120, comments: 65, shares: 45, credits: 230 },
-  { date: "Jan 8", likes: 145, comments: 78, shares: 52, credits: 275 },
-  { date: "Jan 15", likes: 165, comments: 82, shares: 58, credits: 305 },
-  { date: "Jan 22", likes: 185, comments: 95, shares: 68, credits: 348 },
-  { date: "Jan 29", likes: 210, comments: 105, shares: 75, credits: 390 },
-  { date: "Feb 5", likes: 235, comments: 115, shares: 82, credits: 432 },
-  { date: "Feb 12", likes: 260, comments: 128, shares: 95, credits: 483 },
-];
+const PERIODS = [7, 30, 90] as const;
 
-const campaignPerformance = [
-  { name: "Product Launch", engagements: 412, credits: 300, roi: 137 },
-  { name: "Summer Sale", engagements: 325, credits: 250, roi: 130 },
-  { name: "Testimonials", engagements: 285, credits: 200, roi: 143 },
-  { name: "Blog Promotion", engagements: 198, credits: 150, roi: 132 },
-  { name: "Brand Awareness", engagements: 445, credits: 350, roi: 127 },
-];
+const cardClass =
+  "border-border bg-card shadow-none dark:bg-gradient-to-br dark:from-card dark:to-card/70 dark:ring-1 dark:ring-white/[0.06]";
 
-const engagementTypeData = [
-  { name: "Likes", value: 45, color: "#10a37f" },
-  { name: "Comments", value: 30, color: "#2563eb" },
-  { name: "Shares", value: 25, color: "#f59e0b" },
-];
+const TYPE_LABELS: Record<string, string> = {
+  subscribe: "Subscribes",
+  like: "Likes",
+  comment: "Comments",
+  share: "Reposts",
+};
 
-const creditFlowData = [
-  { month: "Sep", earned: 420, spent: 380 },
-  { month: "Oct", earned: 450, spent: 410 },
-  { month: "Nov", earned: 480, spent: 445 },
-  { month: "Dec", earned: 520, spent: 480 },
-  { month: "Jan", earned: 560, spent: 520 },
-  { month: "Feb", earned: 590, spent: 555 },
-  { month: "Mar", earned: 620, spent: 580 },
-];
+const STATUS_STYLES: Record<string, string> = {
+  active: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  pending: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  paused: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  completed: "bg-muted text-muted-foreground",
+  cancelled: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+};
+
+function EngagementMix({ byType }: { byType: UserAnalytics["engagementsByType"] }) {
+  const t = useChartTheme();
+  const entries = (["subscribe", "like", "comment", "share"] as const).map((k, i) => ({
+    key: k,
+    label: TYPE_LABELS[k],
+    value: byType[k] || 0,
+    color: t.series[i],
+  }));
+  const total = entries.reduce((s, e) => s + e.value, 0);
+  if (total === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-muted-foreground">
+        You haven&apos;t completed any engagements yet.{" "}
+        <Link to="/earn" className="font-medium text-primary underline-offset-2 hover:underline">
+          Start earning
+        </Link>
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {/* One stacked bar with a 2px gap between segments, then labelled rows (no color-only identity). */}
+      <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full">
+        {entries
+          .filter((e) => e.value > 0)
+          .map((e) => (
+            <div key={e.key} style={{ width: `${(e.value / total) * 100}%`, background: e.color }} title={`${e.label}: ${e.value}`} />
+          ))}
+      </div>
+      <ul className="space-y-2.5">
+        {entries.map((e) => (
+          <li key={e.key} className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: e.color }} />
+              {e.label}
+            </span>
+            <span className="tabular-nums">
+              <span className="font-semibold text-foreground">{e.value.toLocaleString()}</span>
+              <span className="ml-2 text-muted-foreground">{Math.round((e.value / total) * 100)}%</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export function Analytics() {
+  const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
+  const [data, setData] = useState<UserAnalytics | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async (period: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      setData(await api.getAnalytics(period));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load analytics");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load(days);
+  }, [days, load]);
+
+  const totals = data?.totals;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-        <p className="text-muted-foreground mt-1">Track your performance and insights</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
+          <p className="mt-1 text-muted-foreground">Your real credit flow, engagements and campaign results</p>
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1" role="group" aria-label="Time range">
+          {PERIODS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setDays(p)}
+              aria-pressed={days === p}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                days === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {p} days
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Key Metrics */}
+      {error ? (
+        <Card className={cardClass}>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-6">
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => void load(days)} className="gap-2">
+              <RefreshCw className="h-4 w-4" /> Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Engagement</p>
-                <p className="text-2xl font-bold text-foreground mt-1">3,847</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="h-3 w-3 text-primary" />
-                  <span className="text-xs text-primary">+12.5%</span>
-                </div>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                <Activity className="h-6 w-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatsCard title="Credits earned" value={loading && !totals ? "…" : (totals?.creditsEarned ?? 0).toLocaleString()} change="All time" icon={Coins} accent="emerald" />
+        <StatsCard title="Credits spent" value={loading && !totals ? "…" : (totals?.creditsSpent ?? 0).toLocaleString()} change="Net of refunds" icon={Megaphone} accent="rose" />
+        <StatsCard title="Engagements received" value={loading && !totals ? "…" : (totals?.engagementsReceived ?? 0).toLocaleString()} change={totals?.costPerEngagement ? `${totals.costPerEngagement} cr each` : "On your campaigns"} icon={Users} accent="blue" />
+        <StatsCard title="Engagements done" value={loading && !totals ? "…" : (totals?.engagementsDone ?? 0).toLocaleString()} change="By you" icon={Activity} accent="amber" />
+      </div>
 
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg. ROI</p>
-                <p className="text-2xl font-bold text-foreground mt-1">134%</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="h-3 w-3 text-primary" />
-                  <span className="text-xs text-primary">+8.2%</span>
-                </div>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10">
-                <TrendingUp className="h-6 w-6 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className={cardClass}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-foreground">Credit flow</CardTitle>
+            <p className="text-sm text-muted-foreground">Credits earned from tasks vs. locked into campaigns, per day</p>
+          </CardHeader>
+          <CardContent className="pt-0">{data ? <CreditsFlowChart daily={data.daily} /> : <div className="h-[300px]" />}</CardContent>
         </Card>
-
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Credits Used</p>
-                <p className="text-2xl font-bold text-foreground mt-1">2,380</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="h-3 w-3 text-orange-500" />
-                  <span className="text-xs text-orange-500">+15.3%</span>
-                </div>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">
-                <DollarSign className="h-6 w-6 text-orange-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Campaigns</p>
-                <p className="text-2xl font-bold text-foreground mt-1">12</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="h-3 w-3 text-primary" />
-                  <span className="text-xs text-primary">+2</span>
-                </div>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
-                <Activity className="h-6 w-6 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
+        <Card className={cardClass}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-foreground">Engagement activity</CardTitle>
+            <p className="text-sm text-muted-foreground">Actions you completed vs. actions your campaigns received</p>
+          </CardHeader>
+          <CardContent className="pt-0">{data ? <EngagementActivityChart daily={data.daily} /> : <div className="h-[300px]" />}</CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-          <TabsTrigger value="credits">Credits</TabsTrigger>
-        </TabsList>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className={cardClass}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-foreground">What you engage with</CardTitle>
+            <p className="text-sm text-muted-foreground">All-time engagements by type</p>
+          </CardHeader>
+          <CardContent>{data ? <EngagementMix byType={data.engagementsByType} /> : null}</CardContent>
+        </Card>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Engagement Growth */}
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-foreground">Engagement Growth</CardTitle>
-                <p className="text-sm text-muted-foreground">Weekly engagement trends</p>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={engagementData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                    <XAxis dataKey="date" stroke="#8e8ea0" />
-                    <YAxis stroke="#8e8ea0" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#1a1a1a",
-                        border: "1px solid #2a2a2a",
-                        borderRadius: "8px",
-                      }}
-                      labelStyle={{ color: "#ececec" }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="likes"
-                      stackId="1"
-                      stroke="#10a37f"
-                      fill="#10a37f"
-                      fillOpacity={0.6}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="comments"
-                      stackId="1"
-                      stroke="#2563eb"
-                      fill="#2563eb"
-                      fillOpacity={0.6}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="shares"
-                      stackId="1"
-                      stroke="#f59e0b"
-                      fill="#f59e0b"
-                      fillOpacity={0.6}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Engagement Distribution */}
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-foreground">Engagement Distribution</CardTitle>
-                <p className="text-sm text-muted-foreground">Breakdown by type</p>
-              </CardHeader>
-              <CardContent className="flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={engagementTypeData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {engagementTypeData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#1a1a1a",
-                        border: "1px solid #2a2a2a",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Campaigns Tab */}
-        <TabsContent value="campaigns">
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Campaign Performance</CardTitle>
-              <p className="text-sm text-muted-foreground">Compare campaign effectiveness</p>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={campaignPerformance}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis dataKey="name" stroke="#8e8ea0" />
-                  <YAxis stroke="#8e8ea0" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #2a2a2a",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#ececec" }}
-                  />
-                  <Legend />
-                  <Bar dataKey="engagements" fill="#10a37f" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="credits" fill="#2563eb" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Credits Tab */}
-        <TabsContent value="credits">
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Credits Flow</CardTitle>
-              <p className="text-sm text-muted-foreground">Earned vs Spent over time</p>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={creditFlowData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis dataKey="month" stroke="#8e8ea0" />
-                  <YAxis stroke="#8e8ea0" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #2a2a2a",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#ececec" }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="earned"
-                    stroke="#10a37f"
-                    strokeWidth={3}
-                    dot={{ fill: "#10a37f", r: 5 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="spent"
-                    stroke="#ef4444"
-                    strokeWidth={3}
-                    dot={{ fill: "#ef4444", r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        <Card className={cn(cardClass, "lg:col-span-2")}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-foreground">Campaign performance</CardTitle>
+            <p className="text-sm text-muted-foreground">Progress and spend of your latest campaigns</p>
+          </CardHeader>
+          <CardContent>
+            {!data || data.campaigns.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No campaigns yet.{" "}
+                <Link to="/submit" className="font-medium text-primary underline-offset-2 hover:underline">
+                  Launch your first campaign
+                </Link>
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="pb-2 font-medium">Campaign</th>
+                      <th className="pb-2 font-medium">Status</th>
+                      <th className="pb-2 font-medium">Progress</th>
+                      <th className="pb-2 text-right font-medium">Spent / budget</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.campaigns.slice(0, 10).map((c) => (
+                      <tr key={c.id} className="border-b border-border/60 last:border-0">
+                        <td className="py-3 pr-3">
+                          <p className="max-w-[220px] truncate font-medium text-foreground">{c.name}</p>
+                          <p className="text-xs capitalize text-muted-foreground">{c.engagementType.replace("_", " + ")}</p>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium capitalize", STATUS_STYLES[c.status] || STATUS_STYLES.completed)}>
+                            {c.status}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <div className="flex items-center gap-2">
+                            <Progress value={c.progress} className="h-1.5 w-28" />
+                            <span className="text-xs tabular-nums text-muted-foreground">
+                              {c.completed}/{c.maxEngagements}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 text-right tabular-nums text-foreground">
+                          {c.creditsSpent.toLocaleString()} <span className="text-muted-foreground">/ {c.budget.toLocaleString()}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

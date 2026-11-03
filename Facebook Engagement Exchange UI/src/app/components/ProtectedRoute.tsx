@@ -1,12 +1,15 @@
-import { Navigate, Outlet } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { getToken, isAccessTokenValid } from "../services/api";
 
 /**
- * Wrapper for all authenticated app routes. Sends guests to /login.
+ * Wrapper for all authenticated app routes. Sends guests to /login and remembers where they
+ * were going so they land there after signing in.
  */
 export function ProtectedRoute() {
+  const location = useLocation();
   if (!isAccessTokenValid(getToken())) {
-    return <Navigate to="/login" replace />;
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
   return <Outlet />;
 }

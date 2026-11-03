@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { safeReturnPath } from "../lib/returnPath";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -11,6 +12,12 @@ export function ConnectTelegram() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isWelcome = searchParams.get("welcome") === "1";
+  const location = useLocation();
+  const fromState = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+  const nextPath =
+    safeReturnPath(searchParams.get("returnTo")) ??
+    (fromState?.pathname ? safeReturnPath(`${fromState.pathname}${fromState.search || ""}`) : null) ??
+    "/dashboard";
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -20,7 +27,7 @@ export function ConnectTelegram() {
       .then((res) => {
         if (cancelled) return;
         if (res.user?.telegramUserId) {
-          navigate("/dashboard", { replace: true });
+          navigate(nextPath, { replace: true });
           return;
         }
         setChecking(false);
@@ -31,7 +38,7 @@ export function ConnectTelegram() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, nextPath]);
 
   if (checking) {
     return (
@@ -58,7 +65,7 @@ export function ConnectTelegram() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <TelegramLinkPanel variant="connect" onLinked={() => navigate("/dashboard", { replace: true })} />
+          <TelegramLinkPanel variant="connect" onLinked={() => navigate(nextPath, { replace: true })} />
           <Button
             type="button"
             variant="ghost"

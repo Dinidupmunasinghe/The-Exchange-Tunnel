@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import {
   Copy,
   ExternalLink,
@@ -77,6 +77,17 @@ export function Campaigns() {
       .catch(() => setSelectedPageName(null));
   }, []);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = (searchParams.get("q") || "").trim().toLowerCase();
+  const visibleCampaigns = useMemo(
+    () =>
+      query
+        ? campaigns.filter((c) =>
+            [c.name, c.messageUrl, c.engagementType].some((v) => String(v || "").toLowerCase().includes(query))
+          )
+        : campaigns,
+    [campaigns, query]
+  );
   const activeCount = campaigns.filter(isCampaignLive).length;
   const totalEngagements = campaigns.reduce((sum, c) => sum + (c.completedEngagements || 0), 0);
   const totalSpent = campaigns.reduce((sum, c) => sum + (c.spentCredits || 0), 0);
@@ -176,20 +187,44 @@ export function Campaigns() {
       </div>
       {!selectedPageName ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
-          No Page selected for actions yet.{" "}
+          No Telegram channel connected yet.{" "}
           <Link to="/settings" className="font-medium underline underline-offset-2">
-            Select a Page in Settings
+            Connect your channel in Settings
           </Link>
           .
         </div>
       ) : (
         <div className="rounded-lg border border-border bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
-          Active action Page: <span className="font-medium text-foreground">{selectedPageName}</span>
+          Connected channel: <span className="font-medium text-foreground">{selectedPageName}</span>
         </div>
       )}
 
+      {query ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-secondary/20 px-4 py-3 text-sm">
+          <span className="text-muted-foreground">
+            {visibleCampaigns.length} result{visibleCampaigns.length === 1 ? "" : "s"} for{" "}
+            <span className="font-medium text-foreground">“{searchParams.get("q")}”</span>
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setSearchParams({})}>
+            Clear search
+          </Button>
+        </div>
+      ) : null}
+
+      {campaigns.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/10 px-6 py-14 text-center">
+          <p className="font-medium text-foreground">No campaigns yet</p>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            Launch a campaign to get subscribers, likes, comments or reposts on your Telegram posts.
+          </p>
+          <Button asChild className="mt-4">
+            <Link to="/submit">Launch your first campaign</Link>
+          </Button>
+        </div>
+      ) : null}
+
       <div className="space-y-4">
-        {campaigns.map((campaign) => {
+        {visibleCampaigns.map((campaign) => {
           const creditsTotal = campaign.maxEngagements * campaign.creditsPerEngagement;
           const creditsSpent = campaign.spentCredits || 0;
           const progress = creditsTotal ? (creditsSpent / creditsTotal) * 100 : 0;

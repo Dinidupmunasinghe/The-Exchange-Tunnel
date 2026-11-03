@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { earnFeedCacheOwner } from "../lib/earnFeedCache";
 import { Link } from "react-router";
 import {
   Bell,
@@ -44,6 +45,7 @@ type Transaction = {
   type: "earn" | "spend";
   amount: number;
   description?: string | null;
+  reason?: string | null;
   createdAt?: string;
 };
 
@@ -116,7 +118,7 @@ function formatRelative(value?: string) {
 }
 
 function classifyTransaction(t: Transaction): NotificationCategory {
-  const desc = String(t.description || "").toLowerCase();
+  const desc = String(t.reason || t.description || "").toLowerCase();
   if (/(package|purchase|topup|top-up|payment|invoice|refund)/.test(desc)) {
     return "payment";
   }
@@ -127,7 +129,7 @@ function classifyTransaction(t: Transaction): NotificationCategory {
 }
 
 function statusFromTransaction(t: Transaction): NotificationItem["status"] {
-  const desc = String(t.description || "").toLowerCase();
+  const desc = String(t.reason || t.description || "").toLowerCase();
   if (/cancel|refund/.test(desc)) return "cancelled";
   return "completed";
 }
@@ -139,10 +141,15 @@ function statusFromRequest(r: RepostRequest): NotificationItem["status"] {
   return "pending";
 }
 
+/** Per-account "seen" marker so a shared browser does not mix two users' notifications. */
+function seenKey() {
+  return `notifications_seen_at:${earnFeedCacheOwner() || "anon"}`;
+}
+
 function readSeenAtFromStorage(): number {
   if (typeof window === "undefined") return 0;
   try {
-    const raw = Number(window.localStorage.getItem("notifications_seen_at") || 0);
+    const raw = Number(window.localStorage.getItem(seenKey()) || 0);
     return Number.isFinite(raw) ? raw : 0;
   } catch {
     return 0;
@@ -180,8 +187,18 @@ export function NotificationsPopover() {
 
   useEffect(() => {
     void load(true);
-    const timer = window.setInterval(() => void load(true), 30000);
-    return () => window.clearInterval(timer);
+    // Poll only while the tab is visible (keeps a sleeping free-tier API asleep).
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load(true);
+    }, 60000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load]);
 
   useEffect(() => {
@@ -228,7 +245,7 @@ export function NotificationsPopover() {
             ? "Payment charged"
             : "Credits added to wallet"
           : cat === "action"
-            ? t.description || "Account activity"
+            ? t.reason || t.description || "Account activity"
             : t.type === "earn"
               ? "Credits earned"
               : "Credits spent";
@@ -236,7 +253,7 @@ export function NotificationsPopover() {
         id: `tx-${t.id}`,
         category: cat,
         title,
-        body: `${sign}${amount} credits${t.description ? ` • ${t.description}` : ""}`,
+        body: `${sign}${amount} credits${t.reason || t.description ? ` • ${t.reason || t.description}` : ""}`,
         createdAt: t.createdAt || "",
         status: statusFromTransaction(t),
         href: cat === "payment" ? "/wallet" : "/wallet",
@@ -269,7 +286,7 @@ export function NotificationsPopover() {
     const now = Date.now();
     setReadKey(now);
     try {
-      window.localStorage.setItem("notifications_seen_at", String(now));
+      window.localStorage.setItem(seenKey(), String(now));
     } catch {
       /* private mode / blocked storage */
     }

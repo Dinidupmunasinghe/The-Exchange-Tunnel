@@ -506,8 +506,18 @@ async function getDashboardStats(userId) {
     }
     return false;
   }).length;
-  const creditsEarned30d = tx.filter((t) => t.type === "earn").reduce((sum, t) => sum + t.amount, 0);
-  const creditsSpent30d = Math.abs(tx.filter((t) => t.type === "spend").reduce((sum, t) => sum + t.amount, 0));
+  // Earned = rewards for completed tasks (not welcome/plan credits or refunds).
+  const creditsEarned30d = tx
+    .filter((t) => t.type === "earn" && t.referenceType === "task")
+    .reduce((sum, t) => sum + t.amount, 0);
+  // Spent = campaign budgets, net of refunds for unused slots.
+  const spent = tx
+    .filter((t) => t.type === "spend" && t.referenceType === "campaign")
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const refunded = tx
+    .filter((t) => t.type === "earn" && t.referenceType === "campaign")
+    .reduce((sum, t) => sum + t.amount, 0);
+  const creditsSpent30d = Math.max(0, spent - refunded);
   return { activeCampaigns, creditsEarned30d, creditsSpent30d, recentActivity };
 }
 

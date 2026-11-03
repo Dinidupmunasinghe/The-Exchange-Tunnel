@@ -31,6 +31,11 @@ export function AdminTransactions() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const uid = userId.trim();
+    if (uid && !/^\d+$/.test(uid)) {
+      setError("User ID must be a number.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
