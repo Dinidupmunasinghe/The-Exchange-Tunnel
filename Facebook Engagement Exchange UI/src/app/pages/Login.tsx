@@ -27,6 +27,13 @@ export function Login() {
 
   const alreadySignedIn = isAccessTokenValid(getToken());
 
+  function afterAuthPath() {
+    const intent = searchParams.get("intent");
+    const packageId = searchParams.get("packageId");
+    if (intent === "subscribe" && packageId) return `/checkout?packageId=${packageId}`;
+    return "/dashboard";
+  }
+
   useEffect(() => {
     const wantOut = searchParams.get("logout") === "1" || searchParams.get("reauth") === "1";
     if (!wantOut) return;
@@ -43,11 +50,13 @@ export function Login() {
       if (mode === "login") {
         await loginWithEmail(email, password);
         toast.success("Signed in!");
-        navigate("/dashboard", { replace: true });
+        navigate(afterAuthPath(), { replace: true });
       } else {
         await registerWithEmail(email, password, name || undefined);
         toast.success("Account created!");
-        navigate("/connect-telegram?welcome=1", { replace: true });
+        navigate(searchParams.get("intent") === "subscribe" ? afterAuthPath() : "/connect-telegram?welcome=1", {
+          replace: true
+        });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");

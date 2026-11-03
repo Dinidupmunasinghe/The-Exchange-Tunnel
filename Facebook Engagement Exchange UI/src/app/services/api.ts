@@ -137,6 +137,28 @@ async function fetchWithTimeout(
   }
 }
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  required?: number;
+  balance?: number;
+  freeCreditCap?: number;
+  lifetimeCreditsSpent?: number;
+
+  constructor(message: string, status: number, payload: Json = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    if (typeof payload.code === "string") this.code = payload.code;
+    if (payload.required != null) this.required = Number(payload.required);
+    if (payload.balance != null) this.balance = Number(payload.balance);
+    if (payload.freeCreditCap != null) this.freeCreditCap = Number(payload.freeCreditCap);
+    if (payload.lifetimeCreditsSpent != null) {
+      this.lifetimeCreditsSpent = Number(payload.lifetimeCreditsSpent);
+    }
+  }
+}
+
 function extractApiErrorMessage(response: Response, payload: Json, rawText: string): string {
   const msg = typeof payload.message === "string" ? payload.message : "";
   const errors = payload.errors as Array<{ message?: string }> | undefined;
@@ -217,7 +239,7 @@ async function requestJson<T>(
         window.location.assign(`/login?session=expired&returnTo=${returnTo}`);
       }
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status, payload);
   }
 
   return payload as T;
@@ -369,15 +391,48 @@ export type CreditPackagePayload = {
   priceLabel?: string;
   pricePeriod?: string;
   credits: number;
-  priceLkr: number;
+  priceLkr?: number;
+  priceUsd?: number;
   features?: string[] | string;
+  entitlements?: import("../lib/creditPackages").PackageEntitlements;
   isPopular?: boolean;
   sortOrder?: number;
   isActive?: boolean;
+  isFree?: boolean;
+  billingInterval?: string;
 };
 
 export const api = {
   getPublicPackages: () => requestWithoutAuth<{ packages: PublicCreditPackage[] }>("/packages"),
+  createPayPalSubscription: (packageId: number) =>
+    authRequest("/payments/paypal/subscriptions", {
+      method: "POST",
+      body: JSON.stringify({ packageId })
+    }) as Promise<{ approvalUrl: string; paypalSubscriptionId: string }>,
+  getMySubscription: () =>
+    authRequest("/payments/subscription/me") as Promise<{
+      subscription: {
+        id: number;
+        status: string;
+        packageId: number;
+        packageName?: string;
+        paypalSubscriptionId?: string;
+        currentPeriodEnd?: string;
+        cancelAtPeriodEnd?: boolean;
+        isPaid?: boolean;
+      } | null;
+      package: PublicCreditPackage | null;
+      usage: {
+        lifetimeCreditsSpent: number;
+        freeCreditCap: number | null;
+        isOnFreePlan: boolean;
+        planName: string;
+        packageId: number | null;
+      };
+      paypalConfigured: boolean;
+    }>,
+  cancelMySubscription: () =>
+    authRequest("/payments/subscription/cancel", { method: "POST" }) as Promise<{ message: string }>,
   getProfile: (opts?: SessionRequestOpts) =>
     authRequest("/users/me", {}, opts) as Promise<{ user: any }>,
   updateProfilePhoto,
@@ -688,6 +743,38 @@ export const api = {
     }) as Promise<{ message: string; package: PublicCreditPackage }>,
   adminDeletePackage: (id: number) =>
     adminRequestJson(`/admin/packages/${id}`, { method: "DELETE" }) as Promise<{ message: string }>,
+  adminSyncPackagePayPal: (id: number) =>
+    adminRequestJson(`/admin/packages/${id}/sync-paypal`, { method: "POST" }) as Promise<{
+      message: string;
+      package: PublicCreditPackage;
+    }>,
+  adminListPayments: () =>
+    adminRequestJson("/admin/payments") as Promise<{
+      paypalConfigured: boolean;
+      paypalMode: string;
+      subscriptions: Array<{
+        id: number;
+        userId: number;
+        userEmail?: string;
+        packageName?: string;
+        status: string;
+        paypalSubscriptionId?: string;
+        currentPeriodEnd?: string;
+      }>;
+      recentEvents: Array<{
+        id: number;
+        eventType: string;
+        processedAt?: string;
+        error?: string;
+        createdAt: string;
+      }>;
+    }>,
+  adminGetPaymentSettings: () =>
+    adminRequestJson("/admin/payment-settings") as Promise<{
+      paypalConfigured: boolean;
+      paypalMode: string;
+      frontendUrl: string;
+    }>,
   adminGetOverview: () =>
     adminRequestJson("/admin/overview") as Promise<{ overview: any; recentAuditLogs: any[] }>,
   adminGetUserDetails: (id: number) =>

@@ -165,7 +165,11 @@ router.post(
     body("features").optional(),
     body("isPopular").optional().isBoolean(),
     body("sortOrder").optional().isInt({ min: 0 }),
-    body("isActive").optional().isBoolean()
+    body("isActive").optional().isBoolean(),
+    body("isFree").optional().isBoolean(),
+    body("priceUsd").optional().isFloat({ min: 0 }),
+    body("entitlements").optional(),
+    body("billingInterval").optional().isString().trim()
   ],
   validateRequest,
   ctrl.createCreditPackage
@@ -183,7 +187,11 @@ router.patch(
     body("features").optional(),
     body("isPopular").optional().isBoolean(),
     body("sortOrder").optional().isInt({ min: 0 }),
-    body("isActive").optional().isBoolean()
+    body("isActive").optional().isBoolean(),
+    body("isFree").optional().isBoolean(),
+    body("priceUsd").optional().isFloat({ min: 0 }),
+    body("entitlements").optional(),
+    body("billingInterval").optional().isString().trim()
   ],
   validateRequest,
   ctrl.updateCreditPackage
@@ -194,6 +202,15 @@ router.delete(
   validateRequest,
   ctrl.deleteCreditPackage
 );
+router.post(
+  "/packages/:id/sync-paypal",
+  [param("id").isInt({ min: 1 })],
+  validateRequest,
+  ctrl.syncPackagePayPalPlan
+);
+
+router.get("/payments", ctrl.listPaymentsAdmin);
+router.get("/payment-settings", ctrl.getPaymentSettings);
 
 /* Campaigns */
 router.get(

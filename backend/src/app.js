@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const routes = require("./routes");
 const errorHandler = require("./middleware/errorHandler");
 const env = require("./config/env");
+const { handlePayPalWebhook } = require("./controllers/paymentController");
 
 const app = express();
 
@@ -38,6 +39,11 @@ app.use(
     origin: corsOrigin,
     credentials: true
   })
+);
+app.post(
+  "/api/payments/paypal/webhook",
+  express.raw({ type: "application/json" }),
+  handlePayPalWebhook
 );
 app.use(express.json({ limit: env.lowMemoryHost ? "2mb" : "10mb" }));
 if (env.nodeEnv !== "production") {

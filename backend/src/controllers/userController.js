@@ -5,6 +5,11 @@ const { getDashboardStats } = require("../services/creditService");
 const tg = require("../services/telegramService");
 const deeplinkStore = require("../services/telegramDeeplinkStore");
 const { attachTelegramIdentityToUser } = require("../services/telegramLinkService");
+const {
+  getEffectiveEntitlements,
+  getUsageSnapshot,
+  assignFreePlan
+} = require("../services/subscriptionService");
 
 async function getProfile(req, res) {
   const user = await db.User.findByPk(req.user.id, {
@@ -24,6 +29,15 @@ async function getProfile(req, res) {
     ]
   });
   if (!user) return res.status(404).json({ message: "User not found" });
+
+  const activeSub = await db.UserSubscription.findOne({
+    where: { userId: user.id, status: "active" }
+  });
+  if (!activeSub) await assignFreePlan(user);
+
+  const effective = await getEffectiveEntitlements(user.id);
+  const usage = await getUsageSnapshot(user.id);
+
   // One-time lazy backfill: resolve @username from connected channel membership.
   const currentName = String(user.name || "").trim();
   const needsUsernameBackfill = Boolean(
@@ -45,7 +59,18 @@ async function getProfile(req, res) {
   const pendingRefundDebt = await db.PendingRefund.sum("amountRemaining", {
     where: { workerUserId: req.user.id, status: "pending" }
   });
-  return res.json({ user: { ...data, hasMtprotoSession, pendingRefundDebt: Number(pendingRefundDebt || 0) } });
+  return res.json({
+    user: {
+      ...data,
+      hasMtprotoSession,
+      pendingRefundDebt: Number(pendingRefundDebt || 0),
+      plan: effective.package
+        ? { id: effective.package.id, name: effective.package.name, isFree: effective.package.isFree }
+        : null,
+      subscription: effective.subscription,
+      usage
+    }
+  });
 }
 
 async function getDashboard(req, res) {

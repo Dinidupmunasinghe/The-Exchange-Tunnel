@@ -4,6 +4,7 @@ import { Zap } from "lucide-react";
 import { api } from "../../services/api";
 import type { PublicCreditPackage } from "../../lib/creditPackages";
 import { PricingCard } from "./PricingCard";
+import { packageCta } from "../../lib/packageCheckout";
 
 export function LandingPricingSection() {
   const [packages, setPackages] = useState<PublicCreditPackage[]>([]);
@@ -38,18 +39,23 @@ export function LandingPricingSection() {
           <p className="text-center text-gray-500">Plans coming soon.</p>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {packages.map((pkg, index) => (
-              <PricingCard
-                key={pkg.id}
-                name={pkg.name}
-                price={pkg.priceLabel}
-                period={pkg.pricePeriod}
-                description={pkg.tagline}
-                features={pkg.features}
-                popular={pkg.isPopular}
-                delay={index * 0.1}
-              />
-            ))}
+            {packages.map((pkg, index) => {
+              const cta = packageCta(pkg);
+              return (
+                <PricingCard
+                  key={pkg.id}
+                  name={pkg.name}
+                  price={pkg.priceLabel}
+                  period={pkg.pricePeriod}
+                  description={pkg.tagline}
+                  features={pkg.features}
+                  popular={pkg.isPopular}
+                  delay={index * 0.1}
+                  ctaHref={cta.href}
+                  ctaLabel={cta.label}
+                />
+              );
+            })}
           </div>
         )}
 

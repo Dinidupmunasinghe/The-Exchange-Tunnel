@@ -10,6 +10,9 @@ import { Campaigns } from "./pages/Campaigns";
 import { RepostRequests } from "./pages/RepostRequests";
 import { Analytics } from "./pages/Analytics";
 import { Wallet } from "./pages/Wallet";
+import { Checkout } from "./pages/Checkout";
+import { CheckoutSuccess } from "./pages/CheckoutSuccess";
+import { CheckoutCancel } from "./pages/CheckoutCancel";
 import { Settings } from "./pages/Settings";
 import { AdminLogin } from "./pages/AdminLogin";
 import { NotFound } from "./pages/NotFound";
@@ -28,6 +31,7 @@ import { AdminPendingRefunds } from "./pages/admin/PendingRefunds";
 import { AdminRewards } from "./pages/admin/Rewards";
 import { AdminRepostPricing } from "./pages/admin/RepostPricing";
 import { AdminPackages } from "./pages/admin/Packages";
+import { AdminPayments } from "./pages/admin/Payments";
 import { AdminCampaigns } from "./pages/admin/Campaigns";
 import { AdminCampaignDetails } from "./pages/admin/CampaignDetails";
 import { AdminTasks } from "./pages/admin/Tasks";
@@ -60,6 +64,7 @@ export const router = createBrowserRouter([
               { path: "rewards", Component: AdminRewards },
               { path: "repost-pricing", Component: AdminRepostPricing },
               { path: "packages", Component: AdminPackages },
+              { path: "payments", Component: AdminPayments },
               { path: "campaigns", Component: AdminCampaigns },
               { path: "campaigns/:id", Component: AdminCampaignDetails },
               { path: "tasks", Component: AdminTasks },
@@ -95,6 +100,9 @@ export const router = createBrowserRouter([
               { path: "repost", Component: RepostRequests },
               { path: "analytics", Component: Analytics },
               { path: "wallet", Component: Wallet },
+              { path: "checkout", Component: Checkout },
+              { path: "checkout/success", Component: CheckoutSuccess },
+              { path: "checkout/cancel", Component: CheckoutCancel },
               { path: "settings", Component: Settings },
               { path: "*", Component: NotFound },
             ],

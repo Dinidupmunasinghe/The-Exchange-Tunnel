@@ -3,6 +3,10 @@ const app = require("./app");
 const env = require("./config/env");
 const db = require("./models");
 const { activateDueCampaigns } = require("./services/campaignScheduler");
+const {
+  defaultEntitlementsForPackage,
+  serializeEntitlements
+} = require("./utils/packageEntitlements");
 
 async function addColumnIfMissing(queryInterface, tableName, columnName, definition) {
   const columns = await queryInterface.describeTable(tableName);
@@ -42,7 +46,9 @@ async function ensureSchemaPatches() {
     // Best effort only; the cursor feed still works if a hosted DB blocks DDL.
   }
   await ensureCreditPackageColumns(qi);
+  await ensureUserSubscriptionColumns(qi);
   await seedDefaultCreditPackages();
+  await backfillPackageEntitlements();
 }
 
 async function ensureCreditPackageColumns(queryInterface) {
@@ -73,6 +79,61 @@ async function ensureCreditPackageColumns(queryInterface) {
     allowNull: false,
     defaultValue: 0
   });
+  await addColumnIfMissing(queryInterface, "credit_packages", "entitlements", {
+    type: db.sequelize.Sequelize.TEXT,
+    allowNull: true
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "paypalPlanId", {
+    type: db.sequelize.Sequelize.STRING(80),
+    allowNull: true
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "priceUsd", {
+    type: db.sequelize.Sequelize.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "billingInterval", {
+    type: db.sequelize.Sequelize.STRING(16),
+    allowNull: false,
+    defaultValue: "MONTH"
+  });
+  await addColumnIfMissing(queryInterface, "credit_packages", "isFree", {
+    type: db.sequelize.Sequelize.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  });
+}
+
+async function ensureUserSubscriptionColumns(queryInterface) {
+  await addColumnIfMissing(queryInterface, "users", "lifetimeCreditsSpent", {
+    type: db.sequelize.Sequelize.INTEGER,
+    allowNull: false,
+    defaultValue: 0
+  });
+}
+
+async function backfillPackageEntitlements() {
+  const rows = await db.CreditPackage.findAll();
+  for (const row of rows) {
+    const isFree =
+      Boolean(row.isFree) ||
+      String(row.priceLabel || "")
+        .trim()
+        .toLowerCase() === "free" ||
+      Number(row.priceUsd || 0) <= 0;
+    const patch = {};
+    if (!row.entitlements) {
+      patch.entitlements = serializeEntitlements(
+        defaultEntitlementsForPackage({ credits: row.credits, isFree })
+      );
+    }
+    if (row.isFree !== isFree) patch.isFree = isFree;
+    if (!Number(row.priceUsd) && !isFree) {
+      const { priceUsdFromLabel } = require("./utils/packageEntitlements");
+      patch.priceUsd = priceUsdFromLabel(row.priceLabel, row.priceLkr);
+    }
+    if (Object.keys(patch).length) await row.update(patch);
+  }
 }
 
 async function seedDefaultCreditPackages() {
@@ -95,7 +156,10 @@ async function seedDefaultCreditPackages() {
       ]),
       isPopular: false,
       sortOrder: 0,
-      isActive: true
+      isActive: true,
+      isFree: true,
+      priceUsd: 0,
+      entitlements: serializeEntitlements(defaultEntitlementsForPackage({ credits: 50, isFree: true }))
     },
     {
       name: "Starter",
@@ -114,7 +178,10 @@ async function seedDefaultCreditPackages() {
       ]),
       isPopular: false,
       sortOrder: 1,
-      isActive: true
+      isActive: true,
+      isFree: false,
+      priceUsd: 9,
+      entitlements: serializeEntitlements(defaultEntitlementsForPackage({ credits: 500, isFree: false }))
     },
     {
       name: "Pro",
@@ -135,7 +202,12 @@ async function seedDefaultCreditPackages() {
       ]),
       isPopular: true,
       sortOrder: 2,
-      isActive: true
+      isActive: true,
+      isFree: false,
+      priceUsd: 29,
+      entitlements: serializeEntitlements(
+        defaultEntitlementsForPackage({ credits: 2000, isFree: false })
+      )
     },
     {
       name: "Enterprise",
@@ -157,7 +229,12 @@ async function seedDefaultCreditPackages() {
       ]),
       isPopular: false,
       sortOrder: 3,
-      isActive: true
+      isActive: true,
+      isFree: false,
+      priceUsd: 99,
+      entitlements: serializeEntitlements(
+        defaultEntitlementsForPackage({ credits: 10000, isFree: false })
+      )
     }
   ];
   await db.CreditPackage.bulkCreate(defaults);

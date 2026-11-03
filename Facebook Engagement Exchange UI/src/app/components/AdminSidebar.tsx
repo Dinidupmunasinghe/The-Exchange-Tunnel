@@ -9,6 +9,7 @@ import {
   Undo2,
   Sparkles,
   Package,
+  CreditCard,
   Megaphone,
   ListChecks,
   Activity,
@@ -40,7 +41,8 @@ const navGroups: NavGroup[] = [
       { name: "Pending Refunds", href: "/admin/dashboard/pending-refunds", icon: Undo2 },
       { name: "Rewards", href: "/admin/dashboard/rewards", icon: Sparkles },
       { name: "Repost Pricing", href: "/admin/dashboard/repost-pricing", icon: Repeat2 },
-      { name: "Packages", href: "/admin/dashboard/packages", icon: Package }
+      { name: "Packages", href: "/admin/dashboard/packages", icon: Package },
+      { name: "Payments", href: "/admin/dashboard/payments", icon: CreditCard }
     ]
   },
   {

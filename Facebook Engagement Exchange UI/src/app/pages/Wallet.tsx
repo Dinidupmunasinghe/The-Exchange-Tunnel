@@ -1,22 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Plus, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { api } from "../services/api";
 import { WalletPackageCard } from "../components/WalletPackageCard";
 import type { PublicCreditPackage } from "../lib/creditPackages";
+import { packageCta } from "../lib/packageCheckout";
 
 export function Wallet() {
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [balance, setBalance] = useState(0);
   const [packages, setPackages] = useState<PublicCreditPackage[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
+  const [planName, setPlanName] = useState<string>("Free");
+  const [usage, setUsage] = useState<{
+    lifetimeCreditsSpent: number;
+    freeCreditCap: number | null;
+    isOnFreePlan: boolean;
+  } | null>(null);
 
   useEffect(() => {
-    Promise.all([api.getTransactions(), api.getProfile()])
-      .then(([tx, profile]) => {
+    Promise.all([api.getTransactions(), api.getProfile(), api.getMySubscription().catch(() => null)])
+      .then(([tx, profile, sub]) => {
         setTransactions(tx.transactions);
         setBalance(profile.user.credits || 0);
+        setPlanName(profile.user.plan?.name || sub?.package?.name || "Free");
+        setUsage(profile.user.usage || sub?.usage || null);
       })
       .catch(() => undefined);
   }, []);
@@ -44,11 +55,19 @@ export function Wallet() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Wallet</h1>
-          <p className="text-muted-foreground mt-1">Manage your credits and transactions</p>
+          <p className="text-muted-foreground mt-1">
+            Plan: <span className="font-medium text-foreground">{planName}</span>
+            {usage?.isOnFreePlan && usage.freeCreditCap != null ? (
+              <span className="text-muted-foreground">
+                {" "}
+                · {usage.lifetimeCreditsSpent}/{usage.freeCreditCap} free credits used
+              </span>
+            ) : null}
+          </p>
         </div>
-        <Button>
+        <Button type="button" onClick={() => navigate("/wallet")}>
           <Plus className="mr-2 h-4 w-4" />
-          Buy Credits
+          View plans
         </Button>
       </div>
 
@@ -113,7 +132,14 @@ export function Wallet() {
               }`}
             >
               {packages.map((pkg) => (
-                <WalletPackageCard key={pkg.id} pkg={pkg} />
+                <WalletPackageCard
+                  key={pkg.id}
+                  pkg={pkg}
+                  onBuy={(p) => {
+                    const cta = packageCta(p);
+                    navigate(cta.href);
+                  }}
+                />
               ))}
             </div>
           )}

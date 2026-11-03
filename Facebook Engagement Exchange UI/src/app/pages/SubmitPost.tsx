@@ -14,7 +14,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popove
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
 import { cn } from "../components/ui/utils";
-import { api } from "../services/api";
+import { api, ApiError } from "../services/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "../components/ui/dialog";
 import {
   BASE_ENGAGEMENT_CHOICES,
   ENGAGEMENT_OPTIONS,
@@ -47,6 +55,7 @@ export function SubmitPost() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRecheckingSetup, setIsRecheckingSetup] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [channelTitle, setChannelTitle] = useState<string | null>(null);
   const [connectedChannelId, setConnectedChannelId] = useState<string | null>(null);
   const [hasTelegramLogin, setHasTelegramLogin] = useState<boolean>(false);
@@ -204,8 +213,12 @@ export function SubmitPost() {
       const res = await api.getProfile();
       setBalance(res.user?.credits ?? 0);
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Failed";
-      toast.error("Could not create campaign", { description: msg });
+      if (error instanceof ApiError && error.code === "PLAN_UPGRADE_REQUIRED") {
+        setUpgradeOpen(true);
+      } else {
+        const msg = error instanceof Error ? error.message : "Failed";
+        toast.error("Could not create campaign", { description: msg });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -674,6 +687,25 @@ export function SubmitPost() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upgrade your plan</DialogTitle>
+            <DialogDescription>
+              You have reached your free plan credit limit. Subscribe to a paid plan to launch more campaigns.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setUpgradeOpen(false)}>
+              Not now
+            </Button>
+            <Button type="button" asChild>
+              <Link to="/wallet">View plans</Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

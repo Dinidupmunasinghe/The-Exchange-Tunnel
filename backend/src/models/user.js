@@ -27,6 +27,7 @@ module.exports = (sequelize, DataTypes) => {
         field: "facebookPageAccessTokenEncrypted"
       },
       credits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      lifetimeCreditsSpent: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       dailyEarnedCredits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       dailyEarnedAt: { type: DataTypes.DATEONLY, allowNull: true },
       isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true }

@@ -1,3 +1,17 @@
+export type PackageEntitlements = {
+  freeCreditCap: number | null;
+  monthlyCreditGrant: number;
+  monthlyExchangeLimit: number;
+  dailyEarnLimitOverride: number | null;
+  maxActiveCampaigns: number;
+  flags: {
+    apiAccess: boolean;
+    prioritySupport: boolean;
+    customTargeting: boolean;
+    removeWatermark: boolean;
+  };
+};
+
 export type PublicCreditPackage = {
   id: number;
   name: string;
@@ -6,10 +20,44 @@ export type PublicCreditPackage = {
   pricePeriod: string;
   credits: number;
   priceLkr: number;
+  priceUsd: number;
   features: string[];
   isPopular: boolean;
   isActive?: boolean;
   sortOrder?: number;
+  isFree?: boolean;
+  requiresPayment?: boolean;
+  billingInterval?: string;
+  paypalPlanId?: string | null;
+  entitlements?: PackageEntitlements;
+};
+
+export const DEFAULT_ENTITLEMENTS: PackageEntitlements = {
+  freeCreditCap: null,
+  monthlyCreditGrant: 500,
+  monthlyExchangeLimit: 500,
+  dailyEarnLimitOverride: null,
+  maxActiveCampaigns: 5,
+  flags: {
+    apiAccess: false,
+    prioritySupport: false,
+    customTargeting: false,
+    removeWatermark: false
+  }
+};
+
+export const FREE_ENTITLEMENTS: PackageEntitlements = {
+  freeCreditCap: 50,
+  monthlyCreditGrant: 0,
+  monthlyExchangeLimit: 50,
+  dailyEarnLimitOverride: null,
+  maxActiveCampaigns: 1,
+  flags: {
+    apiAccess: false,
+    prioritySupport: false,
+    customTargeting: false,
+    removeWatermark: false
+  }
 };
 
 export const EMPTY_PACKAGE_DRAFT: Omit<PublicCreditPackage, "id"> = {
@@ -19,16 +67,42 @@ export const EMPTY_PACKAGE_DRAFT: Omit<PublicCreditPackage, "id"> = {
   pricePeriod: "/month",
   credits: 500,
   priceLkr: 0,
+  priceUsd: 9,
   features: ["Feature one", "Feature two", "Feature three"],
   isPopular: false,
   isActive: true,
-  sortOrder: 0
+  sortOrder: 0,
+  isFree: false,
+  entitlements: { ...DEFAULT_ENTITLEMENTS }
 };
+
+export function normalizeEntitlements(raw?: Partial<PackageEntitlements> | null, isFree = false): PackageEntitlements {
+  const base = isFree ? { ...FREE_ENTITLEMENTS } : { ...DEFAULT_ENTITLEMENTS, monthlyCreditGrant: 500 };
+  if (!raw) return base;
+  return {
+    freeCreditCap: raw.freeCreditCap === undefined ? base.freeCreditCap : raw.freeCreditCap,
+    monthlyCreditGrant: Number.isFinite(Number(raw.monthlyCreditGrant))
+      ? Number(raw.monthlyCreditGrant)
+      : base.monthlyCreditGrant,
+    monthlyExchangeLimit: Number.isFinite(Number(raw.monthlyExchangeLimit))
+      ? Number(raw.monthlyExchangeLimit)
+      : base.monthlyExchangeLimit,
+    dailyEarnLimitOverride:
+      raw.dailyEarnLimitOverride === undefined || raw.dailyEarnLimitOverride === null
+        ? base.dailyEarnLimitOverride
+        : Number(raw.dailyEarnLimitOverride),
+    maxActiveCampaigns: Number.isFinite(Number(raw.maxActiveCampaigns))
+      ? Number(raw.maxActiveCampaigns)
+      : base.maxActiveCampaigns,
+    flags: { ...base.flags, ...(raw.flags || {}) }
+  };
+}
 
 /** Coerce API / legacy rows into a safe shape for the admin editor and public UI. */
 export function normalizePublicPackage(raw: Partial<PublicCreditPackage> & { id?: unknown }): PublicCreditPackage {
   const priceLkr = Number(raw.priceLkr ?? 0);
   const priceLabel = String(raw.priceLabel ?? "").trim();
+  const isFree = Boolean(raw.isFree) || priceUsdFromDisplayLabel(priceLabel) <= 0;
   let features: string[] = [];
   if (Array.isArray(raw.features)) {
     features = raw.features.map((line) => String(line).trim()).filter(Boolean);
@@ -46,27 +120,41 @@ export function normalizePublicPackage(raw: Partial<PublicCreditPackage> & { id?
     }
   }
 
+  const priceUsd = Number.isFinite(Number(raw.priceUsd))
+    ? Number(raw.priceUsd)
+    : priceUsdFromDisplayLabel(priceLabel);
+
   return {
     id: Number(raw.id),
     name: String(raw.name ?? "").trim() || "Plan",
     tagline: String(raw.tagline ?? "").trim(),
-    priceLabel: priceLabel || (priceLkr <= 0 ? "Free" : `$${priceLkr}`),
+    priceLabel: priceLabel || (priceUsd <= 0 ? "Free" : `$${priceUsd}`),
     pricePeriod: String(raw.pricePeriod ?? "/month").trim() || "/month",
     credits: Number(raw.credits ?? 0),
     priceLkr,
+    priceUsd,
     features,
     isPopular: Boolean(raw.isPopular),
     isActive: raw.isActive !== false,
-    sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Number(raw.sortOrder) : 0
+    sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Number(raw.sortOrder) : 0,
+    isFree,
+    requiresPayment: !isFree,
+    billingInterval: String(raw.billingInterval || "MONTH"),
+    paypalPlanId: raw.paypalPlanId ? String(raw.paypalPlanId) : null,
+    entitlements: normalizeEntitlements(raw.entitlements, isFree)
   };
 }
 
-/** Backend legacy field — derived from display price so admin never edits LKR separately. */
-export function priceLkrFromDisplayLabel(label: string): number {
+export function priceUsdFromDisplayLabel(label: string): number {
   const s = String(label ?? "").trim().toLowerCase();
   if (!s || s === "free") return 0;
   const match = String(label).replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
   return match ? Number(match[1]) : 0;
+}
+
+/** Legacy LKR field — derived from display price when not set explicitly. */
+export function priceLkrFromDisplayLabel(label: string): number {
+  return priceUsdFromDisplayLabel(label);
 }
 
 export function normalizeFeatures(features: string[] | undefined | null): string[] {

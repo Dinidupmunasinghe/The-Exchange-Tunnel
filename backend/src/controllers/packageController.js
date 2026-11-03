@@ -1,5 +1,5 @@
 const db = require("../models");
-const { serializeCreditPackage } = require("../utils/creditPackageSerializer");
+const { serializeCreditPackagePublic } = require("../utils/creditPackageSerializer");
 
 async function listPublicPackages(req, res) {
   const rows = await db.CreditPackage.findAll({
@@ -9,7 +9,7 @@ async function listPublicPackages(req, res) {
       ["id", "ASC"]
     ]
   });
-  return res.json({ packages: rows.map(serializeCreditPackage) });
+  return res.json({ packages: rows.map(serializeCreditPackagePublic) });
 }
 
 module.exports = {

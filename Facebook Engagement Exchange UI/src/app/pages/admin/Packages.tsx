@@ -9,12 +9,16 @@ import { api } from "../../services/api";
 import { PricingCard } from "../../landing/components/PricingCard";
 import {
   EMPTY_PACKAGE_DRAFT,
+  normalizeEntitlements,
   normalizeFeatures,
   normalizePublicPackage,
   priceLkrFromDisplayLabel,
+  priceUsdFromDisplayLabel,
+  type PackageEntitlements,
   type PublicCreditPackage
 } from "../../lib/creditPackages";
 import { FormError, FormMessage, PageHeader, StatusPill } from "./_shared";
+import { PackageEditorSections } from "./PackageEditorSections";
 
 type Draft = Omit<PublicCreditPackage, "id"> & { id?: number };
 
@@ -30,6 +34,8 @@ function PackageEditor({
   onSave,
   onDelete,
   onCancel,
+  onSyncPayPal,
+  syncingPayPal,
   saving
 }: {
   draft: Draft;
@@ -37,10 +43,25 @@ function PackageEditor({
   onSave: () => void;
   onDelete?: () => void;
   onCancel?: () => void;
+  onSyncPayPal?: () => void;
+  syncingPayPal?: boolean;
   saving: boolean;
 }) {
   const featureRows = draft.features?.length ? draft.features : [""];
   const previewFeatures = normalizeFeatures(draft.features);
+  const ent = normalizeEntitlements(draft.entitlements, Boolean(draft.isFree));
+
+  function setEntitlements(next: PackageEntitlements) {
+    onChange({ ...draft, entitlements: next });
+  }
+
+  function patchEntitlements(patch: Partial<PackageEntitlements>) {
+    setEntitlements(normalizeEntitlements({ ...ent, ...patch }, Boolean(draft.isFree)));
+  }
+
+  function patchFlags(patch: Partial<PackageEntitlements["flags"]>) {
+    setEntitlements(normalizeEntitlements({ ...ent, flags: { ...ent.flags, ...patch } }, Boolean(draft.isFree)));
+  }
 
   function setFeatures(next: string[]) {
     onChange({ ...draft, features: next });
@@ -150,39 +171,19 @@ function PackageEditor({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-6">
-          <label className="flex items-center gap-2 text-sm">
-            <Switch
-              checked={draft.isPopular}
-              onCheckedChange={(checked) => onChange({ ...draft, isPopular: checked })}
-            />
-            Most popular badge
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <Switch
-              checked={draft.isActive !== false}
-              onCheckedChange={(checked) => onChange({ ...draft, isActive: checked })}
-            />
-            Visible on site
-          </label>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={onSave} disabled={saving}>
-            {saving ? "Saving…" : "Save package"}
-          </Button>
-          {onCancel ? (
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-          ) : null}
-          {onDelete ? (
-            <Button type="button" variant="outline" onClick={onDelete}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </Button>
-          ) : null}
-        </div>
+        <PackageEditorSections
+          draft={draft}
+          ent={ent}
+          onChange={onChange}
+          patchEntitlements={patchEntitlements}
+          patchFlags={patchFlags}
+          onSyncPayPal={onSyncPayPal}
+          syncingPayPal={syncingPayPal}
+          onSave={onSave}
+          onCancel={onCancel}
+          onDelete={onDelete}
+          saving={saving}
+        />
       </div>
 
       <div className="rounded-xl border border-border bg-white p-4">
@@ -207,6 +208,7 @@ export function AdminPackages() {
   const [packages, setPackages] = useState<PublicCreditPackage[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncingPayPal, setSyncingPayPal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
@@ -262,6 +264,7 @@ export function AdminPackages() {
     setSaving(true);
     setError(null);
     setMessage(null);
+    const isFree = Boolean(draft.isFree) || priceUsdFromDisplayLabel(String(draft.priceLabel ?? "")) <= 0;
     const payload = {
       name: String(draft.name ?? "").trim(),
       tagline: String(draft.tagline ?? "").trim(),
@@ -269,9 +272,12 @@ export function AdminPackages() {
       pricePeriod: String(draft.pricePeriod ?? "").trim() || "/month",
       credits: Number(draft.credits),
       priceLkr: priceLkrFromDisplayLabel(String(draft.priceLabel ?? "")),
+      priceUsd: Number(draft.priceUsd ?? priceUsdFromDisplayLabel(String(draft.priceLabel ?? ""))),
       features: normalizeFeatures(draft.features),
+      entitlements: normalizeEntitlements(draft.entitlements, isFree),
       isPopular: Boolean(draft.isPopular),
       isActive: draft.isActive !== false,
+      isFree,
       sortOrder: Number(draft.sortOrder ?? 0)
     };
     try {
@@ -288,6 +294,23 @@ export function AdminPackages() {
       setError(err instanceof Error ? err.message : "Failed to save package");
     } finally {
       setSaving(false);
+    }
+  }
+
+
+  async function syncPayPalPlan() {
+    if (typeof editingId !== "number") return;
+    setSyncingPayPal(true);
+    setError(null);
+    try {
+      const res = await api.adminSyncPackagePayPal(editingId);
+      const planId = res.package?.paypalPlanId;
+      setDraft((d) => ({ ...d, paypalPlanId: planId ?? d.paypalPlanId }));
+      setMessage(res.message || "PayPal plan synced");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "PayPal sync failed");
+    } finally {
+      setSyncingPayPal(false);
     }
   }
 
@@ -342,6 +365,8 @@ export function AdminPackages() {
                     ? () => void remove({ ...draft, id: editingId } as PublicCreditPackage)
                     : undefined
                 }
+                onSyncPayPal={typeof editingId === "number" ? () => void syncPayPalPlan() : undefined}
+                syncingPayPal={syncingPayPal}
                 saving={saving}
               />
             </CardContent>

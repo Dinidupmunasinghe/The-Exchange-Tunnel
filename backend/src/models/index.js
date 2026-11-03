@@ -11,6 +11,8 @@ const PendingRefund = require("./pendingRefund")(sequelize, DataTypes);
 const UserSubscriptionMemory = require("./userSubscriptionMemory")(sequelize, DataTypes);
 const AppSetting = require("./appSetting")(sequelize, DataTypes);
 const CreditPackage = require("./creditPackage")(sequelize, DataTypes);
+const UserSubscription = require("./userSubscription")(sequelize, DataTypes);
+const PaymentEvent = require("./paymentEvent")(sequelize, DataTypes);
 const AdminAuditLog = require("./adminAuditLog")(sequelize, DataTypes);
 const RepostPricingRule = require("./repostPricingRule")(sequelize, DataTypes);
 
@@ -46,6 +48,11 @@ PendingRefund.belongsTo(User, { foreignKey: "ownerUserId", as: "owner" });
 User.hasMany(UserSubscriptionMemory, { foreignKey: "userId", as: "subscriptionMemory" });
 UserSubscriptionMemory.belongsTo(User, { foreignKey: "userId", as: "user" });
 
+User.hasMany(UserSubscription, { foreignKey: "userId", as: "subscriptions" });
+UserSubscription.belongsTo(User, { foreignKey: "userId", as: "user" });
+CreditPackage.hasMany(UserSubscription, { foreignKey: "packageId", as: "subscriptions" });
+UserSubscription.belongsTo(CreditPackage, { foreignKey: "packageId", as: "package" });
+
 const db = {
   sequelize,
   User,
@@ -59,6 +66,8 @@ const db = {
   ,
   AppSetting,
   CreditPackage,
+  UserSubscription,
+  PaymentEvent,
   AdminAuditLog,
   RepostPricingRule
 };

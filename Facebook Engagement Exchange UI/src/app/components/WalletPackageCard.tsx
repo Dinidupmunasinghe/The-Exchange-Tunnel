@@ -41,7 +41,7 @@ export function WalletPackageCard({ pkg, onBuy }: WalletPackageCardProps) {
         variant={pkg.isPopular ? "default" : "outline"}
         onClick={() => onBuy?.(pkg)}
       >
-        Buy Now
+        {pkg.isFree ? "Get Started" : "Subscribe"}
       </Button>
 
       <ul className="mt-auto space-y-2.5">

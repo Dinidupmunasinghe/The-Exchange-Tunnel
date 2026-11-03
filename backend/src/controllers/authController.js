@@ -5,6 +5,7 @@ const db = require("../models");
 const env = require("../config/env");
 const tg = require("../services/telegramService");
 const deeplinkStore = require("../services/telegramDeeplinkStore");
+const { assignFreePlan } = require("../services/subscriptionService");
 
 function createToken(user) {
   return jwt.sign({ sub: user.id, email: user.email }, env.jwt.secret, {
@@ -29,8 +30,10 @@ async function findOrCreateTelegramUser({ id, first_name, last_name, username })
       passwordHash,
       name: nameBase,
       telegramUserId: tgId,
-      credits: 500
+      credits: 0
     });
+    await assignFreePlan(user);
+    await user.reload();
   } else {
     user.telegramUserId = tgId;
     if (usernameHandle) {
@@ -55,8 +58,10 @@ async function register(req, res) {
     email,
     passwordHash,
     name: name || null,
-    credits: 500
+    credits: 0
   });
+  await assignFreePlan(user);
+  await user.reload();
   const token = createToken(user);
   return res.status(201).json({
     message: "Registered successfully",

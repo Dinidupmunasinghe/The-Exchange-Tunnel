@@ -8,6 +8,7 @@ const taskRoutes = require("./taskRoutes");
 const transactionRoutes = require("./transactionRoutes");
 const repostRoutes = require("./repostRoutes");
 const packageRoutes = require("./packageRoutes");
+const paymentRoutes = require("./paymentRoutes");
 const adminRoutes = require("./adminRoutes");
 const adminAuthRoutes = require("./adminAuthRoutes");
 
@@ -35,6 +36,7 @@ router.use("/auth", authRoutes);
 router.use("/admin-auth", adminAuthRoutes);
 router.use("/admin", adminRoutes);
 router.use("/packages", packageRoutes);
+router.use("/payments", paymentRoutes);
 router.use(authMiddleware);
 router.use("/users", userRoutes);
 router.use("/telegram", telegramRoutes);

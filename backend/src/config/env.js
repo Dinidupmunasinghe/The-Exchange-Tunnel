@@ -69,6 +69,15 @@ const env = {
     likeReward: Number(process.env.LIKE_REWARD || 5),
     commentReward: Number(process.env.COMMENT_REWARD || 10),
     shareReward: Number(process.env.SHARE_REWARD || 15)
+  },
+  frontendUrl: (process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:5173")
+    .split(",")[0]
+    .trim(),
+  paypal: {
+    clientId: process.env.PAYPAL_CLIENT_ID || "",
+    clientSecret: process.env.PAYPAL_CLIENT_SECRET || "",
+    mode: process.env.PAYPAL_MODE === "live" ? "live" : "sandbox",
+    webhookId: process.env.PAYPAL_WEBHOOK_ID || ""
   }
 };
 

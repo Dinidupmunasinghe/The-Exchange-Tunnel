@@ -631,6 +631,13 @@ async function deleteRepostPricingRule(req, res) {
  * ========================================================================= */
 
 const { parseFeatures, serializeCreditPackage } = require("../utils/creditPackageSerializer");
+const {
+  parseEntitlements,
+  serializeEntitlements,
+  priceUsdFromLabel,
+  defaultEntitlementsForPackage
+} = require("../utils/packageEntitlements");
+const paypal = require("../services/paypalService");
 
 function readPackageBody(body) {
   const name = String(body.name || "").trim();
@@ -643,6 +650,17 @@ function readPackageBody(body) {
   const isPopular = Boolean(body.isPopular);
   const isActive = body.isActive !== false;
   const sortOrder = Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0;
+  const isFree = Boolean(body.isFree) || priceUsdFromLabel(priceLabel, priceLkr) <= 0;
+  const priceUsd =
+    body.priceUsd != null && body.priceUsd !== ""
+      ? Number(body.priceUsd)
+      : priceUsdFromLabel(priceLabel, priceLkr);
+  const entitlements = serializeEntitlements(
+    body.entitlements != null
+      ? body.entitlements
+      : defaultEntitlementsForPackage({ credits, isFree })
+  );
+  const billingInterval = String(body.billingInterval || "MONTH").trim() || "MONTH";
   return {
     name,
     tagline,
@@ -650,10 +668,14 @@ function readPackageBody(body) {
     pricePeriod,
     credits,
     priceLkr,
+    priceUsd: isFree ? 0 : priceUsd,
     features: JSON.stringify(features),
     isPopular,
     isActive,
-    sortOrder
+    sortOrder,
+    isFree,
+    entitlements,
+    billingInterval
   };
 }
 
@@ -715,6 +737,10 @@ async function updateCreditPackage(req, res) {
   if (req.body.isPopular != null) updates.isPopular = payload.isPopular;
   if (req.body.isActive != null) updates.isActive = payload.isActive;
   if (req.body.sortOrder != null) updates.sortOrder = payload.sortOrder;
+  if (req.body.isFree != null) updates.isFree = payload.isFree;
+  if (req.body.priceUsd != null) updates.priceUsd = payload.priceUsd;
+  if (req.body.entitlements != null) updates.entitlements = payload.entitlements;
+  if (req.body.billingInterval != null) updates.billingInterval = payload.billingInterval;
   const err = validatePackagePayload(updates, { partial: true });
   if (err) return res.status(400).json({ message: err });
   Object.assign(pkg, updates);
@@ -737,6 +763,65 @@ async function deleteCreditPackage(req, res) {
   await pkg.destroy();
   await logAdminAction({ req, action: "delete_credit_package", targetType: "package", targetId: id });
   return res.json({ message: "Package deleted" });
+}
+
+async function syncPackagePayPalPlan(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid package id" });
+  const pkg = await db.CreditPackage.findByPk(id);
+  if (!pkg) return res.status(404).json({ message: "Package not found" });
+  const result = await paypal.syncPlanForPackage(pkg);
+  if (!result.ok) return res.status(400).json({ message: result.message || "PayPal sync failed" });
+  await pkg.reload();
+  return res.json({ message: "PayPal plan synced", result, package: serializeCreditPackage(pkg) });
+}
+
+async function listPaymentsAdmin(req, res) {
+  const subs = await db.UserSubscription.findAll({
+    include: [
+      { model: db.User, as: "user", attributes: ["id", "email", "name"] },
+      { model: db.CreditPackage, as: "package", attributes: ["id", "name", "priceUsd"] }
+    ],
+    order: [["id", "DESC"]],
+    limit: 100
+  });
+  const events = await db.PaymentEvent.findAll({
+    order: [["id", "DESC"]],
+    limit: 50
+  });
+  return res.json({
+    paypalConfigured: paypal.isConfigured(),
+    paypalMode: require("../config/env").paypal.mode,
+    subscriptions: subs.map((s) => ({
+      id: s.id,
+      userId: s.userId,
+      userEmail: s.user?.email,
+      packageName: s.package?.name,
+      status: s.status,
+      paypalSubscriptionId: s.paypalSubscriptionId,
+      currentPeriodEnd: s.currentPeriodEnd,
+      cancelAtPeriodEnd: s.cancelAtPeriodEnd
+    })),
+    recentEvents: events.map((e) => ({
+      id: e.id,
+      eventId: e.eventId,
+      eventType: e.eventType,
+      processedAt: e.processedAt,
+      error: e.error,
+      createdAt: e.createdAt
+    }))
+  });
+}
+
+async function getPaymentSettings(req, res) {
+  const env = require("../config/env");
+  return res.json({
+    paypalConfigured: paypal.isConfigured(),
+    paypalMode: env.paypal.mode,
+    hasClientId: Boolean(env.paypal.clientId),
+    hasWebhookId: Boolean(env.paypal.webhookId),
+    frontendUrl: env.frontendUrl
+  });
 }
 
 /* =========================================================================
@@ -1280,6 +1365,9 @@ module.exports = {
   createCreditPackage,
   updateCreditPackage,
   deleteCreditPackage,
+  syncPackagePayPalPlan,
+  listPaymentsAdmin,
+  getPaymentSettings,
   listCampaigns,
   getCampaignDetails,
   updateCampaign,

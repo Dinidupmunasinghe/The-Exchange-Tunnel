@@ -3,6 +3,7 @@ const db = require("../models");
 const sequelize = require("../config/database");
 const tg = require("../services/telegramService");
 const { spendCredits, refundCredits, getRewardByType } = require("../services/creditService");
+const { assertCanCreateCampaign, recordCampaignSpend } = require("../services/entitlementService");
 const { ENGAGEMENT_TYPES } = require("../constants/engagement");
 
 function normalizeCampaignName(raw) {
@@ -131,11 +132,17 @@ async function createCampaign(req, res) {
   const launchesLater = scheduledLaunchAt && scheduledLaunchAt > now;
   const status = launchesLater ? "pending" : "active";
 
-  if (owner.credits < totalBudget) {
-    return res.status(400).json({
-      message: `Insufficient credits — this campaign needs ${totalBudget} upfront (${effectiveCreditsPerEngagement} × ${maxEngagements} slots) but you have ${owner.credits}.`,
-      required: totalBudget,
-      balance: owner.credits
+  try {
+    await assertCanCreateCampaign(owner, { totalBudget });
+  } catch (err) {
+    const status = err.status || 400;
+    return res.status(status).json({
+      message: err.message,
+      code: err.code || (status === 402 ? "PLAN_UPGRADE_REQUIRED" : undefined),
+      required: err.required,
+      balance: err.balance,
+      freeCreditCap: err.freeCreditCap,
+      lifetimeCreditsSpent: err.lifetimeCreditsSpent
     });
   }
 
@@ -163,6 +170,7 @@ async function createCampaign(req, res) {
       referenceId: campaign.id,
       transaction
     });
+    await recordCampaignSpend(req.user.id, totalBudget, { transaction });
 
     const taskPayload = Array.from({ length: maxEngagements }).map(() => ({
       campaignId: campaign.id,

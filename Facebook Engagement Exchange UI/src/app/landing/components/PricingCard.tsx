@@ -12,6 +12,8 @@ interface PricingCardProps {
   delay?: number;
   /** Admin preview: static CTA instead of router link */
   preview?: boolean;
+  ctaHref?: string;
+  ctaLabel?: string;
 }
 
 export function PricingCard({
@@ -22,7 +24,9 @@ export function PricingCard({
   features,
   popular = false,
   delay = 0,
-  preview = false
+  preview = false,
+  ctaHref = "/login",
+  ctaLabel = "Get Started"
 }: PricingCardProps) {
   const ctaClass = `block w-full py-3 rounded-lg font-semibold mb-8 text-center transition-colors ${
     popular
@@ -70,14 +74,15 @@ export function PricingCard({
         </div>
 
         {preview ? (
-          <div className={ctaClass}>Get Started</div>
+          <div className={ctaClass}>{ctaLabel}</div>
         ) : (
           <GetStartedLink
+            to={ctaHref}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className={ctaClass}
           >
-            Get Started
+            {ctaLabel}
           </GetStartedLink>
         )}
 

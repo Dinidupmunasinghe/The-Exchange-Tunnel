@@ -12,7 +12,12 @@ module.exports = (sequelize, DataTypes) => {
       features: { type: DataTypes.TEXT, allowNull: true },
       isPopular: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       sortOrder: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
-      isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true }
+      isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+      entitlements: { type: DataTypes.TEXT, allowNull: true },
+      paypalPlanId: { type: DataTypes.STRING(80), allowNull: true },
+      priceUsd: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+      billingInterval: { type: DataTypes.STRING(16), allowNull: false, defaultValue: "MONTH" },
+      isFree: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
     },
     {
       tableName: "credit_packages",
