@@ -28,6 +28,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       credits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       lifetimeCreditsSpent: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      /** When the one-time free-plan welcome credits were granted (null = not yet). */
+      freeGrantGivenAt: { type: DataTypes.DATE, allowNull: true },
       dailyEarnedCredits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       dailyEarnedAt: { type: DataTypes.DATEONLY, allowNull: true },
       isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true }

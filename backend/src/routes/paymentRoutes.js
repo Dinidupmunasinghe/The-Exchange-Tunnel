@@ -15,6 +15,7 @@ router.post(
   ctrl.createPayPalSubscription
 );
 router.get("/subscription/me", ctrl.getMySubscription);
+router.get("/subscription/confirm", ctrl.confirmMySubscription);
 router.post("/subscription/cancel", ctrl.cancelMySubscription);
 
 module.exports = router;

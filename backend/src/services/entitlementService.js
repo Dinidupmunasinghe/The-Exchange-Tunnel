@@ -1,9 +1,6 @@
 const { Op } = require("sequelize");
 const db = require("../models");
-const {
-  getEffectiveEntitlements,
-  getUsageSnapshot
-} = require("./subscriptionService");
+const { getEffectiveEntitlements } = require("./subscriptionService");
 
 class EntitlementError extends Error {
   constructor(code, message, extra = {}) {
@@ -15,41 +12,43 @@ class EntitlementError extends Error {
   }
 }
 
-async function countActiveCampaigns(userId) {
+async function countActiveCampaigns(userId, transaction) {
   return db.Campaign.count({
-    where: { userId, status: { [Op.in]: ["active", "pending"] } }
+    where: { userId, status: { [Op.in]: ["active", "pending"] } },
+    transaction
   });
 }
 
-async function assertCanCreateCampaign(user, { totalBudget }) {
+/**
+ * Plan checks for spending credits on a campaign. Call it again INSIDE the spending
+ * transaction with the user row locked (`user` = locked row), so parallel requests cannot
+ * all pass the limits.
+ */
+async function assertCanCreateCampaign(user, { totalBudget, transaction, skipCampaignLimit = false } = {}) {
   const budget = Number(totalBudget) || 0;
-  const { entitlements, subscription } = await getEffectiveEntitlements(user.id);
-  const usage = await getUsageSnapshot(user.id);
+  const { entitlements, subscription } = await getEffectiveEntitlements(user.id, { transaction });
   const isPaid = Boolean(subscription?.isPaid);
 
-  const maxCampaigns = Number(entitlements.maxActiveCampaigns) || 1;
-  const activeCampaigns = await countActiveCampaigns(user.id);
-  if (activeCampaigns >= maxCampaigns) {
-    throw new EntitlementError(
-      "CAMPAIGN_LIMIT_REACHED",
-      `Your plan allows up to ${maxCampaigns} active campaign(s). Upgrade to run more.`,
-      { maxActiveCampaigns: maxCampaigns, activeCampaigns }
-    );
+  if (!skipCampaignLimit) {
+    const maxCampaigns = Number(entitlements.maxActiveCampaigns) || 1;
+    const activeCampaigns = await countActiveCampaigns(user.id, transaction);
+    if (activeCampaigns >= maxCampaigns) {
+      throw new EntitlementError(
+        "CAMPAIGN_LIMIT_REACHED",
+        `Your plan allows up to ${maxCampaigns} active campaign(s). Upgrade to run more.`,
+        { maxActiveCampaigns: maxCampaigns, activeCampaigns }
+      );
+    }
   }
 
-  if (!isPaid && usage.freeCreditCap != null) {
-    const cap = Number(usage.freeCreditCap);
-    const spent = Number(usage.lifetimeCreditsSpent);
-    const projected = spent + budget;
-    if (projected > cap) {
+  const freeCap = Number(entitlements.freeCreditCap);
+  if (!isPaid && Number.isFinite(freeCap)) {
+    const spent = Number(user.lifetimeCreditsSpent || 0);
+    if (spent + budget > freeCap) {
       throw new EntitlementError(
         "PLAN_UPGRADE_REQUIRED",
-        `You've reached your free plan limit (${cap} credits). Upgrade to launch more campaigns.`,
-        {
-          freeCreditCap: cap,
-          lifetimeCreditsSpent: spent,
-          required: budget
-        }
+        `You've reached your free plan limit (${freeCap} credits). Upgrade to launch more campaigns.`,
+        { freeCreditCap: freeCap, lifetimeCreditsSpent: spent, required: budget }
       );
     }
   }
@@ -62,23 +61,39 @@ async function assertCanCreateCampaign(user, { totalBudget }) {
     );
   }
 
-  return { entitlements, usage, isPaid };
+  return { entitlements, isPaid };
 }
 
+/** Tracks free-plan spend (the free cap). Must run in the same transaction as the spend. */
 async function recordCampaignSpend(userId, amount, { transaction } = {}) {
   const n = Math.floor(Number(amount));
   if (n <= 0) return;
   const user = await db.User.findByPk(userId, { transaction, lock: true });
   if (!user) return;
-  const { subscription } = await getEffectiveEntitlements(userId);
+  const { subscription } = await getEffectiveEntitlements(userId, { transaction });
   if (subscription?.isPaid) return;
   user.lifetimeCreditsSpent = Number(user.lifetimeCreditsSpent || 0) + n;
   await user.save({ transaction });
+}
+
+function entitlementErrorBody(err) {
+  const status = err.status || 400;
+  return {
+    status,
+    body: {
+      message: err.message,
+      code: err.code || (status === 402 ? "PLAN_UPGRADE_REQUIRED" : undefined),
+      required: err.required,
+      balance: err.balance,
+      freeCreditCap: err.freeCreditCap,
+      lifetimeCreditsSpent: err.lifetimeCreditsSpent
+    }
+  };
 }
 
 module.exports = {
   EntitlementError,
   assertCanCreateCampaign,
   recordCampaignSpend,
-  getUsageSnapshot
+  entitlementErrorBody
 };

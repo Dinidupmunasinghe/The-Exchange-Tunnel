@@ -4,7 +4,13 @@ const db = require("../models");
 const sequelize = require("../config/database");
 const env = require("../config/env");
 const tg = require("../services/telegramService");
-const { adjustCreditsByAdmin, refundCredits, reverseEarnCredits } = require("../services/creditService");
+const { adjustCreditsByAdmin, refundCredits } = require("../services/creditService");
+const { revertEngagement } = require("../services/engagementRevertService");
+const {
+  deleteCampaignWithRefund,
+  cancelCampaignWithRefund,
+  isCampaignFinished
+} = require("../services/campaignLifecycleService");
 const { logAdminAction } = require("../services/adminAuditService");
 const { auditSubscribeEngagements, auditSubscriptionMemory } = require("../services/subscriptionAuditService");
 const { auditLikeEngagements } = require("../services/likeEngagementAuditService");
@@ -142,9 +148,9 @@ async function listUsers(req, res) {
   const where = {};
   if (query) {
     where[Op.or] = [
-      { email: { [Op.like]: `%${query}%` } },
-      { name: { [Op.like]: `%${query}%` } },
-      { telegramUserId: { [Op.like]: `%${query}%` } }
+      { email: { [sequelize.likeOp()]: `%${query}%` } },
+      { name: { [sequelize.likeOp()]: `%${query}%` } },
+      { telegramUserId: { [sequelize.likeOp()]: `%${query}%` } }
     ];
   }
   if (status === "active") where.isActive = true;
@@ -646,22 +652,24 @@ function readPackageBody(body) {
   const priceLabel = String(body.priceLabel || "").trim();
   const pricePeriod = String(body.pricePeriod || "/month").trim() || "/month";
   const credits = Number(body.credits);
-  const priceLkr = Number(body.priceLkr);
+  const priceLkr = Number.isFinite(Number(body.priceLkr)) ? Number(body.priceLkr) : 0;
   const features = parseFeatures(body.features);
   const isPopular = Boolean(body.isPopular);
   const isActive = body.isActive !== false;
   const sortOrder = Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0;
-  const isFree = Boolean(body.isFree) || priceUsdFromLabel(priceLabel, priceLkr) <= 0;
+  // priceUsd is the billing price (what PayPal charges); the label is display text only.
   const priceUsd =
     body.priceUsd != null && body.priceUsd !== ""
       ? Number(body.priceUsd)
-      : priceUsdFromLabel(priceLabel, priceLkr);
+      : priceUsdFromLabel(priceLabel, 0);
+  const isFree = body.isFree === true || body.isFree === "true" || !(Number(priceUsd) > 0);
   const entitlements = serializeEntitlements(
     body.entitlements != null
       ? body.entitlements
       : defaultEntitlementsForPackage({ credits, isFree })
   );
-  const billingInterval = String(body.billingInterval || "MONTH").trim() || "MONTH";
+  const interval = String(body.billingInterval || "MONTH").trim().toUpperCase();
+  const billingInterval = ["DAY", "WEEK", "MONTH", "YEAR"].includes(interval) ? interval : "MONTH";
   return {
     name,
     tagline,
@@ -688,9 +696,9 @@ function validatePackagePayload(payload, { partial = false } = {}) {
       return "Credits must be a positive integer";
     }
   }
-  if (payload.priceLkr != null) {
-    if (!Number.isFinite(payload.priceLkr) || payload.priceLkr < 0) {
-      return "Price must be a valid non-negative number";
+  if (payload.priceUsd != null) {
+    if (!Number.isFinite(Number(payload.priceUsd)) || Number(payload.priceUsd) < 0) {
+      return "Price (USD) must be a valid non-negative number";
     }
   }
   return null;
@@ -744,8 +752,23 @@ async function updateCreditPackage(req, res) {
   if (req.body.billingInterval != null) updates.billingInterval = payload.billingInterval;
   const err = validatePackagePayload(updates, { partial: true });
   if (err) return res.status(400).json({ message: err });
+  const billingChanged =
+    (updates.priceUsd != null && Number(updates.priceUsd) !== Number(pkg.priceUsd)) ||
+    (updates.billingInterval != null && updates.billingInterval !== pkg.billingInterval) ||
+    (updates.isFree != null && Boolean(updates.isFree) !== Boolean(pkg.isFree));
   Object.assign(pkg, updates);
   await pkg.save();
+  // The PayPal plan carries the price: a new price needs a new plan, or new subscribers
+  // would keep being billed the old amount.
+  let paypalSync = null;
+  if (billingChanged && pkg.paypalPlanId) {
+    if (paypal.isConfigured() && !pkg.isFree && Number(pkg.priceUsd) > 0) {
+      paypalSync = await paypal.syncPlanForPackage(pkg).catch((e) => ({ ok: false, message: e.message }));
+      if (!paypalSync.ok) await pkg.update({ paypalPlanId: null });
+    } else {
+      await pkg.update({ paypalPlanId: null });
+    }
+  }
   await logAdminAction({
     req,
     action: "update_credit_package",
@@ -753,7 +776,13 @@ async function updateCreditPackage(req, res) {
     targetId: id,
     payload: updates
   });
-  return res.json({ message: "Package updated", package: serializeCreditPackage(pkg) });
+  return res.json({
+    message:
+      paypalSync && !paypalSync.ok
+        ? `Package updated, but PayPal plan sync failed: ${paypalSync.message}`
+        : "Package updated",
+    package: serializeCreditPackage(pkg)
+  });
 }
 
 async function deleteCreditPackage(req, res) {
@@ -761,6 +790,18 @@ async function deleteCreditPackage(req, res) {
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid package id" });
   const pkg = await db.CreditPackage.findByPk(id);
   if (!pkg) return res.status(404).json({ message: "Package not found" });
+  const subscribers = await db.UserSubscription.count({
+    where: { packageId: id, status: ["active", "past_due", "suspended", "pending"] }
+  });
+  if (subscribers > 0) {
+    // Keep the row so existing subscribers keep their plan; just hide it from new buyers.
+    await pkg.update({ isActive: false });
+    await logAdminAction({ req, action: "deactivate_credit_package", targetType: "package", targetId: id });
+    return res.json({
+      message: `Package has ${subscribers} subscriber(s), so it was hidden instead of deleted.`,
+      package: serializeCreditPackage(pkg)
+    });
+  }
   await pkg.destroy();
   await logAdminAction({ req, action: "delete_credit_package", targetType: "package", targetId: id });
   return res.json({ message: "Package deleted" });
@@ -771,7 +812,12 @@ async function syncPackagePayPalPlan(req, res) {
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid package id" });
   const pkg = await db.CreditPackage.findByPk(id);
   if (!pkg) return res.status(404).json({ message: "Package not found" });
-  const result = await paypal.syncPlanForPackage(pkg);
+  let result;
+  try {
+    result = await paypal.syncPlanForPackage(pkg);
+  } catch (e) {
+    return res.status(502).json({ message: e.message || "PayPal sync failed" });
+  }
   if (!result.ok) return res.status(400).json({ message: result.message || "PayPal sync failed" });
   await pkg.reload();
   return res.json({ message: "PayPal plan synced", result, package: serializeCreditPackage(pkg) });
@@ -842,7 +888,7 @@ async function listCampaigns(req, res) {
     where.status = status;
   }
   if (ownerId && Number.isInteger(ownerId)) where.userId = ownerId;
-  if (query) where.name = { [Op.like]: `%${query}%` };
+  if (query) where.name = { [sequelize.likeOp()]: `%${query}%` };
 
   const { rows, count } = await db.Campaign.findAndCountAll({
     where,
@@ -910,6 +956,9 @@ async function updateCampaign(req, res) {
     return res.status(400).json({ message: "Invalid action. Use pause, resume or cancel" });
   }
 
+  if (campaign.status === "cancelled") {
+    return res.status(400).json({ message: "Campaign is cancelled" });
+  }
   if (action === "pause") {
     if (campaign.status === "completed") {
       return res.status(400).json({ message: "Cannot pause a completed campaign" });
@@ -931,10 +980,7 @@ async function updateCampaign(req, res) {
     if (campaign.status !== "paused") {
       return res.status(400).json({ message: "Campaign is not paused" });
     }
-    const completed = await db.Task.count({
-      where: { campaignId: id, status: "completed" }
-    });
-    if (completed >= campaign.maxEngagements) {
+    if (await isCampaignFinished(campaign)) {
       campaign.status = "completed";
     } else {
       const now = new Date();
@@ -950,16 +996,32 @@ async function updateCampaign(req, res) {
     });
     return res.json({ message: "Campaign resumed", campaign });
   }
-  // cancel = mark completed without deleting
-  campaign.status = "completed";
-  await campaign.save();
+  // cancel = stop for good, refund unfinished slots to the owner, keep history
+  let result;
+  try {
+    result = await sequelize.transaction((transaction) =>
+      cancelCampaignWithRefund({
+        campaignId: id,
+        reason: `Admin cancellation: refund unused budget for campaign #${id}`,
+        transaction
+      })
+    );
+  } catch (err) {
+    if (err.status && err.status < 500) return res.status(err.status).json({ message: err.message });
+    throw err;
+  }
   await logAdminAction({
     req,
     action: "cancel_campaign",
     targetType: "campaign",
-    targetId: id
+    targetId: id,
+    payload: { refundedCredits: result.refundedCredits }
   });
-  return res.json({ message: "Campaign cancelled", campaign });
+  return res.json({
+    message: "Campaign cancelled",
+    campaign: result.campaign,
+    refundedCredits: result.refundedCredits
+  });
 }
 
 async function deleteCampaign(req, res) {
@@ -970,32 +1032,13 @@ async function deleteCampaign(req, res) {
   let ownerId = null;
   try {
     await sequelize.transaction(async (transaction) => {
-      const campaign = await db.Campaign.findByPk(id, { transaction });
-      if (!campaign) {
-        const err = new Error("Campaign not found");
-        err.status = 404;
-        throw err;
-      }
-      ownerId = campaign.userId;
-      const completed = await db.Task.count({
-        where: { campaignId: campaign.id, status: "completed" },
+      const result = await deleteCampaignWithRefund({
+        campaignId: id,
+        reason: `Admin deletion: refund unused budget for campaign #${id}`,
         transaction
       });
-      const refund = (campaign.maxEngagements - completed) * campaign.creditsPerEngagement;
-      await db.Engagement.destroy({ where: { campaignId: campaign.id }, transaction });
-      await db.Task.destroy({ where: { campaignId: campaign.id }, transaction });
-      await campaign.destroy({ transaction });
-      if (refund > 0) {
-        await refundCredits({
-          userId: campaign.userId,
-          amount: refund,
-          reason: `Admin deletion: refund unused budget for campaign #${id}`,
-          referenceType: "campaign",
-          referenceId: id,
-          transaction
-        });
-        refundedCredits = refund;
-      }
+      ownerId = result.campaign.userId;
+      refundedCredits = result.refundedCredits;
     });
   } catch (err) {
     if (err.status === 404) return res.status(404).json({ message: err.message });
@@ -1171,66 +1214,12 @@ async function reverseEngagement(req, res) {
       }
       workerId = engagement.userId;
       ownerId = engagement.campaign?.userId || null;
-
-      const amount = Number(engagement.task?.rewardCredits || 0);
-      const reversal = amount > 0
-        ? await reverseEarnCredits({
-            userId: engagement.userId,
-            amount,
-            reason: `Admin reversal of engagement #${engagement.id}`,
-            referenceType: "task",
-            referenceId: engagement.taskId,
-            beneficiaryUserId: engagement.campaign?.userId || null,
-            transaction
-          })
-        : null;
-      collected = Number(reversal?.collected || 0);
-      if (collected > 0 && engagement.campaign?.userId) {
-        await refundCredits({
-          userId: engagement.campaign.userId,
-          amount: collected,
-          reason: `Admin refund: engagement reversal on campaign #${engagement.campaignId}`,
-          referenceType: "campaign",
-          referenceId: engagement.campaignId,
-          transaction
-        });
-      }
-      // Reopen the underlying task if it was completed for this engagement.
-      const task = engagement.task;
-      if (task) {
-        task.status = "open";
-        task.assignedUserId = null;
-        task.assignedAt = null;
-        task.completedAt = null;
-        await task.save({ transaction });
-      }
-      // Clean up cross-campaign memory so users can re-earn elsewhere appropriately.
-      if (engagement.campaign?.messageKey) {
-        if (engagement.engagementType === "subscribe") {
-          await db.UserSubscriptionMemory.destroy({
-            where: {
-              userId: engagement.userId,
-              channelKey: String(engagement.campaign.messageKey)
-            },
-            transaction
-          });
-        } else if (engagement.actionKind) {
-          await db.UserPostAction.destroy({
-            where: {
-              userId: engagement.userId,
-              postKey: String(engagement.campaign.messageKey),
-              actionKind: engagement.actionKind
-            },
-            transaction
-          });
-        }
-      }
-      // If campaign was completed, reopen because of new free slot.
-      if (engagement.campaign?.status === "completed") {
-        engagement.campaign.status = "active";
-        await engagement.campaign.save({ transaction });
-      }
-      await engagement.destroy({ transaction });
+      const result = await revertEngagement({
+        engagement,
+        reason: `Admin reversal of engagement #${engagement.id}`,
+        transaction
+      });
+      collected = result.collected;
     });
   } catch (err) {
     if (err.status === 404) return res.status(404).json({ message: err.message });
@@ -1328,8 +1317,8 @@ async function listAuditLogs(req, res) {
   const action = String(req.query.action || "").trim();
 
   const where = {};
-  if (adminEmail) where.adminEmail = { [Op.like]: `%${adminEmail}%` };
-  if (action) where.action = { [Op.like]: `%${action}%` };
+  if (adminEmail) where.adminEmail = { [sequelize.likeOp()]: `%${adminEmail}%` };
+  if (action) where.action = { [sequelize.likeOp()]: `%${action}%` };
 
   const { rows, count } = await db.AdminAuditLog.findAndCountAll({
     where,

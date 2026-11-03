@@ -1,4 +1,9 @@
 const { Op } = require("sequelize");
+const {
+  assertCanCreateCampaign,
+  recordCampaignSpend,
+  entitlementErrorBody
+} = require("../services/entitlementService");
 const db = require("../models");
 const sequelize = require("../config/database");
 const tg = require("../services/telegramService");
@@ -116,7 +121,12 @@ async function requestRepost(req, res) {
   }
 
   const key = tg.stableKeyFromTmeMessage(parsed) || stableKeyFromUrl(messageUrl);
-  const created = await sequelize.transaction(async (transaction) => {
+  let created;
+  try {
+  created = await sequelize.transaction(async (transaction) => {
+    // Balance + free-plan cap checked under the owner's row lock (parallel requests safe).
+    const lockedOwner = await db.User.findByPk(req.user.id, { transaction, lock: true });
+    await assertCanCreateCampaign(lockedOwner, { totalBudget: credits, transaction, skipCampaignLimit: true });
     const campaign = await db.Campaign.create(
       {
         userId: req.user.id,
@@ -149,8 +159,16 @@ async function requestRepost(req, res) {
       referenceId: campaign.id,
       transaction
     });
+    await recordCampaignSpend(req.user.id, credits, { transaction });
     return { campaign, task };
   });
+  } catch (err) {
+    if (err.name === "EntitlementError") {
+      const { status, body: errBody } = entitlementErrorBody(err);
+      return res.status(status).json(errBody);
+    }
+    throw err;
+  }
 
   return res.status(201).json({
     message: "Repost request sent",

@@ -8,17 +8,29 @@ const {
   serializeEntitlements
 } = require("./utils/packageEntitlements");
 
+/** describeTable, or null when the table does not exist yet (fresh database). */
+async function describeTableOrNull(queryInterface, tableName) {
+  try {
+    return await queryInterface.describeTable(tableName);
+  } catch {
+    return null;
+  }
+}
+
 async function addColumnIfMissing(queryInterface, tableName, columnName, definition) {
-  const columns = await queryInterface.describeTable(tableName);
+  const columns = await describeTableOrNull(queryInterface, tableName);
+  // Missing table: sync() will create it with every model column, so nothing to patch.
+  if (!columns) return;
   if (!Object.prototype.hasOwnProperty.call(columns, columnName)) {
     await queryInterface.addColumn(tableName, columnName, definition);
   }
 }
 
-async function addIndexIfMissing(queryInterface, tableName, indexName, fields) {
+async function addIndexIfMissing(queryInterface, tableName, indexName, fields, options = {}) {
+  if (!(await describeTableOrNull(queryInterface, tableName))) return;
   const indexes = await queryInterface.showIndex(tableName);
   if (!indexes.some((idx) => idx.name === indexName)) {
-    await queryInterface.addIndex(tableName, fields, { name: indexName });
+    await queryInterface.addIndex(tableName, fields, { name: indexName, ...options });
   }
 }
 
@@ -47,6 +59,41 @@ async function ensureSchemaPatches() {
   }
   await ensureCreditPackageColumns(qi);
   await ensureUserSubscriptionColumns(qi);
+  await ensureEnumValues(qi, "campaigns", "status", ["pending", "active", "paused", "completed", "cancelled"]);
+}
+
+/**
+ * Adds missing values to an existing ENUM column (MySQL inline ENUM or Postgres enum type).
+ * Fresh databases get the full list from sync(), so a missing table is skipped.
+ */
+async function ensureEnumValues(queryInterface, tableName, columnName, values) {
+  const columns = await describeTableOrNull(queryInterface, tableName);
+  if (!columns || !columns[columnName]) return;
+  const dialect = db.sequelize.getDialect();
+  try {
+    if (dialect === "postgres") {
+      const typeName = `enum_${tableName}_${columnName}`;
+      for (const v of values) {
+        await db.sequelize.query(`ALTER TYPE "${typeName}" ADD VALUE IF NOT EXISTS '${v}'`);
+      }
+      return;
+    }
+    const current = String(columns[columnName].type || "");
+    if (values.every((v) => current.includes(`'${v}'`))) return;
+    const col = columns[columnName];
+    await queryInterface.changeColumn(tableName, columnName, {
+      type: db.sequelize.Sequelize.ENUM(...values),
+      allowNull: col.allowNull,
+      defaultValue: col.defaultValue ?? undefined
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[schema] could not extend ${tableName}.${columnName} enum:`, err.message);
+  }
+}
+
+/** Data seeding/backfills: run after sync() so every table and column exists. */
+async function ensureSeedData() {
   await seedDefaultCreditPackages();
   await backfillPackageEntitlements();
 }
@@ -105,34 +152,83 @@ async function ensureCreditPackageColumns(queryInterface) {
 }
 
 async function ensureUserSubscriptionColumns(queryInterface) {
+  const S = db.sequelize.Sequelize;
   await addColumnIfMissing(queryInterface, "users", "lifetimeCreditsSpent", {
-    type: db.sequelize.Sequelize.INTEGER,
+    type: S.INTEGER,
     allowNull: false,
     defaultValue: 0
   });
+  const userCols = await describeTableOrNull(queryInterface, "users");
+  if (userCols && !userCols.freeGrantGivenAt) {
+    await queryInterface.addColumn("users", "freeGrantGivenAt", { type: S.DATE, allowNull: true });
+    // Existing accounts already received their free credits under the old rules.
+    await db.User.update({ freeGrantGivenAt: new Date() }, { where: {} });
+  }
+  for (const [name, type] of [
+    ["resourceId", S.STRING(120)],
+    ["creditsGranted", S.INTEGER],
+    ["userId", S.INTEGER],
+    ["processingAt", S.DATE]
+  ]) {
+    await addColumnIfMissing(queryInterface, "payment_events", name, { type, allowNull: true });
+  }
+  await ensureEnumValues(queryInterface, "user_subscriptions", "status", [
+    "active",
+    "past_due",
+    "cancelled",
+    "expired",
+    "pending",
+    "suspended"
+  ]);
+  try {
+    await addIndexIfMissing(
+      queryInterface,
+      "user_subscriptions",
+      "uniq_user_subscriptions_paypal_id",
+      ["paypalSubscriptionId"],
+      { unique: true }
+    );
+    await addIndexIfMissing(queryInterface, "engagements", "idx_engagements_user_campaign_action", [
+      "userId",
+      "campaignId",
+      "actionKind"
+    ]);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[schema] index patch skipped:", err.message);
+  }
+  try {
+    const pkgCols = await describeTableOrNull(queryInterface, "credit_packages");
+    if (pkgCols?.priceLkr && pkgCols.priceLkr.allowNull === false) {
+      await queryInterface.changeColumn("credit_packages", "priceLkr", {
+        type: S.DECIMAL(10, 2),
+        allowNull: true,
+        defaultValue: 0
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[schema] priceLkr patch skipped:", err.message);
+  }
 }
 
+/**
+ * One-time migration for packages created before entitlements/priceUsd existed
+ * (rows with entitlements IS NULL). Price comes from the display label first; isFree is only
+ * inferred for these legacy rows and never overrides what an admin set later.
+ */
 async function backfillPackageEntitlements() {
-  const rows = await db.CreditPackage.findAll();
+  const { priceUsdFromLabel } = require("./utils/packageEntitlements");
+  const rows = await db.CreditPackage.findAll({ where: { entitlements: null } });
   for (const row of rows) {
-    const isFree =
-      Boolean(row.isFree) ||
-      String(row.priceLabel || "")
-        .trim()
-        .toLowerCase() === "free" ||
-      Number(row.priceUsd || 0) <= 0;
-    const patch = {};
-    if (!row.entitlements) {
-      patch.entitlements = serializeEntitlements(
-        defaultEntitlementsForPackage({ credits: row.credits, isFree })
-      );
-    }
-    if (row.isFree !== isFree) patch.isFree = isFree;
-    if (!Number(row.priceUsd) && !isFree) {
-      const { priceUsdFromLabel } = require("./utils/packageEntitlements");
-      patch.priceUsd = priceUsdFromLabel(row.priceLabel, row.priceLkr);
-    }
-    if (Object.keys(patch).length) await row.update(patch);
+    const label = String(row.priceLabel || "").trim();
+    const priceUsd = Number(row.priceUsd) > 0 ? Number(row.priceUsd) : priceUsdFromLabel(label, 0);
+    const isFree = Boolean(row.isFree) || label.toLowerCase() === "free" || priceUsd <= 0;
+    await row.update({
+      priceUsd: isFree ? 0 : priceUsd,
+      isFree,
+      entitlements: serializeEntitlements(defaultEntitlementsForPackage({ credits: row.credits, isFree }))
+    });
   }
 }
 
@@ -324,6 +420,7 @@ async function bootstrap() {
     await ensureDevSchema();
     await ensureActionKindColumnCompatibility();
     await db.sequelize.sync(env.dbSyncAlter ? { alter: true } : undefined);
+    await ensureSeedData();
     const server = http.createServer(app);
 
     if (!env.isProduction && process.env.SOCKET_IO_ENABLED === "true") {
@@ -345,6 +442,12 @@ async function bootstrap() {
       activateDueCampaigns().catch(() => undefined);
     }, 60 * 1000);
     activateDueCampaigns().catch(() => undefined);
+
+    const { expireEndedSubscriptions } = require("./services/subscriptionService");
+    setInterval(() => {
+      expireEndedSubscriptions().catch(() => undefined);
+    }, 60 * 60 * 1000);
+    expireEndedSubscriptions().catch(() => undefined);
 
     if (!env.auditsEnabled) return;
     const { auditSubscribeEngagements, auditSubscriptionMemory } = require("./services/subscriptionAuditService");

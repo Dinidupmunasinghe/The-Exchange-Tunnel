@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
       maxEngagements: { type: DataTypes.INTEGER, allowNull: false },
       spentCredits: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       status: {
-        type: DataTypes.ENUM("pending", "active", "paused", "completed"),
+        type: DataTypes.ENUM("pending", "active", "paused", "completed", "cancelled"),
         allowNull: false,
         defaultValue: "pending"
       }

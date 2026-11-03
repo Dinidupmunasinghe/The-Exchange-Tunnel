@@ -33,4 +33,10 @@ const sequelize = env.db.url
       port: env.db.port
     });
 
+/** Case-insensitive LIKE on every dialect (MySQL LIKE is already CI; Postgres needs ILIKE). */
+sequelize.likeOp = () => {
+  const { Op } = require("sequelize");
+  return sequelize.getDialect() === "postgres" ? Op.iLike : Op.like;
+};
+
 module.exports = sequelize;

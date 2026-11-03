@@ -1,13 +1,26 @@
 const { Op } = require("sequelize");
 const db = require("../models");
+const auditCursor = require("./auditCursor");
 const sequelize = require("../config/database");
 const tg = require("./telegramService");
-const { reverseEarnCredits, refundCredits } = require("./creditService");
+const { revertEngagement } = require("./engagementRevertService");
 
-function parseChannelIdFromMeta(metaEngagementId) {
-  const raw = String(metaEngagementId || "");
-  const m = /^tg-mem-\d+-(-?\d+)$/.exec(raw);
-  return m ? m[1] : null;
+/**
+ * Channel of a comment campaign, derived from the campaign's post link.
+ * (Comment engagements are stored as "tg-com-…", so the old "tg-mem-…" parse never matched
+ * and this audit silently did nothing.)
+ */
+async function resolveCampaignChannelId(campaign, cache) {
+  const url = String(campaign?.messageUrl || "");
+  if (cache.has(url)) return cache.get(url);
+  let chatId = null;
+  const parsed = tg.parseTmeMessageUrl(url);
+  if (parsed) {
+    const resolved = await tg.resolveChannelChatIdFromTme(parsed, null).catch(() => null);
+    if (resolved && !resolved.error && resolved.chatId) chatId = String(resolved.chatId);
+  }
+  cache.set(url, chatId);
+  return chatId;
 }
 
 /**
@@ -18,8 +31,10 @@ function parseChannelIdFromMeta(metaEngagementId) {
 async function auditCommentMembershipEngagements() {
   if (!tg.isConfigured()) return { scanned: 0, reversed: 0 };
 
+  const cursor = await auditCursor.get("commentMembership");
   const rows = await db.Engagement.findAll({
     where: {
+      ...auditCursor.where(cursor),
       actionKind: "comment",
       verificationStatus: "verified"
     },
@@ -47,15 +62,17 @@ async function auditCommentMembershipEngagements() {
       }
     ],
     order: [["id", "DESC"]],
-    limit: Number(process.env.AUDIT_BATCH_SIZE || 25)
+    limit: auditCursor.BATCH_SIZE
   });
+  await auditCursor.advance("commentMembership", rows);
 
   let reversed = 0;
+  const channelCache = new Map();
   for (const e of rows) {
     const workerTelegramId = e.user?.telegramUserId ? String(e.user.telegramUserId) : null;
     if (!workerTelegramId) continue;
 
-    const channelId = parseChannelIdFromMeta(e.metaEngagementId);
+    const channelId = await resolveCampaignChannelId(e.campaign, channelCache);
     if (!channelId) continue;
 
     const detail = await tg.getUserChatMemberStatus(String(channelId), workerTelegramId);
@@ -76,50 +93,11 @@ async function auditCommentMembershipEngagements() {
         if (!fresh.task || fresh.task.status !== "completed") return;
         if (!fresh.campaign || fresh.campaign.status === "paused") return;
 
-        const amount = fresh.task.rewardCredits;
-        const reversal = await reverseEarnCredits({
-          userId: fresh.userId,
-          amount,
+        await revertEngagement({
+          engagement: fresh,
           reason: `Auto-reversal: left channel after comment on campaign #${fresh.campaignId} (task #${fresh.taskId})`,
-          referenceType: "task",
-          referenceId: fresh.taskId,
-          beneficiaryUserId: fresh.campaign.userId,
           transaction
         });
-        const collected = Number(reversal?.collected || 0);
-        if (collected > 0) {
-          await refundCredits({
-            userId: fresh.campaign.userId,
-            amount: collected,
-            reason: `Auto-refund: worker left channel after comment on campaign #${fresh.campaignId}`,
-            referenceType: "campaign",
-            referenceId: fresh.campaignId,
-            transaction
-          });
-        }
-
-        fresh.task.status = "open";
-        fresh.task.assignedUserId = null;
-        fresh.task.assignedAt = null;
-        fresh.task.completedAt = null;
-        await fresh.task.save({ transaction });
-
-        await fresh.destroy({ transaction });
-        if (fresh.campaign?.messageKey) {
-          await db.UserPostAction.destroy({
-            where: {
-              userId: fresh.userId,
-              postKey: String(fresh.campaign.messageKey),
-              actionKind: "comment"
-            },
-            transaction
-          });
-        }
-
-        if (fresh.campaign.status === "completed") {
-          fresh.campaign.status = "active";
-          await fresh.campaign.save({ transaction });
-        }
       });
       reversed += 1;
     } catch {

@@ -6,7 +6,7 @@ module.exports = (sequelize, DataTypes) => {
       userId: { type: DataTypes.INTEGER, allowNull: false },
       packageId: { type: DataTypes.INTEGER, allowNull: false },
       status: {
-        type: DataTypes.ENUM("active", "past_due", "cancelled", "expired"),
+        type: DataTypes.ENUM("active", "past_due", "cancelled", "expired", "pending", "suspended"),
         allowNull: false,
         defaultValue: "active"
       },
@@ -21,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: true,
       indexes: [
         { fields: ["userId"] },
-        { fields: ["paypalSubscriptionId"] },
+        { unique: true, fields: ["paypalSubscriptionId"], name: "uniq_user_subscriptions_paypal_id" },
         { fields: ["status"] }
       ]
     }

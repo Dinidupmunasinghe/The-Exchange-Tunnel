@@ -2,8 +2,16 @@ const crypto = require("crypto");
 const db = require("../models");
 const sequelize = require("../config/database");
 const tg = require("../services/telegramService");
-const { spendCredits, refundCredits, getRewardByType } = require("../services/creditService");
-const { assertCanCreateCampaign, recordCampaignSpend } = require("../services/entitlementService");
+const { spendCredits, getRewardByType } = require("../services/creditService");
+const {
+  deleteCampaignWithRefund,
+  isCampaignFinished
+} = require("../services/campaignLifecycleService");
+const {
+  assertCanCreateCampaign,
+  recordCampaignSpend,
+  entitlementErrorBody
+} = require("../services/entitlementService");
 const { ENGAGEMENT_TYPES } = require("../constants/engagement");
 
 function normalizeCampaignName(raw) {
@@ -132,21 +140,18 @@ async function createCampaign(req, res) {
   const launchesLater = scheduledLaunchAt && scheduledLaunchAt > now;
   const status = launchesLater ? "pending" : "active";
 
-  try {
-    await assertCanCreateCampaign(owner, { totalBudget });
-  } catch (err) {
-    const status = err.status || 400;
-    return res.status(status).json({
-      message: err.message,
-      code: err.code || (status === 402 ? "PLAN_UPGRADE_REQUIRED" : undefined),
-      required: err.required,
-      balance: err.balance,
-      freeCreditCap: err.freeCreditCap,
-      lifetimeCreditsSpent: err.lifetimeCreditsSpent
-    });
+  if (!Number.isInteger(Number(maxEngagements)) || Number(maxEngagements) < 1 || Number(maxEngagements) > 10000) {
+    return res.status(400).json({ message: "maxEngagements must be a whole number between 1 and 10000" });
   }
 
-  const createdCampaign = await sequelize.transaction(async (transaction) => {
+  let createdCampaign;
+  try {
+    // Fast feedback before doing any writes.
+    await assertCanCreateCampaign(owner, { totalBudget });
+    createdCampaign = await sequelize.transaction(async (transaction) => {
+    // Re-check under the user row lock so parallel requests cannot all pass the plan limits.
+    const lockedOwner = await db.User.findByPk(req.user.id, { transaction, lock: true });
+    await assertCanCreateCampaign(lockedOwner, { totalBudget, transaction });
     const campaign = await db.Campaign.create(
       {
         userId: req.user.id,
@@ -181,6 +186,13 @@ async function createCampaign(req, res) {
     await db.Task.bulkCreate(taskPayload, { transaction });
     return campaign;
   });
+  } catch (err) {
+    if (err.name === "EntitlementError") {
+      const { status, body: errBody } = entitlementErrorBody(err);
+      return res.status(status).json(errBody);
+    }
+    throw err;
+  }
 
   return res.status(201).json({
     message: launchesLater ? "Campaign scheduled" : "Campaign created",
@@ -228,8 +240,8 @@ async function patchCampaign(req, res) {
     return res.status(404).json({ message: "Campaign not found" });
   }
   if (action === "pause") {
-    if (campaign.status === "completed") {
-      return res.status(400).json({ message: "Cannot pause a completed campaign" });
+    if (campaign.status === "completed" || campaign.status === "cancelled") {
+      return res.status(400).json({ message: `Cannot pause a ${campaign.status} campaign` });
     }
     if (campaign.status === "paused") {
       return res.status(400).json({ message: "Campaign is already paused" });
@@ -245,10 +257,7 @@ async function patchCampaign(req, res) {
     if (campaign.status !== "paused") {
       return res.status(400).json({ message: "Campaign is not paused" });
     }
-    const completed = await db.Task.count({
-      where: { campaignId: campaign.id, status: "completed" }
-    });
-    if (completed >= campaign.maxEngagements) {
+    if (await isCampaignFinished(campaign)) {
       campaign.status = "completed";
       await campaign.save();
       return res.json({ message: "Campaign completed", campaign });
@@ -270,32 +279,15 @@ async function deleteCampaign(req, res) {
   if (!Number.isFinite(id) || id < 1) {
     return res.status(400).json({ message: "Invalid campaign id" });
   }
+  let refundedCredits = 0;
   try {
     await sequelize.transaction(async (transaction) => {
-      const campaign = await db.Campaign.findOne({ where: { id, userId: req.user.id }, transaction });
-      if (!campaign) {
-        const err = new Error("Campaign not found");
-        err.status = 404;
-        throw err;
-      }
-      const completed = await db.Task.count({
-        where: { campaignId: campaign.id, status: "completed" },
+      const result = await deleteCampaignWithRefund({
+        campaignId: id,
+        ownerUserId: req.user.id,
         transaction
       });
-      const refund = (campaign.maxEngagements - completed) * campaign.creditsPerEngagement;
-      await db.Engagement.destroy({ where: { campaignId: campaign.id }, transaction });
-      await db.Task.destroy({ where: { campaignId: campaign.id }, transaction });
-      await campaign.destroy({ transaction });
-      if (refund > 0) {
-        await refundCredits({
-          userId: req.user.id,
-          amount: refund,
-          reason: `Refund unused budget for deleted campaign #${id}`,
-          referenceType: "campaign",
-          referenceId: id,
-          transaction
-        });
-      }
+      refundedCredits = result.refundedCredits;
     });
   } catch (e) {
     if (e.status === 404) {
@@ -305,7 +297,7 @@ async function deleteCampaign(req, res) {
     console.error(e);
     return res.status(500).json({ message: "Could not delete campaign" });
   }
-  return res.json({ message: "Campaign deleted" });
+  return res.json({ message: "Campaign deleted", refundedCredits });
 }
 
 async function getCampaignRewards(req, res) {

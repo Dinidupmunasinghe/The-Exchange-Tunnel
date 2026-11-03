@@ -1,8 +1,9 @@
 const { Op } = require("sequelize");
 const db = require("../models");
+const auditCursor = require("./auditCursor");
 const sequelize = require("../config/database");
 const tg = require("./telegramService");
-const { reverseEarnCredits, refundCredits } = require("./creditService");
+const { revertEngagement } = require("./engagementRevertService");
 
 function parseTmeChannelUsername(url) {
   try {
@@ -32,8 +33,10 @@ function parseChannelIdFromSubscriptionKey(channelKey) {
 async function auditSubscribeEngagements() {
   if (!tg.isConfigured()) return { scanned: 0, reversed: 0 };
 
+  const cursor = await auditCursor.get("subscribe");
   const rows = await db.Engagement.findAll({
     where: {
+      ...auditCursor.where(cursor),
       engagementType: "subscribe",
       verificationStatus: "verified"
     },
@@ -61,8 +64,9 @@ async function auditSubscribeEngagements() {
       }
     ],
     order: [["id", "DESC"]],
-    limit: Number(process.env.AUDIT_BATCH_SIZE || 25)
+    limit: auditCursor.BATCH_SIZE
   });
+  await auditCursor.advance("subscribe", rows);
 
   let reversed = 0;
   for (const e of rows) {
@@ -92,49 +96,11 @@ async function auditSubscribeEngagements() {
         if (!fresh.task || fresh.task.status !== "completed") return;
         if (!fresh.campaign || fresh.campaign.status === "paused") return;
 
-        const amount = fresh.task.rewardCredits;
-        const reversal = await reverseEarnCredits({
-          userId: fresh.userId,
-          amount,
+        await revertEngagement({
+          engagement: fresh,
           reason: `Auto-reversal: unsubscribed from channel on campaign #${fresh.campaignId} (task #${fresh.taskId})`,
-          referenceType: "task",
-          referenceId: fresh.taskId,
-          beneficiaryUserId: fresh.campaign.userId,
           transaction
         });
-        const collected = Number(reversal?.collected || 0);
-        if (collected > 0) {
-          await refundCredits({
-            userId: fresh.campaign.userId,
-            amount: collected,
-            reason: `Auto-refund: worker unsubscribed from campaign #${fresh.campaignId}`,
-            referenceType: "campaign",
-            referenceId: fresh.campaignId,
-            transaction
-          });
-        }
-
-        fresh.task.status = "open";
-        fresh.task.assignedUserId = null;
-        fresh.task.assignedAt = null;
-        fresh.task.completedAt = null;
-        await fresh.task.save({ transaction });
-
-        await fresh.destroy({ transaction });
-        if (fresh.campaign?.messageKey) {
-          await db.UserSubscriptionMemory.destroy({
-            where: {
-              userId: fresh.userId,
-              channelKey: String(fresh.campaign.messageKey)
-            },
-            transaction
-          });
-        }
-
-        if (fresh.campaign.status === "completed") {
-          fresh.campaign.status = "active";
-          await fresh.campaign.save({ transaction });
-        }
       });
       reversed += 1;
     } catch {
@@ -152,11 +118,14 @@ async function auditSubscribeEngagements() {
 async function auditSubscriptionMemory() {
   if (!tg.isConfigured()) return { scanned: 0, cleared: 0 };
 
+  const cursor = await auditCursor.get("subscriptionMemory");
   const rows = await db.UserSubscriptionMemory.findAll({
+    where: auditCursor.where(cursor),
     include: [{ model: db.User, as: "user", required: true, attributes: ["id", "telegramUserId"] }],
     order: [["id", "DESC"]],
-    limit: Number(process.env.AUDIT_BATCH_SIZE || 25)
+    limit: auditCursor.BATCH_SIZE
   });
+  await auditCursor.advance("subscriptionMemory", rows);
 
   let cleared = 0;
   for (const row of rows) {

@@ -16,12 +16,21 @@ async function loadDynamicLimits(transaction) {
     transaction
   }).catch(() => []);
   const map = new Map(rows.map((r) => [String(r.key), String(r.value)]));
+  // An admin-set 0 is a real value (e.g. disable a reward), so only fall back on missing/NaN.
+  const pick = (key, ...fallbacks) => {
+    for (const v of [map.get(key), ...fallbacks]) {
+      if (v == null || v === "") continue;
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+    return 0;
+  };
   const out = {
-    dailyEarnLimit: Number(map.get("dailyEarnLimit") || env.limits.dailyEarnLimit || 500),
-    likeReward: Number(map.get("likeReward") || env.limits.likeReward || 5),
-    commentReward: Number(map.get("commentReward") || env.limits.commentReward || 10),
-    subscribeReward: Number(map.get("subscribeReward") || env.limits.commentReward || 10),
-    shareReward: Number(map.get("shareReward") || env.limits.shareReward || 15)
+    dailyEarnLimit: pick("dailyEarnLimit", env.limits.dailyEarnLimit, 500),
+    likeReward: pick("likeReward", env.limits.likeReward, 5),
+    commentReward: pick("commentReward", env.limits.commentReward, 10),
+    subscribeReward: pick("subscribeReward", process.env.SUBSCRIBE_REWARD, 10),
+    shareReward: pick("shareReward", env.limits.shareReward, 15)
   };
   if (!transaction) {
     limitsCache = out;
@@ -29,6 +38,9 @@ async function loadDynamicLimits(transaction) {
   }
   return out;
 }
+
+/** PendingRefund.referenceType for worker clawback shortfalls (collected and burned). */
+const CLAWBACK_DEBT_TYPE = "task_clawback";
 
 function getTodayDateString() {
   return new Date().toISOString().slice(0, 10);
@@ -102,12 +114,16 @@ async function settlePendingRefundDebts({ workerUserId, transaction }) {
     const pay = Math.min(available, Number(debt.amountRemaining || 0));
     if (pay <= 0) continue;
 
-    const owner = await db.User.findByPk(debt.ownerUserId, { transaction, lock: true });
-    if (!owner) continue;
+    // Clawback debts are burned: the owner's slot was reopened, so paying them would double-pay.
+    const burns = debt.referenceType === CLAWBACK_DEBT_TYPE;
+    const owner = burns ? null : await db.User.findByPk(debt.ownerUserId, { transaction, lock: true });
+    if (!burns && !owner) continue;
 
     worker.credits -= pay;
-    owner.credits += pay;
-    await owner.save({ transaction });
+    if (owner) {
+      owner.credits += pay;
+      await owner.save({ transaction });
+    }
 
     debt.amountRemaining -= pay;
     if (debt.amountRemaining <= 0) {
@@ -122,23 +138,25 @@ async function settlePendingRefundDebts({ workerUserId, transaction }) {
         userId: workerUserId,
         type: "spend",
         amount: -pay,
-        reason: `Auto debt settlement: ${debt.reason}`,
+        reason: `Auto debt settlement: ${debt.reason}`.slice(0, 255),
         referenceType: "pending_refund",
         referenceId: debt.id
       },
       { transaction }
     );
-    await db.Transaction.create(
-      {
-        userId: owner.id,
-        type: "earn",
-        amount: pay,
-        reason: `Refund debt settled by worker #${workerUserId}: ${debt.reason}`,
-        referenceType: "pending_refund",
-        referenceId: debt.id
-      },
-      { transaction }
-    );
+    if (owner) {
+      await db.Transaction.create(
+        {
+          userId: owner.id,
+          type: "earn",
+          amount: pay,
+          reason: `Refund debt settled by worker #${workerUserId}: ${debt.reason}`.slice(0, 255),
+          referenceType: "pending_refund",
+          referenceId: debt.id
+        },
+        { transaction }
+      );
+    }
 
     available -= pay;
     settled += pay;
@@ -165,26 +183,45 @@ async function canEarnCreditsToday({ userId, amount, transaction }) {
   return { user, allowed };
 }
 
-/** Take back credits that were earned (e.g. user removed a like). Adjusts daily earn when applicable. */
+/**
+ * Take back credits that were earned (e.g. user removed a like).
+ * Any amount the worker cannot cover becomes a "task_clawback" debt that is collected from
+ * future earnings and burned (the campaign owner is not paid twice for one slot).
+ * `debtOwnerUserId` is stored on the debt for reference only.
+ */
 async function reverseEarnCredits({
   userId,
   amount,
   reason,
   referenceType,
   referenceId,
-  beneficiaryUserId = null,
+  debtOwnerUserId = null,
   transaction
 }) {
   const n = Math.floor(Number(amount));
   if (n <= 0) return null;
   const user = await db.User.findByPk(userId, { transaction, lock: true });
   if (!user) throw new Error("User not found");
-  const collected = Math.min(Number(user.credits || 0), n);
+  const collected = Math.min(Math.max(0, Number(user.credits || 0)), n);
   const remaining = n - collected;
   user.credits -= collected;
   const today = getTodayDateString();
+  // Only give back daily-limit headroom when the reversed reward was earned today.
   if (user.dailyEarnedAt === today && user.dailyEarnedCredits > 0) {
-    user.dailyEarnedCredits = Math.max(0, Number(user.dailyEarnedCredits || 0) - collected);
+    const originalEarn =
+      referenceType && referenceId
+        ? await db.Transaction.findOne({
+            where: { userId, type: "earn", referenceType, referenceId },
+            order: [["id", "DESC"]],
+            transaction
+          })
+        : null;
+    const earnedToday = originalEarn
+      ? new Date(originalEarn.createdAt).toISOString().slice(0, 10) === today
+      : false;
+    if (earnedToday) {
+      user.dailyEarnedCredits = Math.max(0, Number(user.dailyEarnedCredits || 0) - n);
+    }
   }
   await user.save({ transaction });
   if (collected > 0) {
@@ -200,14 +237,14 @@ async function reverseEarnCredits({
       { transaction }
     );
   }
-  if (remaining > 0 && beneficiaryUserId) {
+  if (remaining > 0) {
     await db.PendingRefund.create(
       {
         workerUserId: userId,
-        ownerUserId: beneficiaryUserId,
+        ownerUserId: debtOwnerUserId || userId,
         amountRemaining: remaining,
         reason,
-        referenceType,
+        referenceType: CLAWBACK_DEBT_TYPE,
         referenceId,
         status: "pending"
       },
@@ -479,6 +516,9 @@ module.exports = {
   earnCredits,
   reverseEarnCredits,
   settlePendingRefundDebts,
+  canEarnCreditsToday,
+  loadDynamicLimits,
+  CLAWBACK_DEBT_TYPE,
   refundCredits,
   adjustCreditsByAdmin,
   getRewardByType,

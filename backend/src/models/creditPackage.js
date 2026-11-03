@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       priceLabel: { type: DataTypes.STRING(40), allowNull: true },
       pricePeriod: { type: DataTypes.STRING(24), allowNull: false, defaultValue: "/month" },
       credits: { type: DataTypes.INTEGER, allowNull: false },
-      priceLkr: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+      priceLkr: { type: DataTypes.DECIMAL(10, 2), allowNull: true, defaultValue: 0 },
       features: { type: DataTypes.TEXT, allowNull: true },
       isPopular: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       sortOrder: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
