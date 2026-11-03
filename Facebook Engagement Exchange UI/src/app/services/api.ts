@@ -30,12 +30,48 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+const WAKE_MAX_MS = 120_000;
+const WAKE_POLL_MS = 3_000;
+let wakePromise: Promise<boolean> | null = null;
+
+/**
+ * The free Render instance sleeps after ~15 min idle and can take a minute or more to boot.
+ * Poll the cheap /health endpoint until it answers (shared by every caller), so pages wait for
+ * the server instead of failing on the first 25s timeout.
+ */
+export function waitForApiAwake(): Promise<boolean> {
+  if (wakePromise) return wakePromise;
+  wakePromise = (async () => {
+    const deadline = Date.now() + WAKE_MAX_MS;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetchWithTimeout(`${API_BASE_URL}/health`, { cache: "no-store" }, 20_000);
+        if (res.ok) return true;
+      } catch {
+        // still booting
+      }
+      await new Promise((r) => setTimeout(r, WAKE_POLL_MS));
+    }
+    return false;
+  })().finally(() => {
+    window.setTimeout(() => {
+      wakePromise = null;
+    }, 5_000);
+  });
+  return wakePromise;
+}
+
+function isWakeableError(e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /failed to fetch|timed out|502|503|504|unavailable|asleep|restarting|waking up|cannot reach/i.test(msg);
+}
+
 /** Retry transient network / cold-start failures (e.g. Render waking up). */
 export async function withNetworkRetry<T>(
   fn: () => Promise<T>,
   opts?: { attempts?: number; baseDelayMs?: number }
 ): Promise<T> {
-  const attempts = opts?.attempts ?? 3;
+  const attempts = Math.max(opts?.attempts ?? 3, 2);
   const baseDelayMs = opts?.baseDelayMs ?? 2500;
   let last: unknown;
   for (let i = 0; i < attempts; i++) {
@@ -43,11 +79,11 @@ export async function withNetworkRetry<T>(
       return await fn();
     } catch (e) {
       last = e;
-      const msg = e instanceof Error ? e.message : String(e);
-      const retryable =
-        /failed to fetch|timed out|502|503|unavailable|asleep|restarting/i.test(msg);
-      if (!retryable || i >= attempts - 1) throw e;
-      await new Promise((r) => setTimeout(r, baseDelayMs * (i + 1)));
+      if (!isWakeableError(e) || i >= attempts - 1) throw e;
+      // Wait until the server is actually up, then retry right away.
+      const awake = await waitForApiAwake();
+      if (!awake) throw e;
+      if (i > 0) await new Promise((r) => setTimeout(r, baseDelayMs));
     }
   }
   throw last;
@@ -114,7 +150,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 25_000;
 function mapNetworkError(e: unknown): Error {
   if (e instanceof DOMException && e.name === "AbortError") {
     return new Error(
-      "Request timed out. The server may be waking up — wait a moment and tap Refresh feed."
+      "Request timed out. The server is taking longer than usual to wake up — please try again in a minute."
     );
   }
   if (e instanceof TypeError && (e.message === "Failed to fetch" || e.message.includes("fetch"))) {
@@ -217,9 +253,8 @@ async function requestJson<T>(
   sessionOpts?: SessionRequestOpts
 ): Promise<T> {
   const token = getToken();
-  let response: Response;
-  try {
-    response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
+  const doFetch = () =>
+    fetchWithTimeout(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -227,8 +262,23 @@ async function requestJson<T>(
         ...(options.headers || {}),
       },
     });
+  const isRead = !options.method || options.method.toUpperCase() === "GET";
+  let response: Response;
+  try {
+    response = await doFetch();
+    // Proxy says the host is still booting: wait for it, then retry reads once.
+    if (isRead && [502, 503, 504].includes(response.status) && (await waitForApiAwake())) {
+      response = await doFetch();
+    }
   } catch (e) {
-    throw mapNetworkError(e);
+    const mapped = mapNetworkError(e);
+    // Only reads are retried automatically — never risk sending a write twice.
+    if (!isRead || !isWakeableError(mapped) || !(await waitForApiAwake())) throw mapped;
+    try {
+      response = await doFetch();
+    } catch (e2) {
+      throw mapNetworkError(e2);
+    }
   }
 
   const { payload, rawText } = await readJsonBody(response);
