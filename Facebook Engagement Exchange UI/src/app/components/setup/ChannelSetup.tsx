@@ -19,11 +19,13 @@ const BOT = (import.meta.env.VITE_TELEGRAM_BOT_NAME || "ExchangeTunnelApp_bot").
 export function ChannelSetup({
   channelTitle,
   channelUsername,
+  channelVisibility,
   connected,
   onConnected,
 }: {
   channelTitle?: string | null;
   channelUsername?: string | null;
+  channelVisibility?: "public" | "private" | "unknown" | null;
   connected: boolean;
   onConnected?: () => void;
 }) {
@@ -93,7 +95,12 @@ export function ChannelSetup({
             </Button>
           </div>
         </div>
-        {!channelUsername ? (
+        {channelVisibility === "unknown" ? (
+          <Callout tone="warning" title="We couldn’t check your channel right now">
+            Make sure our bot is still an admin of your channel. If you removed it, add it again and reconnect.
+          </Callout>
+        ) : null}
+        {channelVisibility === "private" ? (
           <Callout tone="warning" title="Your channel is private">
             Subscriber campaigns need a public channel with an @username. Likes, comments and reposts work for private
             channels too.

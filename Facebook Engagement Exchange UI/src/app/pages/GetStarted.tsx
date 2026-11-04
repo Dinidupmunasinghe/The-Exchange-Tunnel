@@ -239,6 +239,7 @@ export function GetStarted() {
                 connected={setup.channel}
                 channelTitle={setup.profile?.telegramActingChannelTitle}
                 channelUsername={setup.profile?.telegramActingChannelUsername}
+                channelVisibility={setup.profile?.channelVisibility}
                 onConnected={() => advance("channel")}
               />
               {setup.channel ? <DoneRow text="" onNext={() => advance("channel")} /> : null}

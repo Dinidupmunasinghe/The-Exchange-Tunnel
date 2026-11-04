@@ -293,7 +293,7 @@ export function SubmitPost() {
           />
         </Section>
       ) : null}
-      {!setup.loading && setup.channel && campaignMode === "subscribe" && !setup.profile?.telegramActingChannelUsername ? (
+      {!setup.loading && setup.channel && campaignMode === "subscribe" && setup.profile?.channelVisibility === "private" ? (
         <Callout tone="warning" title="Subscriber campaigns need a public channel">
           Your channel has no public @username. Add one in Telegram (Channel info → Edit → Channel type → Public), then
           reconnect it in Settings — or choose a post engagement campaign instead.

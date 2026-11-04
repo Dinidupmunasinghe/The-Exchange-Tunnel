@@ -12,6 +12,43 @@ const {
   assignFreePlan
 } = require("../services/subscriptionService");
 
+/**
+ * Live check of the connected channel's public @username (Telegram is the source of truth).
+ * The stored username can be missing (channels connected before it was saved) or stale
+ * (channel made public/private later), which caused false "your channel is private" warnings.
+ * Result is cached per user for a few minutes so the profile endpoint stays fast.
+ * @returns {"public"|"private"|"unknown"|null} null = no channel connected
+ */
+const CHANNEL_CHECK_TTL_MS = 2 * 60 * 1000;
+const channelChecks = new Map(); // userId -> { channelId, visibility, at }
+
+async function refreshChannelVisibility(user) {
+  const channelId = user.telegramActingChannelId ? String(user.telegramActingChannelId) : null;
+  if (!channelId) return null;
+  const cached = channelChecks.get(user.id);
+  if (cached && cached.channelId === channelId && Date.now() - cached.at < CHANNEL_CHECK_TTL_MS) {
+    return cached.visibility;
+  }
+  let visibility = "unknown";
+  try {
+    const chat = await tg.getChat(channelId);
+    const username = chat?.username ? String(chat.username).replace(/^@/, "") : null;
+    visibility = username ? "public" : "private";
+    const title = chat?.title ? String(chat.title) : user.telegramActingChannelTitle;
+    if ((user.telegramActingChannelUsername || null) !== username || title !== user.telegramActingChannelTitle) {
+      user.telegramActingChannelUsername = username;
+      if (title) user.telegramActingChannelTitle = title;
+      await user.save();
+    }
+  } catch {
+    // Bot removed from the channel, or Telegram unreachable: we can't tell — don't guess.
+    visibility = "unknown";
+  }
+  if (channelChecks.size > 5000) channelChecks.clear();
+  channelChecks.set(user.id, { channelId, visibility, at: Date.now() });
+  return visibility;
+}
+
 async function getProfile(req, res) {
   const user = await db.User.findByPk(req.user.id, {
     attributes: [
@@ -55,6 +92,7 @@ async function getProfile(req, res) {
       await user.save();
     }
   }
+  const channelVisibility = await refreshChannelVisibility(user);
   const data = user.toJSON();
   const hasMtprotoSession = Boolean(data.userActingTokenEncrypted);
   delete data.userActingTokenEncrypted;
@@ -65,6 +103,7 @@ async function getProfile(req, res) {
     user: {
       ...data,
       hasMtprotoSession,
+      channelVisibility,
       pendingRefundDebt: Number(pendingRefundDebt || 0),
       plan: effective.package
         ? { id: effective.package.id, name: effective.package.name, isFree: effective.package.isFree }

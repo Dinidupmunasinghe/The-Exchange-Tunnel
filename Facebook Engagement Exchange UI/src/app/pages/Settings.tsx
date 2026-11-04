@@ -242,6 +242,7 @@ export function Settings() {
                 connected={setup.channel}
                 channelTitle={profile?.telegramActingChannelTitle}
                 channelUsername={profile?.telegramActingChannelUsername}
+                channelVisibility={profile?.channelVisibility}
               />
             ) : (
               <p className="text-sm text-muted-foreground">Connect your Telegram account first.</p>

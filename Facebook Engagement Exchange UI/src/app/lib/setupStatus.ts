@@ -23,6 +23,8 @@ export type SetupProfile = {
   telegramActingChannelId?: string | null;
   telegramActingChannelTitle?: string | null;
   telegramActingChannelUsername?: string | null;
+  /** Live check by the server: "public" (has @username), "private", or "unknown" (couldn't check). */
+  channelVisibility?: "public" | "private" | "unknown" | null;
   hasMtprotoSession?: boolean;
   plan?: { id: number; name: string; isFree: boolean } | null;
   profilePhotoUrl?: string | null;
