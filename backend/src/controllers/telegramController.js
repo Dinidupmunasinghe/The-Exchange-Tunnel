@@ -9,6 +9,7 @@ const { runBridge } = require("../services/telegramMtprotoService");
 const { encrypt, decrypt } = require("../utils/crypto");
 const env = require("../config/env");
 const mtprotoAuthStore = require("../services/mtprotoAuthStore");
+const engagementAudit = require("../services/engagementAuditService");
 
 function parseStoredMtprotoCredentials(user) {
   if (!user.userOAuthTokenEncrypted) return null;
@@ -321,8 +322,10 @@ async function mtprotoSignIn(req, res) {
       JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: null })
     );
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
+    req.user.mtprotoSessionLostAt = null;
     mtprotoAuthStore.clearPhoneCodeHash(req.user.id, normalizedPhone);
     await req.user.save();
+    engagementAudit.onSessionRestored(req.user.id).catch(() => undefined);
     return res.json({
       ...publicBridgeResult(result),
       sessionSaved: true
@@ -373,7 +376,9 @@ async function mtprotoSignInPassword(req, res) {
       JSON.stringify({ apiId: creds.apiId, apiHash: creds.apiHash, proxy: null })
     );
     req.user.userActingTokenEncrypted = encrypt(result.sessionString);
+    req.user.mtprotoSessionLostAt = null;
     await req.user.save();
+    engagementAudit.onSessionRestored(req.user.id).catch(() => undefined);
     return res.json({
       ...publicBridgeResult(result),
       sessionSaved: true

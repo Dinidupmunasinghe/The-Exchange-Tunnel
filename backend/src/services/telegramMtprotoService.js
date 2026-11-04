@@ -144,6 +144,12 @@ function spawnBridge(operation, payload) {
   });
 }
 
+/** True while a bridge process is running or queued — background audits yield to user actions. */
+function isBridgeBusy() {
+  return activeBridgeCount >= MAX_CONCURRENT_BRIDGES || bridgeQueue.length > 0;
+}
+
 module.exports = {
-  runBridge
+  runBridge,
+  isBridgeBusy
 };

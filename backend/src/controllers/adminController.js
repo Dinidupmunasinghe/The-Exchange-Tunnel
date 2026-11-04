@@ -12,18 +12,13 @@ const {
   isCampaignFinished
 } = require("../services/campaignLifecycleService");
 const { logAdminAction } = require("../services/adminAuditService");
-const { auditSubscribeEngagements, auditSubscriptionMemory } = require("../services/subscriptionAuditService");
-const { auditLikeEngagements } = require("../services/likeEngagementAuditService");
-const { auditCommentDeletions } = require("../services/commentDeletionAuditService");
-const { auditCommentMembershipEngagements } = require("../services/commentMembershipAuditService");
-const { auditShareDeletions } = require("../services/shareDeletionAuditService");
+const engagementAudit = require("../services/engagementAuditService");
 
 const lastAuditRuns = {
   subscribe: null,
   like: null,
   comment: null,
   share: null,
-  commentMembership: null,
   subscribeMemory: null
 };
 
@@ -1253,6 +1248,7 @@ async function getTelegramHealth(req, res) {
     mtprotoApiHashConfigured: Boolean(env.telegram.mtproto?.apiHash),
     pythonBinary: env.telegram.mtproto?.pythonBinary || "python",
     webhookSecretConfigured: Boolean(env.telegram.webhookSecret),
+    engagementAudit: engagementAudit.getAuditStatus(),
     lastAuditRuns
   });
 }
@@ -1261,37 +1257,17 @@ async function runTelegramAudits(req, res) {
   const kind = String(req.body.kind || "all").trim();
   const results = {};
   const startedAt = new Date();
+  const KINDS = ["all", "subscribe", "like", "comment", "share", "subscribeMemory"];
+  if (!KINDS.includes(kind)) {
+    return res.status(400).json({ message: "Unknown audit kind" });
+  }
   try {
-    if (kind === "all" || kind === "subscribe") {
-      results.subscribe = await auditSubscribeEngagements();
-      lastAuditRuns.subscribe = { ranAt: startedAt.toISOString(), result: results.subscribe };
+    if (kind === "subscribeMemory") {
+      results.subscribeMemory = await engagementAudit.auditSubscriptionMemory();
+    } else {
+      results[kind] = await engagementAudit.recheckNow(kind);
     }
-    if (kind === "all" || kind === "subscribeMemory") {
-      results.subscribeMemory = await auditSubscriptionMemory();
-      lastAuditRuns.subscribeMemory = { ranAt: startedAt.toISOString(), result: results.subscribeMemory };
-    }
-    if (kind === "all" || kind === "like") {
-      results.like = await auditLikeEngagements();
-      lastAuditRuns.like = { ranAt: startedAt.toISOString(), result: results.like };
-    }
-    if (kind === "all" || kind === "comment") {
-      results.comment = await auditCommentDeletions();
-      lastAuditRuns.comment = { ranAt: startedAt.toISOString(), result: results.comment };
-    }
-    if (kind === "all" || kind === "commentMembership") {
-      results.commentMembership = await auditCommentMembershipEngagements();
-      lastAuditRuns.commentMembership = {
-        ranAt: startedAt.toISOString(),
-        result: results.commentMembership
-      };
-    }
-    if (kind === "all" || kind === "share") {
-      results.share = await auditShareDeletions();
-      lastAuditRuns.share = {
-        ranAt: startedAt.toISOString(),
-        result: results.share
-      };
-    }
+    lastAuditRuns[kind] = { ranAt: startedAt.toISOString(), result: results[kind] };
   } catch (err) {
     return res.status(500).json({ message: clientErrorMessage(err, "Audit run failed") });
   }

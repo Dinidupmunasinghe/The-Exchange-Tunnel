@@ -1037,7 +1037,7 @@ export const api = {
       lastAuditRuns: Record<string, { ranAt: string; result: any } | null>;
     }>,
   adminRunTelegramAudits: (
-    kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership" | "share" = "all"
+    kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "share" = "all"
   ) =>
     adminRequestJson("/admin/telegram/audits/run", {
       method: "POST",

@@ -15,7 +15,9 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: "pending"
       },
-      verificationDetails: { type: DataTypes.TEXT, allowNull: true }
+      verificationDetails: { type: DataTypes.TEXT, allowNull: true },
+      /** When the audit should next re-check this action on Telegram (null = no longer checked). */
+      nextAuditAt: { type: DataTypes.DATE, allowNull: true }
     },
     {
       tableName: "engagements",

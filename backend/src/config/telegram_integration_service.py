@@ -26,6 +26,10 @@ class TwoFactorRequiredError(TelegramClientManagerError):
     """Raised when Telegram account requires 2FA password."""
 
 
+class EntityNotFoundError(TelegramClientManagerError):
+    """A numeric chat id is not among this account's dialogs (left, removed or deleted)."""
+
+
 class ReactionVerificationError(TelegramClientManagerError):
     """Raised when a sent reaction cannot be verified as chosen."""
 
@@ -425,38 +429,7 @@ class TelegramClientManager:
         message = await self._client.get_messages(chat, ids=msg_id)
         if message is None or message.reactions is None:
             return False
-
-        # Telethon objects differ across versions:
-        # - some expose reaction_result.chosen
-        # - some only provide aggregate counts in results and user picks in recent_reactions
-        had_chosen_field = False
-        reaction_present_in_counts = False
-        for reaction_result in message.reactions.results:
-            reaction_obj = reaction_result.reaction
-            if isinstance(reaction_obj, types.ReactionEmoji):
-                if reaction_obj.emoticon == reaction:
-                    reaction_present_in_counts = True
-                if hasattr(reaction_result, "chosen"):
-                    had_chosen_field = True
-                chosen_attr = bool(getattr(reaction_result, "chosen", False))
-                if reaction_obj.emoticon == reaction and chosen_attr:
-                    return True
-
-        recent = getattr(message.reactions, "recent_reactions", None) or []
-        had_recent_chosen_field = False
-        for recent_item in recent:
-            reaction_obj = getattr(recent_item, "reaction", None)
-            if hasattr(recent_item, "chosen"):
-                had_recent_chosen_field = True
-            chosen_attr = bool(getattr(recent_item, "chosen", False))
-            if isinstance(reaction_obj, types.ReactionEmoji):
-                if reaction_obj.emoticon == reaction and chosen_attr:
-                    return True
-        if had_chosen_field or had_recent_chosen_field:
-            return False
-        if reaction_present_in_counts:
-            return None
-        return False
+        return self._reaction_chosen_in(message, reaction)
 
     async def clear_reaction(
         self,
@@ -586,6 +559,126 @@ class TelegramClientManager:
         mid = getattr(message, "id", None)
         return bool(mid and int(mid) == int(msg_id))
 
+    async def audit_checks(self, checks: list[dict[str, Any]]) -> dict[str, Any]:
+        """
+        Re-check many past actions with ONE connection (used by the engagement audit).
+
+        Each check: {"id", "kind": "reaction"|"message", "chats": [ref, ...], "msgId", "reaction"?,
+        "missingIfInaccessible"?}. Result per id: "present" | "missing" | "unknown".
+        "unknown" is never treated as a removal by the caller, so transient errors are safe.
+        Returns {"authorized": False} when the stored session was logged out / revoked.
+        """
+        from telethon import errors as tl_errors
+
+        dead_session_errors = tuple(
+            cls
+            for cls in (
+                getattr(tl_errors, "AuthKeyUnregisteredError", None),
+                getattr(tl_errors, "SessionRevokedError", None),
+                getattr(tl_errors, "SessionExpiredError", None),
+                getattr(tl_errors, "UserDeactivatedError", None),
+                getattr(tl_errors, "UserDeactivatedBanError", None),
+                getattr(tl_errors, "AuthKeyDuplicatedError", None),
+            )
+            if cls is not None
+        )
+        inaccessible_errors = tuple(
+            cls
+            for cls in (
+                getattr(tl_errors, "ChannelPrivateError", None),
+                getattr(tl_errors, "ChannelInvalidError", None),
+            )
+            if cls is not None
+        )
+
+        await self.connect()
+        try:
+            if not await self._client.is_user_authorized():
+                return {"authorized": False, "results": {}}
+        except dead_session_errors:
+            return {"authorized": False, "results": {}}
+
+        results: dict[str, str] = {}
+        peers: dict[str, Any] = {}
+
+        async def resolve(ref: Any) -> Any:
+            key = repr(ref)
+            if key not in peers:
+                peers[key] = await self._resolve_input_entity(ref)
+            return peers[key]
+
+        flood = False
+        for check in checks:
+            cid = str(check.get("id"))
+            if flood:
+                results[cid] = "unknown"
+                continue
+            kind = check.get("kind")
+            msg_id = int(check.get("msgId") or 0)
+            state = "unknown"
+            for ref in check.get("chats") or []:
+                try:
+                    peer = await resolve(ref)
+                    message = await self._client.get_messages(peer, ids=msg_id)
+                except FloodWaitError:
+                    flood = True
+                    break
+                except dead_session_errors:
+                    return {"authorized": False, "results": {}}
+                except (EntityNotFoundError, *inaccessible_errors):
+                    if check.get("missingIfInaccessible"):
+                        state = "missing"
+                        break
+                    continue
+                except Exception:  # noqa: BLE001 - try the next chat reference
+                    continue
+                if kind == "message":
+                    mid = getattr(message, "id", None) if message is not None else None
+                    state = "present" if (mid and int(mid) == msg_id) else "missing"
+                    break
+                if kind == "reaction":
+                    if message is None:
+                        # The channel post itself is gone; that's not the worker's doing.
+                        state = "unknown"
+                        break
+                    chosen = self._reaction_chosen_in(message, str(check.get("reaction") or "👍"))
+                    state = "present" if chosen is True else ("missing" if chosen is False else "unknown")
+                    break
+            results[cid] = state
+        return {"authorized": True, "results": results, "floodWait": flood}
+
+    @staticmethod
+    def _reaction_chosen_in(message: Any, reaction: str) -> bool | None:
+        """Same rules as verify_reaction_chosen, on an already fetched message."""
+        reactions = getattr(message, "reactions", None)
+        if reactions is None:
+            return False
+        had_chosen_field = False
+        present_in_counts = False
+        for result in getattr(reactions, "results", None) or []:
+            obj = getattr(result, "reaction", None)
+            if isinstance(obj, types.ReactionEmoji):
+                if obj.emoticon == reaction:
+                    present_in_counts = True
+                if hasattr(result, "chosen") or hasattr(result, "chosen_order"):
+                    had_chosen_field = True
+                chosen = bool(getattr(result, "chosen", False)) or getattr(result, "chosen_order", None) is not None
+                if obj.emoticon == reaction and chosen:
+                    return True
+        had_recent_field = False
+        for item in getattr(reactions, "recent_reactions", None) or []:
+            obj = getattr(item, "reaction", None)
+            if hasattr(item, "chosen") or hasattr(item, "my"):
+                had_recent_field = True
+            chosen = bool(getattr(item, "chosen", False)) or bool(getattr(item, "my", False))
+            if isinstance(obj, types.ReactionEmoji) and obj.emoticon == reaction and chosen:
+                return True
+        if had_chosen_field or had_recent_field:
+            return False
+        if present_in_counts:
+            return None
+        return False
+
     async def _resolve_input_entity(self, chat: str | int | dict[str, Any] | types.TypeInputPeer) -> types.TypeInputPeer:
         """
         Resolve chat to input peer with dialog-scan fallback for numeric ids.
@@ -624,4 +717,4 @@ class TelegramClientManager:
         except Exception as exc:
             raise TelegramClientManagerError(f"Cannot resolve Telegram entity for chat={chat!r}: {exc}") from exc
 
-        raise TelegramClientManagerError(f"Cannot resolve Telegram entity for chat={chat!r}")
+        raise EntityNotFoundError(f"Cannot resolve Telegram entity for chat={chat!r}")

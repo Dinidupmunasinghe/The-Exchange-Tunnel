@@ -19,6 +19,7 @@ const {
 } = require("../services/telegramEngagementProbeService");
 const { decrypt } = require("../utils/crypto");
 const env = require("../config/env");
+const { firstAuditAt } = require("../services/engagementAuditService");
 const crypto = require("crypto");
 
 function runnableCampaignWhere() {
@@ -766,6 +767,7 @@ async function submitTaskCompletion(req, res) {
           actionKind: storedActionKind,
           metaEngagementId: metaId,
         verificationStatus: "verified",
+          nextAuditAt: firstAuditAt(),
           verificationDetails:
             actionKind === "subscribe"
               ? "Telegram: channel membership verified for subscribe campaign"

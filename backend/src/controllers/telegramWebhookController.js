@@ -3,6 +3,7 @@ const env = require("../config/env");
 const deeplinkStore = require("../services/telegramDeeplinkStore");
 const commentDetectionStore = require("../services/commentDetectionStore");
 const tg = require("../services/telegramService");
+const engagementAudit = require("../services/engagementAuditService");
 
 /**
  * Telegram Bot API push updates — used to complete "open t.me/bot?start=login_*" login.
@@ -28,6 +29,27 @@ async function handleTelegramWebhook(req, res) {
 
   const body = req.body;
   if (!body || typeof body !== "object") {
+    return res.status(200).json({ ok: true });
+  }
+
+  // Real-time undo detection: someone left a channel, or reactions on a post went down.
+  if (body.chat_member && typeof body.chat_member === "object") {
+    const cm = body.chat_member;
+    const next = cm.new_chat_member || {};
+    const left =
+      next.status === "left" || next.status === "kicked" || (next.status === "restricted" && next.is_member === false);
+    if (left && cm.chat?.id != null && next.user?.id != null && !next.user.is_bot) {
+      await engagementAudit.onMemberLeft(String(cm.chat.id), String(next.user.id)).catch(() => undefined);
+    }
+    return res.status(200).json({ ok: true });
+  }
+  if (body.message_reaction_count && typeof body.message_reaction_count === "object") {
+    const rc = body.message_reaction_count;
+    if (rc.chat?.id != null && rc.message_id != null) {
+      await engagementAudit
+        .onReactionCount(String(rc.chat.id), Number(rc.message_id), rc.reactions)
+        .catch(() => undefined);
+    }
     return res.status(200).json({ ok: true });
   }
 

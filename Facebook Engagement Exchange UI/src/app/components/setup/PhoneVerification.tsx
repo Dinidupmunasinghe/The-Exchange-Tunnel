@@ -34,6 +34,7 @@ export function PhoneVerification({
   const [codeHash, setCodeHash] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,6 +127,7 @@ export function PhoneVerification({
       const res = await api.mtprotoDisconnect();
       toast.success(res.message);
       await refreshSetup(true);
+      setConfirmRemove(false);
       setStage("phone");
     } catch (e) {
       toast.error(friendlyError(e).message);
@@ -144,11 +146,31 @@ export function PhoneVerification({
             <p className="text-muted-foreground">You can earn credits by subscribing, liking, commenting and reposting.</p>
           </div>
         </div>
-        {!compact ? (
-          <Button variant="outline" size="sm" disabled={busy} onClick={() => void disconnect()}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        {!compact && !confirmRemove ? (
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => setConfirmRemove(true)}>
             Remove phone verification
           </Button>
+        ) : null}
+        {!compact && confirmRemove ? (
+          <Callout
+            tone="warning"
+            title="Remove phone verification?"
+            action={
+              <div className="flex flex-wrap gap-2">
+                <Button variant="destructive" size="sm" disabled={busy} onClick={() => void disconnect()}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Remove anyway
+                </Button>
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => setConfirmRemove(false)}>
+                  Keep it
+                </Button>
+              </div>
+            }
+          >
+            We use it to confirm that your likes, comments and reposts are still there. Without it we can’t check
+            them, so if you don’t verify again within 24 hours, credits from likes, comments and reposts made in the
+            last 30 days are taken back. You also can’t earn until you verify again.
+          </Callout>
         ) : null}
       </div>
     );

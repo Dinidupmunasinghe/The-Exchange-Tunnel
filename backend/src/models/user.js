@@ -23,6 +23,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       /** Public @username of the connected channel (null = private channel). */
       telegramActingChannelUsername: { type: DataTypes.STRING(64), allowNull: true },
+      /** Set when phone verification was removed/revoked; past actions can't be re-checked after a grace period. */
+      mtprotoSessionLostAt: { type: DataTypes.DATE, allowNull: true },
       userActingTokenEncrypted: {
         type: DataTypes.TEXT,
         allowNull: true,

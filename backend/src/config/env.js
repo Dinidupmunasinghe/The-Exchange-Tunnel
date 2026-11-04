@@ -31,9 +31,28 @@ const env = {
     (isProduction && process.env.LOW_MEMORY_HOST !== "false"),
   /** Like/comment pre-existing checks via MTProto (heavy). Off by default on low-memory hosts. */
   telegramDeepSync: process.env.TELEGRAM_DEEP_SYNC === "true",
-  auditsEnabled:
-    String(process.env.AUDITS_ENABLED || (isProduction ? "false" : "true")).toLowerCase() ===
-    "true",
+  /**
+   * Re-checks completed actions on Telegram and takes credits back when a worker undoes them
+   * (unsubscribe, unlike, deleted comment/repost). On by default everywhere: the cheap Bot API
+   * checks need no extra memory and MTProto checks are batched per worker and rate-limited.
+   * (The old AUDITS_ENABLED flag is no longer used.)
+   */
+  engagementAudit: {
+    enabled: String(process.env.ENGAGEMENT_AUDITS || "true").toLowerCase() !== "false",
+    /** How long an action must be kept; after this it is final and no longer checked. */
+    guaranteeDays: Math.max(1, Number(process.env.AUDIT_GUARANTEE_DAYS || 30)),
+    /** Time to re-verify the phone before actions that need it can't be checked any more. */
+    sessionGraceHours: Math.max(1, Number(process.env.AUDIT_SESSION_GRACE_HOURS || 24)),
+    tickMs: Math.max(15_000, Number(process.env.AUDIT_TICK_MS || 60_000)),
+    /** Python/Telethon processes the audit may start per tick (one per worker checked). */
+    maxBridgeCallsPerTick: Math.max(
+      0,
+      Number(
+        process.env.AUDIT_MAX_BRIDGE_CALLS_PER_TICK ||
+          (process.env.LOW_MEMORY_HOST === "true" || isProduction ? 2 : 4)
+      )
+    )
+  },
   port: Number(process.env.PORT || 5000),
   dbSyncAlter: process.env.DB_SYNC_ALTER === "true",
   db: {

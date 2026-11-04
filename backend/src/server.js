@@ -45,6 +45,14 @@ async function ensureSchemaPatches() {
     type: db.sequelize.Sequelize.TEXT,
     allowNull: true
   });
+  await addColumnIfMissing(qi, "users", "mtprotoSessionLostAt", {
+    type: db.sequelize.Sequelize.DATE,
+    allowNull: true
+  });
+  await addColumnIfMissing(qi, "engagements", "nextAuditAt", {
+    type: db.sequelize.Sequelize.DATE,
+    allowNull: true
+  });
   try {
     await addIndexIfMissing(qi, "tasks", "idx_tasks_feed_cursor", ["status", "assignedUserId", "id"]);
     await addIndexIfMissing(qi, "tasks", "idx_tasks_campaign_id", ["campaignId"]);
@@ -58,6 +66,7 @@ async function ensureSchemaPatches() {
       "campaignId",
       "verificationStatus"
     ]);
+    await addIndexIfMissing(qi, "engagements", "idx_engagements_audit_due", ["verificationStatus", "nextAuditAt"]);
   } catch {
     // Best effort only; the cursor feed still works if a hosted DB blocks DDL.
   }
@@ -393,17 +402,6 @@ async function ensureActionKindColumnCompatibility() {
   }
 }
 
-const AUDIT_INTERVAL_MS = Number(process.env.AUDIT_INTERVAL_MS || 10 * 60 * 1000);
-
-function staggerInterval(fn, intervalMs, offsetMs) {
-  setTimeout(() => {
-    fn().catch(() => undefined);
-    setInterval(() => {
-      fn().catch(() => undefined);
-    }, intervalMs);
-  }, offsetMs);
-}
-
 function assertSecureConfig() {
   const problems = env.validateSecrets();
   if (!problems.length) return;
@@ -453,18 +451,8 @@ async function bootstrap() {
     }, 60 * 60 * 1000);
     expireEndedSubscriptions().catch(() => undefined);
 
-    if (!env.auditsEnabled) return;
-    const { auditSubscribeEngagements, auditSubscriptionMemory } = require("./services/subscriptionAuditService");
-    const { auditCommentMembershipEngagements } = require("./services/commentMembershipAuditService");
-    const { auditLikeEngagements } = require("./services/likeEngagementAuditService");
-    const { auditCommentDeletions } = require("./services/commentDeletionAuditService");
-    const { auditShareDeletions } = require("./services/shareDeletionAuditService");
-    staggerInterval(auditSubscribeEngagements, AUDIT_INTERVAL_MS, 30_000);
-    staggerInterval(auditSubscriptionMemory, AUDIT_INTERVAL_MS, 60_000);
-    staggerInterval(auditCommentMembershipEngagements, AUDIT_INTERVAL_MS, 90_000);
-    staggerInterval(auditLikeEngagements, AUDIT_INTERVAL_MS, 120_000);
-    staggerInterval(auditCommentDeletions, AUDIT_INTERVAL_MS, 150_000);
-    staggerInterval(auditShareDeletions, AUDIT_INTERVAL_MS, 180_000);
+    // Re-checks completed actions and takes credits back when a worker undoes them on Telegram.
+    require("./services/engagementAuditService").startEngagementAudits();
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Failed to start server:", error.message);

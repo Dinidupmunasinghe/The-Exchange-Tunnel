@@ -174,6 +174,13 @@ async def _run(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
             )
             return {"ok": True, "exists": bool(exists)}
 
+        if operation == "audit_batch":
+            checks = payload.get("checks") or []
+            if not isinstance(checks, list):
+                checks = []
+            out = await manager.audit_checks(checks[:50])
+            return {"ok": True, **out}
+
         raise TelegramClientManagerError(f"Unsupported operation: {operation}")
 
 

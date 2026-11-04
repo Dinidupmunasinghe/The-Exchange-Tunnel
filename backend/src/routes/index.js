@@ -28,7 +28,7 @@ router.get("/health", (req, res) => {
       heapUsed: Math.round(mem.heapUsed / 1024 / 1024)
     },
     lowMemoryHost: env.lowMemoryHost,
-    auditsEnabled: env.auditsEnabled,
+    engagementAudit: require("../services/engagementAuditService").getAuditStatus(),
     telegramDeepSync: env.telegramDeepSync
   });
 });

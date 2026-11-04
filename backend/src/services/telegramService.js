@@ -314,6 +314,53 @@ async function getUserChatMemberStatus(channelChatId, userTelegramId) {
   }
 }
 
+/**
+ * Definitive membership state for audits: "member" | "left" | "unknown".
+ * Only an explicit Telegram answer counts as "left"; network errors, rate limits or the bot
+ * losing admin rights are "unknown" so an honest worker is never penalised for our errors.
+ */
+async function getMembershipState(channelChatId, userTelegramId) {
+  if (!isConfigured() || !channelChatId || userTelegramId == null) return "unknown";
+  try {
+    const data = await botRequest("getChatMember", {
+      chat_id: String(channelChatId),
+      user_id: String(userTelegramId)
+    });
+    const m = data.result || {};
+    const st = m.status;
+    if (st === "left" || st === "kicked") return "left";
+    if (st === "restricted") return m.is_member === false ? "left" : "member";
+    if (st === "member" || st === "administrator" || st === "creator") return "member";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/** Updates the webhook must receive (login, unsubscribe and reaction events). */
+const WEBHOOK_UPDATES = ["message", "callback_query", "chat_member", "message_reaction_count"];
+
+/**
+ * Makes sure the existing webhook also delivers "user left the channel" (chat_member) and
+ * "reactions changed" (message_reaction_count) events, which Telegram only sends on request.
+ * Keeps the current URL and re-sends the secret (setWebhook would otherwise drop it).
+ */
+async function ensureWebhookUpdates() {
+  if (!isConfigured() || !env.telegram.webhookSecret) return { changed: false, reason: "not configured" };
+  const info = await botRequest("getWebhookInfo", {});
+  const url = info.result && info.result.url;
+  if (!url) return { changed: false, reason: "no webhook" };
+  const have = new Set((info.result && info.result.allowed_updates) || []);
+  if (WEBHOOK_UPDATES.every((u) => have.has(u))) return { changed: false };
+  await botRequest("setWebhook", {
+    url,
+    secret_token: env.telegram.webhookSecret,
+    allowed_updates: JSON.stringify(WEBHOOK_UPDATES),
+    max_connections: 40
+  });
+  return { changed: true };
+}
+
 async function isUserChannelAdminOrCreator(channelChatId, userTelegramId) {
   if (!isConfigured() || !channelChatId || userTelegramId == null) return false;
   try {
@@ -429,6 +476,8 @@ module.exports = {
   getChatPhotoUrl,
   isUserMemberOrAdminOfChat,
   getUserChatMemberStatus,
+  getMembershipState,
+  ensureWebhookUpdates,
   isUserChannelAdminOrCreator,
   getChatMemberUser,
   getUserProfilePhotoUrl,

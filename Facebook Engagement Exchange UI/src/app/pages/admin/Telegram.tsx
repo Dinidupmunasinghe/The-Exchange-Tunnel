@@ -13,19 +13,27 @@ type Health = {
   pythonBinary: string;
   webhookSecretConfigured: boolean;
   lastAuditRuns: Record<string, { ranAt: string; result: any } | null>;
+  engagementAudit?: {
+    enabled: boolean;
+    guaranteeDays: number;
+    lastRunAt: string | null;
+    lastDue: number;
+    lastReverted: number;
+    totalReverted: number;
+    lastError: string | null;
+  };
 };
 
 const AUDIT_KINDS: {
-  kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership" | "share";
+  kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "share";
   label: string;
 }[] = [
-  { kind: "all", label: "Run all audits" },
-  { kind: "subscribe", label: "Subscribe audit" },
-  { kind: "subscribeMemory", label: "Subscription memory cleanup" },
-  { kind: "like", label: "Like audit" },
-  { kind: "comment", label: "Comment deletion audit" },
-  { kind: "commentMembership", label: "Comment membership audit" },
-  { kind: "share", label: "Repost deletion audit" }
+  { kind: "all", label: "Re-check everything now" },
+  { kind: "subscribe", label: "Re-check subscriptions" },
+  { kind: "like", label: "Re-check likes" },
+  { kind: "comment", label: "Re-check comments" },
+  { kind: "share", label: "Re-check reposts" },
+  { kind: "subscribeMemory", label: "Clean “Subscribed” badges" }
 ];
 
 function YesNo({ value }: { value: boolean }) {
@@ -61,7 +69,7 @@ export function AdminTelegram() {
   }, [load]);
 
   async function run(
-    kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "commentMembership" | "share"
+    kind: "all" | "subscribe" | "subscribeMemory" | "like" | "comment" | "share"
   ) {
     setRunning(kind);
     setError(null);
@@ -152,6 +160,42 @@ export function AdminTelegram() {
               </p>
             </CardContent>
           </Card>
+
+          {health.engagementAudit ? (
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle>Automatic undo detection</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Running</p>
+                  <YesNo value={health.engagementAudit.enabled} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Guarantee period</p>
+                  <p className="font-medium">{health.engagementAudit.guaranteeDays} days</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last pass</p>
+                  <p className="font-medium">
+                    {health.engagementAudit.lastRunAt ? formatDateTime(health.engagementAudit.lastRunAt) : "Not yet"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Checked in last pass</p>
+                  <p className="font-medium">{health.engagementAudit.lastDue}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Reversed since restart</p>
+                  <p className="font-medium">{health.engagementAudit.totalReverted}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last error</p>
+                  <p className="break-words font-medium">{health.engagementAudit.lastError || "None"}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="border-border bg-card">
             <CardHeader>

@@ -576,7 +576,7 @@ export function EarnCredits() {
     <div className="mx-auto max-w-3xl space-y-6 pb-8">
       <PageHeader
         title="Earn credits"
-        description="Pick a task, tap the button and the credits land in your wallet instantly. Each action pays once."
+        description="Pick a task, tap the button and the credits land in your wallet instantly. Keep each action for 30 days — if you undo it on Telegram, the credits are taken back automatically."
         actions={
           <Button
             type="button"

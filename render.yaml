@@ -1,5 +1,6 @@
 # Render Blueprint — tuned for free tier (512MB). Upgrade instance RAM before enabling
-# TELEGRAM_DEEP_SYNC or AUDITS_ENABLED.
+# TELEGRAM_DEEP_SYNC. Undo detection (ENGAGEMENT_AUDITS) is on by default and safe on 512MB:
+# subscription checks use the Bot API and MTProto checks are batched, 2 per minute at most.
 services:
   - type: web
     name: exchange-tunnel-api
@@ -12,8 +13,6 @@ services:
         value: production
       - key: LOW_MEMORY_HOST
         value: "true"
-      - key: AUDITS_ENABLED
-        value: "false"
       - key: TELEGRAM_DEEP_SYNC
         value: "false"
       - key: MTPROTO_MAX_CONCURRENT
