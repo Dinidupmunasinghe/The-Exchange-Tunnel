@@ -243,29 +243,31 @@ function assertTaskClaimable(task, userId) {
 }
 
 /**
- * Rejects a second reward for the same action. like_comment bundles count as one slot per
- * user per campaign (otherwise one person could take two slots of the same campaign).
+ * Rejects a second reward for the same action: each action (subscribe / like / comment /
+ * repost) pays at most once per person per campaign. A "Like + comment" campaign offers both
+ * buttons, so liking must not block commenting (and vice versa).
  */
 async function assertActionNotAlreadyDone({ userId, campaign, engagementType, actionKind, transaction }) {
   const engagementWhere =
     engagementType === "subscribe"
       ? { userId, campaignId: campaign.id, engagementType: "subscribe" }
-      : campaign.engagementType === "like_comment"
-        ? { userId, campaignId: campaign.id }
-        : { userId, campaignId: campaign.id, actionKind };
+      : { userId, campaignId: campaign.id, actionKind };
   const existing = await db.Engagement.findOne({ where: engagementWhere, attributes: ["id"], transaction });
   if (existing) throw httpError(400, "You already completed this action for this post");
 
   if (engagementType === "subscribe") {
     const channelKey = String(campaign.messageKey || `sub_${String(campaign.id)}`);
     const prior = await db.UserSubscriptionMemory.findOne({ where: { userId, channelKey }, transaction });
-    if (prior) throw httpError(400, "You already completed this action for this post");
+    if (prior) throw httpError(400, "You're already subscribed to this channel from an earlier campaign, so it can't be paid again.");
     return;
   }
   const postKey = String(campaign.messageKey || "");
   if (postKey && actionKind) {
     const prior = await db.UserPostAction.findOne({ where: { userId, postKey, actionKind }, transaction });
-    if (prior) throw httpError(400, "You already completed this action for this post");
+    if (prior) {
+      const did = { like: "liked", comment: "commented on", share: "reposted" }[actionKind] || "used";
+      throw httpError(400, `You already ${did} this post in an earlier campaign, so it can't be paid again.`);
+    }
   }
 }
 
@@ -660,7 +662,7 @@ async function submitTaskCompletion(req, res) {
     assertTaskClaimable(preTask, req.user.id);
     const c = preTask.campaign;
     const storedActionKind = actionKind === "subscribe" ? null : actionKind;
-    const key = `${req.user.id}:${c.id}:${c.engagementType === "like_comment" ? "bundle" : actionKind}`;
+    const key = `${req.user.id}:${c.id}:${actionKind}`;
     if (inFlightCompletions.has(key)) {
       throw httpError(409, "This action is already being processed. Please wait a moment.");
     }
@@ -1602,5 +1604,7 @@ module.exports = {
   submitTaskCompletion,
   revertEngagement,
   startCommentDetection,
-  pollCommentDetection
+  pollCommentDetection,
+  // exported for tests
+  _assertActionNotAlreadyDone: assertActionNotAlreadyDone
 };
